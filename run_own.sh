@@ -6,13 +6,13 @@ GPU_NUMBER=0
 MODEL_INDEX='1'
 
 MODEL_PATH='models/'
-DATA_FOLDER='sample_data/images'
-INITIAL_EXAM_LIST_PATH='sample_data/exam_list_before_cropping.pkl'
-CROPPED_IMAGE_PATH='sample_output/cropped_images'
-CROPPED_EXAM_LIST_PATH='sample_output/cropped_images/cropped_exam_list.pkl'
-SEG_PATH='sample_data/segmentation'
-EXAM_LIST_PATH='sample_output/data.pkl'
-OUTPUT_PATH='sample_output'
+DATA_FOLDER='../Data/BSC-DBT/images'
+INITIAL_EXAM_LIST_PATH='../Data/BSC-DBT/exam_list.pkl'
+CROPPED_IMAGE_PATH='../Data/BSC-DBT/output/cropped_images'
+CROPPED_EXAM_LIST_PATH='../Data/BSC-DBT/output/cropped_images/cropped_exam_list.pkl'
+SEG_PATH='../Data/BSC-DBT/segmentation'
+EXAM_LIST_PATH='../Data/BSC-DBT/output/data.pkl'
+OUTPUT_PATH='../Data/BSC-DBT/output'
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
 
@@ -41,5 +41,5 @@ python3 src/scripts/run_model.py \
     --device-type $DEVICE_TYPE \
     --gpu-number $GPU_NUMBER \
     --model-index $MODEL_INDEX \
-    #--visualization-flag
+    --visualization-flag
 
