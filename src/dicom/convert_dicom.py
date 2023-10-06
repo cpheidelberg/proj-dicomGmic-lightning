@@ -1,15 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pydicom as dcm
 from pydicom.data import get_testdata_file
 
-import sys, pickle, os, cv2
-
-# replace this path with path to GMIC
-sys.path.append("./GMIC/")
-
-from src.data_loading import loading
-from src.modeling import gmic as gmic
+import argparse, sys, pickle, os, cv2
 
 
 def getMetadata(dataset:dcm.FileDataset, idx:int) -> tuple[str, str]:
@@ -48,14 +41,14 @@ def savePng(dataset:dcm.FileDataset, idx:int, outPath:str):
     print(f"\tPNG image from slice {idx} saved to {outPath}")
 
 
-def convertExam(examDir:str, idx:int, pngPath:str, pklPath:str) -> dict:
+def convertExam(dicomDir:str, dicomFile:str, idx:int, pngPath:str) -> dict:
     metaData = {}
-    examDir = os.path.join(examDir, [dir for dir in os.listdir(examDir) if os.path.isdir(os.path.join(examDir, dir))][0])
+    dicomDir = os.path.join(dicomDir, [dir for dir in os.listdir(dicomDir) if os.path.isdir(os.path.join(dicomDir, dir))][0])
 
     i = 0
-    for root, dirs, files in os.walk(examDir):
+    for root, dirs, files in os.walk(dicomDir):
         for file in files:
-            if file == inPath:
+            if file == dicomFile:
                 filePath = os.path.join(root, file)
                 print(f"\tRead DICOM file: {filePath}")
     
@@ -72,26 +65,36 @@ def convertExam(examDir:str, idx:int, pngPath:str, pklPath:str) -> dict:
     metaData = addCancerLabel(metaData)
     return metaData
 
-
-def main(examDir:str, pngPath:str=None, pklPath:str=None):
+def convertList(dicomDir:str, dicomFile:str, pngPath:str=None, pklPath:str=None):
     """Walk through all DICOM files of an exam to get all required images for model input"""
 
     metaData = []
-    for idx, examFolder in enumerate(os.scandir(examDir)):
-        if examFolder.name.startswith("DBT-P"):
-            print(examFolder.path)
-            metaData.append(convertExam(examFolder.path, idx, pngPath, pklPath))
+    for idx, dicomFolder in enumerate(os.scandir(dicomDir)):
+        if dicomFolder.name.startswith("DBT-P"):
+            print(dicomFolder.path)
+            metaData.append(convertExam(dicomFolder.path, dicomFile, idx, pngPath))
 
     # TODO: save metadata in single pickle file
-    savePickle(metaData, examDir+"/"+pklPath)
-    print(f"\tPickle file saved: {examDir}/{pklPath}")
+    savePickle(metaData, pklPath)
+    print(f"\tPickle file saved: {pklPath}")
+
+
+def main():
+    # retrieve command line arguments
+    parser = argparse.ArgumentParser(description='Extract model input from DICOM data')
+    parser.add_argument('--dicom-data-folder', required=True)
+    parser.add_argument('--dicom-file', required=True)
+    parser.add_argument('--exam-list-path', required=True)
+    parser.add_argument('--image-data-folder', required=True)
+    args = parser.parse_args()
+
+    dicomDir = args.dicom_data_folder
+    dicomFile = args.dicom_file
+    pklPath = args.exam_list_path
+    pngPath = args.image_data_folder
+
+    convertList(dicomDir, dicomFile, pngPath, pklPath)
 
 
 if __name__ == "__main__":
-
-    examDir = "../Data/BSC-DBT"
-    pngPath = os.path.join(examDir, "images")
-    inPath = "1-1.dcm"
-    pklPath = "exam_list.pkl"
-
-    main(examDir, pngPath, pklPath)
+    main()
