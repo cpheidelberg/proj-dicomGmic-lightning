@@ -106,7 +106,6 @@ def visualize_example(input_img, saliency_maps, true_segs,
     subfigure.set_title("SM: benign")
     subfigure.axis('off')
 
-
     # crops
     for crop_idx in range(parameters["K"]):
         subfigure = figure.add_subplot(1, total_num_subplots, 5 + crop_idx)
@@ -117,6 +116,41 @@ def visualize_example(input_img, saliency_maps, true_segs,
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
     plt.savefig(save_dir, bbox_inches='tight', format="png", dpi=500)
     plt.close()
+
+
+def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, turn_on_visualization):
+    """
+    Store saliency maps for begnin and malignant tissue as separate layers and polylines
+    """
+
+    input_img = input_img[0, 0, :, :]
+    H, W = input_img.shape
+
+    saliency_maps_begnin = (saliency_maps[0,0,:,:]*1e+3).astype(np.uint8)
+    saliency_maps_begnin = cv2.resize(saliency_maps_begnin, (W, H))
+    saliency_maps_malignant = (saliency_maps[0,1,:,:]*1e+3).astype(np.uint8)
+    saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
+
+    process_saliency_map(input_img, saliency_maps_begnin, save_dir, file_path, "begnin", turn_on_visualization)
+    process_saliency_map(input_img, saliency_maps_malignant, save_dir, file_path, "malignant", turn_on_visualization)
+
+
+def process_saliency_map(input_img, saliency_map, save_dir, file_path, label, turn_on_visualization):
+    contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    contour = max(contours, key=cv2.contourArea)
+    polyline = [point[0].tolist() for point in contour]
+    os.makedirs(save_dir, exist_ok=True)
+    with open(os.path.join(save_dir, "{0}_polyline_{1}.txt".format(file_path, label)), 'w') as f:
+        f.write(f"Saliency Map:\n")
+        for point in polyline:
+            f.write(f"{point[0]}, {point[1]}\n")
+        f.write("---\n")
+    
+    if turn_on_visualization:
+        image_with_contours = cv2.drawContours(saliency_map, contours, -1, 255, 2)
+        plt.imshow(input_img, cmap='gray', aspect='equal')
+        plt.imshow(image_with_contours, alpha=0.5)
+        plt.savefig(os.path.join(save_dir, "{0}_seg_{1}.png".format(file_path, label)))
 
 
 def fetch_cancer_label_by_view(view, cancer_label):
@@ -157,25 +191,11 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
                     horizontal_flip=datum["horizontal_flip"],
                 )
                 loaded_image = loading.process_image(loaded_image, view, datum["best_center"][view][0])
-                # load segmentation if available
-                benign_seg_path = os.path.join(parameters["segmentation_path"], "{0}_{1}".format(short_file_path, "benign.png"))
-                malignant_seg_path = os.path.join(parameters["segmentation_path"], "{0}_{1}".format(short_file_path, "malignant.png"))
+
+                # DELETED: load segmentation if available -  because not available
+
                 benign_seg = None
                 malignant_seg = None
-                if os.path.exists(benign_seg_path):
-                    loaded_seg = loading.load_image(
-                        image_path=benign_seg_path,
-                        view=view,
-                        horizontal_flip=False,
-                    )
-                    benign_seg = loaded_seg
-                if os.path.exists(malignant_seg_path):
-                    loaded_seg = loading.load_image(
-                        image_path=malignant_seg_path,
-                        view=view,
-                        horizontal_flip=False,
-                    )
-                    malignant_seg = loaded_seg
                 # convert python 2D array into 4D torch tensor in N,C,H,W format
                 loaded_image = np.expand_dims(np.expand_dims(loaded_image, 0), 0).copy()
                 tensor_batch = torch.Tensor(loaded_image).to(device)
@@ -184,8 +204,8 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
                 pred_numpy = output.data.cpu().numpy()
                 benign_pred, malignant_pred = pred_numpy[0, 0], pred_numpy[0, 1]
                 # save visualization
+                saliency_maps = model.saliency_map.data.cpu().numpy()
                 if turn_on_visualization:
-                    saliency_maps = model.saliency_map.data.cpu().numpy()
                     patch_locations = model.patch_locations
                     patch_imgs = model.patches
                     patch_attentions = model.patch_attns[0, :].data.cpu().numpy()
@@ -193,6 +213,11 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
                     visualize_example(loaded_image, saliency_maps, [benign_seg, malignant_seg],
                           patch_locations, patch_imgs, patch_attentions,
                           save_dir, parameters)
+                 
+                # save predicted regions of interest as polyline
+                save_seg_dir = os.path.join(parameters["output_path"], "segmentation")
+                save_saliency_maps(loaded_image, saliency_maps, save_seg_dir, short_file_path, turn_on_visualization)
+
                 # propagate holders
                 benign_label, malignant_label = fetch_cancer_label_by_view(view, datum["cancer_label"])
                 pred_dict["image_index"].append(short_file_path)
@@ -200,6 +225,7 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
                 pred_dict["malignant_pred"].append(malignant_pred)
                 pred_dict["benign_label"].append(benign_label)
                 pred_dict["malignant_label"].append(malignant_label)
+
     return pd.DataFrame(pred_dict)
 
 

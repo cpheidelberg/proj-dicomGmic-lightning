@@ -3,7 +3,7 @@
 NUM_PROCESSES=10
 DEVICE_TYPE='cpu'
 GPU_NUMBER=0
-MODEL_INDEX='1'
+MODEL_INDEX='2'
 
 MODEL_PATH='models/'
 DATA_FOLDER='../Data/BSC-DBT/images'
@@ -32,7 +32,7 @@ python3 src/optimal_centers/get_optimal_centers.py \
     --num-processes $NUM_PROCESSES
 
 echo 'Stage 3: Run Classifier'
-python3 src/scripts/run_model.py \
+python3 -m cProfile -o model.prof src/scripts/run_model.py \
     --model-path $MODEL_PATH \
     --data-path $EXAM_LIST_PATH \
     --image-path $CROPPED_IMAGE_PATH \
@@ -41,5 +41,5 @@ python3 src/scripts/run_model.py \
     --device-type $DEVICE_TYPE \
     --gpu-number $GPU_NUMBER \
     --model-index $MODEL_INDEX \
-    --visualization-flag
+    # --visualization-flag
 
