@@ -41,10 +41,10 @@ def savePng(dataset:dcm.FileDataset, idx:int, outPath:str):
     print(f"\tPNG image from slice {idx} saved to {outPath}")
 
 
-def convertExam(dicomDir:str, dicomFile:str, idx:int, pngPath:str) -> dict:
+def convertExam(dicomDir:os.DirEntry, dicomFile:str, idx:int, pngPath:str) -> dict:
     metaData = {}
-    dicomDir = os.path.join(dicomDir, [dir for dir in os.listdir(dicomDir) if os.path.isdir(os.path.join(dicomDir, dir))][0])
-
+    metaData["examID"] = dicomDir.name
+    dicomDir = os.path.join(dicomDir.path, [dir for dir in os.listdir(dicomDir.path) if os.path.isdir(os.path.join(dicomDir.path, dir))][0])
     i = 0
     for root, dirs, files in os.walk(dicomDir):
         for file in files:
@@ -56,6 +56,7 @@ def convertExam(dicomDir:str, dicomFile:str, idx:int, pngPath:str) -> dict:
                 metaStr, flip = getMetadata(ds, i)
                 metaData["horizontal_flip"] = flip
                 metaData[metaStr] = [f"{idx}_{metaStr}"]
+                metaData[f"{metaStr}_path"] = "/".join(filePath.split('/')[:-1])
                 outPath = os.path.join(pngPath, f"{idx}_{metaStr}.png")
                 sliceID = len(ds.pixel_array) // 2
                 savePng(ds, sliceID, outPath)
@@ -72,7 +73,7 @@ def convertList(dicomDir:str, dicomFile:str, pngPath:str=None, pklPath:str=None)
     for idx, dicomFolder in enumerate(os.scandir(dicomDir)):
         if dicomFolder.name.startswith("DBT-P"):
             print(dicomFolder.path)
-            metaData.append(convertExam(dicomFolder.path, dicomFile, idx, pngPath))
+            metaData.append(convertExam(dicomFolder, dicomFile, idx, pngPath))
 
     # TODO: save metadata in single pickle file
     savePickle(metaData, pklPath)
