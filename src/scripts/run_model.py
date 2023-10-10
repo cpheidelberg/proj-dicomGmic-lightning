@@ -215,7 +215,7 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
                           save_dir, parameters)
                  
                 # save predicted regions of interest as polyline
-                save_seg_dir = os.path.join(parameters["output_path"], "segmentation")
+                save_seg_dir = parameters["segmentation_path"]
                 save_saliency_maps(loaded_image, saliency_maps, save_seg_dir, short_file_path, turn_on_visualization)
 
                 # propagate holders

@@ -12,14 +12,14 @@ DATA_FOLDER='../Data/BSC-DBT/images'
 INITIAL_EXAM_LIST_PATH='../Data/BSC-DBT/exam_list.pkl'
 CROPPED_IMAGE_PATH='../Data/BSC-DBT/output/cropped_images'
 CROPPED_EXAM_LIST_PATH='../Data/BSC-DBT/output/cropped_images/cropped_exam_list.pkl'
-SEG_PATH='../Data/BSC-DBT/segmentation'
+SEG_PATH='../Data/BSC-DBT/output/segmentation'
 EXAM_LIST_PATH='../Data/BSC-DBT/output/data.pkl'
 OUTPUT_PATH='../Data/BSC-DBT/output'
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
 echo 'Stage 1: Convert DICOM exams'
-python3 src/dicom/convert_dicom.py \
+python3 -m cProfile -o convert.prof src/dicom/convert_dicom.py \
     --dicom-data-folder $DICOM_FOLDER \
     --dicom-file $DICOM_FILE \
     --image-data-folder $DATA_FOLDER \
@@ -27,7 +27,7 @@ python3 src/dicom/convert_dicom.py \
 
 echo 'Stage 2: Crop Mammograms'
 python3 src/cropping/crop_mammogram.py \
-    --image-data-folder $DATA_FOLDER \
+    --input-data-folder $DATA_FOLDER \
     --output-data-folder $CROPPED_IMAGE_PATH \
     --exam-list-path $INITIAL_EXAM_LIST_PATH  \
     --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
@@ -50,4 +50,10 @@ python3 -m cProfile -o model.prof src/scripts/run_model.py \
     --device-type $DEVICE_TYPE \
     --gpu-number $GPU_NUMBER \
     --model-index $MODEL_INDEX \
-    # --visualization-flag
+    --visualization-flag
+
+echo 'Stage 5: Convert DICOM exams'
+python3 src/dicom/create_dicomsr.py \
+    --segmentation-path $SEG_PATH \
+    --dicom-file $DICOM_FILE \
+    --exam-list-path $INITIAL_EXAM_LIST_PATH \
