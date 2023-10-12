@@ -1,15 +1,12 @@
 import numpy as np
-import pydicom as dcm
 from tqdm import tqdm
 
 import argparse, sys, pickle, os, cv2, uuid
 
-from pydicom.uid import generate_uid
+import pydicom as dcm
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
-from pydicom.sr.codedict import codes
-from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues, ContentSequence
-from datetime import datetime
+from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues, ContentItem
 
 
 def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
@@ -29,9 +26,34 @@ def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
     return np.array(polyline)
 
 
+def get_center_container(point):
+
+    center_container = ScoordContentItem(
+        name=CodedConcept(value='111010', 
+                            scheme_designator='DCM',
+                            meaning="Center"),
+        graphic_type=GraphicTypeValues.POINT,
+        graphic_data=point,
+        relationship_type=RelationshipTypeValues.HAS_PROPERTIES
+    )
+    center_item = ScoordContentItem(
+        name=CodedConcept(value='113000', 
+                            scheme_designator='DCM',
+                            meaning="Center"),
+        graphic_type=GraphicTypeValues.POINT,
+        graphic_data=point,
+        relationship_type=RelationshipTypeValues.SELECTED_FROM
+    )
+    center_item.ReferencedContentItemIdentifier = [1,1,1,1]
+    
+    # Nest the polyline inside the container's ContentSequence
+    center_container.ContentSequence = [center_item]
+    return center_container
+
+
 def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
     dicomFile = dcm.dcmread(os.path.join(dicomPath, dicomFile))
-    """Save a list of polylines to a DICOM Structured Report."""
+    
     # Create a primary container for the SR
     root_item = ContainerContentItem(
         name=CodedConcept(
@@ -40,31 +62,80 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
             meaning='CAD Processing and Findings Summary'
         )
     )
-
-    # Adding ContentTemplateSequence
     root_item.ContentTemplateSequence = [Dataset()]
     root_item.ContentTemplateSequence[0].MappingResource = "DCMR"
     root_item.ContentTemplateSequence[0].TemplateIdentifier = "4000"
 
-    # Nested structure for DICOM SR to visualize polylines
-    polyline_content_sequence = Sequence()
+    # Nested 1. layer for DICOM SR
+    major_content_sequence = Sequence()
+    major_content_container = ContainerContentItem(
+        name=CodedConcept(value='111017',
+            scheme_designator='DCM',
+            meaning='CAD Processing and Findings Summary',
+        ),
+        relationship_type=RelationshipTypeValues.CONTAINS,
+    )
+    major_content_container.ConceptCodeSequence = [CodedConcept(value='111242', scheme_designator='DCM', meaning="All algorithms succeeded; with findings")]
+
+    # Nested 2. layer for DICOM SR
+    main_content_container = ContainerContentItem(
+        name=CodedConcept(value='111034', 
+                          scheme_designator='DCM',
+                          meaning="Individual Impression/Recommendation"),
+        relationship_type=RelationshipTypeValues.INFERRED_FROM,
+        is_content_continuous=False,
+    )
+
+    # Nested 3. layer for DICOM SR
+    sub_content_container = ContainerContentItem(
+        name=CodedConcept(value='111059', 
+                          scheme_designator='DCM',
+                          meaning="Single Image Finding"),
+        relationship_type=RelationshipTypeValues.CONTAINS,
+    )
+    sub_content_container.ConceptCodeSequence = [CodedConcept(value='F-01796', scheme_designator='SRT', meaning="Mammography breast density")]
+
+    # Nested 4./5. layer for DICOM SR with polylines
+    polyline_sequence = Sequence()
+    center_container = get_center_container(np.array([[1748, 2457]]))
+    polyline_sequence.append(center_container)
     for polyline in polylines:
-        polyline_item = ScoordContentItem(
-            name=CodedConcept(value='113000', 
-                              scheme_designator='DCM', 
-                              meaning='Region of Interest'
-                            ),
+        # Create a container for each polyline
+        polyline_container = ScoordContentItem(
+            name=CodedConcept(value='111041', 
+                              scheme_designator='DCM',
+                              meaning="Outline"),
             graphic_type=GraphicTypeValues.POLYLINE,
             graphic_data=polyline,
-            relationship_type=RelationshipTypeValues.CONTAINS
+            relationship_type=RelationshipTypeValues.HAS_PROPERTIES
         )
+
+        # Create the actual polyline item
+        polyline_item = ScoordContentItem(
+            name=CodedConcept(value='113000', 
+                              scheme_designator='DCM',
+                              meaning="Polyline"),
+            graphic_type=GraphicTypeValues.POLYLINE,
+            graphic_data=polyline,
+            relationship_type=RelationshipTypeValues.SELECTED_FROM,
+        )
+        polyline_item.ReferencedContentItemIdentifier = [1,1,1,1]
         
-        polyline_content_sequence.append(polyline_item)
-    root_item.ContentSequence = polyline_content_sequence
+        # Nest the polyline inside the container's ContentSequence
+        polyline_container.ContentSequence = [polyline_item]
+        polyline_sequence.append(polyline_container)
+
+    # Add polylines into containers regarding required number of layers
+    sub_content_container.ContentSequence = polyline_sequence
+    main_content_container.ContentSequence = [sub_content_container]
+    major_content_container.ContentSequence = [main_content_container]
+    major_content_sequence.append(major_content_container)
+
+    root_item.ContentSequence = major_content_sequence
     content_sequence = Sequence()
     content_sequence.append(root_item)
 
-    # DICOM SR file
+    # create DICOM SR file
     sr = ComprehensiveSR(
         evidence=[dicomFile],
         content=content_sequence,
@@ -72,11 +143,12 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
         series_number=1,
         instance_number=1,
         sop_instance_uid=dcm.uid.generate_uid(),
-        manufacturer="YourManufacturer"
+        manufacturer="Uni Heidelberg",
     )
-    sr.sop_class_uid="1.2.840.10008.5.1.4.1.1.88.50", 
-    
-    # Require argument adjustment
+
+    # adopt DICOM SR as required by standard
+    del sr.SOPClassUID
+    sr.SOPClassUID = "1.2.840.10008.5.1.4.1.1.88.50"
     if "PertinentOtherEvidenceSequence" in sr:
         sr.CurrentRequestedProcedureEvidenceSequence = sr.PertinentOtherEvidenceSequence
         del sr.PertinentOtherEvidenceSequence
@@ -112,7 +184,7 @@ def startConversion(segPath:str, examPath:str, dicomFile:str):
 def main():
     """Main function to handle command line arguments and initiate the conversion process."""
     
-    # Retrieve command line arguments    
+    # Retrieve command line arguments
     parser = argparse.ArgumentParser(description='Extract model input from DICOM data')
     parser.add_argument('--segmentation-path', required=True)
     parser.add_argument('--dicom-file', required=True)
