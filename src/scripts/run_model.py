@@ -119,16 +119,14 @@ def visualize_example(input_img, saliency_maps, true_segs,
 
 
 def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, turn_on_visualization):
-    """
-    Store saliency maps for begnin and malignant tissue as separate layers and polylines
-    """
+    """Store saliency maps for begnin and malignant tissue as separate layers and polylines"""
 
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
 
-    saliency_maps_begnin = (saliency_maps[0,0,:,:]*1e+3).astype(np.uint8)
+    saliency_maps_begnin = (saliency_maps[0,0,:,:]*1e+2).astype(np.uint8)
     saliency_maps_begnin = cv2.resize(saliency_maps_begnin, (W, H))
-    saliency_maps_malignant = (saliency_maps[0,1,:,:]*1e+3).astype(np.uint8)
+    saliency_maps_malignant = (saliency_maps[0,1,:,:]*1e+2).astype(np.uint8)
     saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
 
     process_saliency_map(input_img, saliency_maps_begnin, save_dir, file_path, "begnin", turn_on_visualization)
@@ -147,9 +145,9 @@ def process_saliency_map(input_img, saliency_map, save_dir, file_path, label, tu
         f.write("---\n")
     
     if turn_on_visualization:
-        image_with_contours = cv2.drawContours(saliency_map, contours, -1, 255, 2)
-        plt.imshow(input_img, cmap='gray', aspect='equal')
-        plt.imshow(image_with_contours, alpha=0.5)
+        image_with_contours = cv2.drawContours(saliency_map, contours, -1, 255, 3)
+        # plt.imshow(input_img, cmap='gray', aspect='equal')
+        plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
         plt.savefig(os.path.join(save_dir, "{0}_seg_{1}.png".format(file_path, label)))
 
 
@@ -179,10 +177,12 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
     pred_dict = {"image_index": [], "benign_pred": [], "malignant_pred": [],
      "benign_label": [], "malignant_label": []}
     with torch.no_grad():
+        print(exam_list)
         # iterate through each exam
         for datum in tqdm.tqdm(exam_list):
             for view in VIEWS.LIST:
                 short_file_path = datum[view][0]
+                print(short_file_path)
                 # load image
                 # the image is already flipped so no need to do it again
                 loaded_image = loading.load_image(

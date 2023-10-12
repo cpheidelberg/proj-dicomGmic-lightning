@@ -72,7 +72,6 @@ def convertList(dicomDir:str, dicomFile:str, pngPath:str=None, pklPath:str=None)
     metaData = []
     for idx, dicomFolder in enumerate(os.scandir(dicomDir)):
         if dicomFolder.name.startswith("DBT-P"):
-            print(dicomFolder.path)
             metaData.append(convertExam(dicomFolder, dicomFile, idx, pngPath))
 
     # TODO: save metadata in single pickle file
