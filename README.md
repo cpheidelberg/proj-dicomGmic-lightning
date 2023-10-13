@@ -35,6 +35,7 @@ Code functionality:
 * matplotlib
 * pydicom
 * highdicom
+* python-gdcm
 
 
 ## Execute a script
