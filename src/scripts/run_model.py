@@ -177,12 +177,10 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
     pred_dict = {"image_index": [], "benign_pred": [], "malignant_pred": [],
      "benign_label": [], "malignant_label": []}
     with torch.no_grad():
-        print(exam_list)
         # iterate through each exam
         for datum in tqdm.tqdm(exam_list):
             for view in VIEWS.LIST:
                 short_file_path = datum[view][0]
-                print(short_file_path)
                 # load image
                 # the image is already flipped so no need to do it again
                 loaded_image = loading.load_image(

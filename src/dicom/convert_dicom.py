@@ -2,16 +2,12 @@ import numpy as np
 import pydicom as dcm
 from pydicom.data import get_testdata_file
 
-import argparse, sys, pickle, os, cv2
+import argparse, pickle, os, cv2
 
 
 def getMetadata(dataset:dcm.FileDataset, idx:int) -> tuple[str, str]:
     viewPosition = dataset.ViewPosition
-    # breastOrientation = 'R' if 'R' in dataset.PatientOrientation[1] else 'L'
-    if idx > 1:
-        breastOrientation = 'R' 
-    else:
-        breastOrientation = 'L'
+    breastOrientation = 'R' if 'R' in dataset.PatientOrientation[1] else 'L'
     horizontalFlip = "NO" if dataset.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip[0] == "N" else "YES"
 
     filename = f"{breastOrientation}-{viewPosition}"

@@ -1,12 +1,12 @@
 import numpy as np
 from tqdm import tqdm
 
-import argparse, sys, pickle, os, cv2, uuid
+import argparse, pickle, os
 
 import pydicom as dcm
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
-from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues, ContentItem
+from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues
 
 
 def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
@@ -49,6 +49,34 @@ def get_center_container(point):
     # Nest the polyline inside the container's ContentSequence
     center_container.ContentSequence = [center_item]
     return center_container
+
+
+def get_polyline_container(polyline, label):
+    # Create a container for each polyline
+    polyline_container = ScoordContentItem(
+        name=CodedConcept(value='111041', 
+                            scheme_designator='DCM',
+                            meaning="Outline"),
+        graphic_type=GraphicTypeValues.POLYLINE,
+        graphic_data=polyline,
+        relationship_type=RelationshipTypeValues.HAS_PROPERTIES
+    )
+
+    # Create the actual polyline item
+    polyline_item = ScoordContentItem(
+        name=CodedConcept(value='113000', 
+                            scheme_designator='DCM',
+                            meaning=f"Polyline {label}"),
+        graphic_type=GraphicTypeValues.POLYLINE,
+        graphic_data=polyline,
+        relationship_type=RelationshipTypeValues.SELECTED_FROM,
+    )
+    polyline_item.ReferencedContentItemIdentifier = [1,1,1,1]
+    
+    # Nest the polyline inside the container's ContentSequence
+    polyline_container.ContentSequence = [polyline_item]
+
+    return polyline_container
 
 
 def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
@@ -99,31 +127,10 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
     polyline_sequence = Sequence()
     center_container = get_center_container(np.array([[1748, 2457]]))
     polyline_sequence.append(center_container)
-    for polyline in polylines:
-        # Create a container for each polyline
-        polyline_container = ScoordContentItem(
-            name=CodedConcept(value='111041', 
-                              scheme_designator='DCM',
-                              meaning="Outline"),
-            graphic_type=GraphicTypeValues.POLYLINE,
-            graphic_data=polyline,
-            relationship_type=RelationshipTypeValues.HAS_PROPERTIES
-        )
-
-        # Create the actual polyline item
-        polyline_item = ScoordContentItem(
-            name=CodedConcept(value='113000', 
-                              scheme_designator='DCM',
-                              meaning="Polyline"),
-            graphic_type=GraphicTypeValues.POLYLINE,
-            graphic_data=polyline,
-            relationship_type=RelationshipTypeValues.SELECTED_FROM,
-        )
-        polyline_item.ReferencedContentItemIdentifier = [1,1,1,1]
-        
-        # Nest the polyline inside the container's ContentSequence
-        polyline_container.ContentSequence = [polyline_item]
-        polyline_sequence.append(polyline_container)
+    polyline_container_ben = get_polyline_container(polylines[0], "benign")
+    polyline_container_mal = get_polyline_container(polylines[1], "malignant")
+    polyline_sequence.append(polyline_container_ben)
+    polyline_sequence.append(polyline_container_mal)
 
     # Add polylines into containers regarding required number of layers
     sub_content_container.ContentSequence = polyline_sequence
