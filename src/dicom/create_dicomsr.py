@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 
-import argparse, pickle, os
+import argparse, pickle, os, cv2
 
 import pydicom as dcm
 from pydicom.dataset import Dataset
@@ -26,12 +26,42 @@ def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
     return np.array(polyline)
 
 
-def get_center_container(point):
+def get_center_coordinate(polyline, shape):
+
+    # img = np.zeros(shape, dtype=np.uint8)
+    # print(polyline.shape)
+
+    # for point in polyline:
+    #     cv2.circle(img, tuple(point), 1, (255, 255, 255), -1)
+
+    # # Wenden Sie die Hough-Transformation an
+    # circles = cv2.HoughCircles(
+    #     img,
+    #     cv2.HOUGH_GRADIENT, dp=1, minDist=20,
+    #     param1=50, param2=20, minRadius=100, maxRadius=1000
+    # )
+    
+    # if circles is None:
+    #     return []
+
+    # circles = np.round(circles[0, :]).astype("int")
+    # center_points = []
+    # for circle in circles:
+    #     x, y, _ = circle
+    #     center_points.append((x, y))
+
+    x_center = (np.min(polyline[:, 0]) + np.max(polyline[:, 0])) / 2
+    y_center = (np.min(polyline[:, 1]) + np.max(polyline[:, 1])) / 2
+    center_point = np.array([[int(x_center), int(y_center)]])
+
+    return center_point
+
+def get_center_container(point, label):
 
     center_container = ScoordContentItem(
         name=CodedConcept(value='111010', 
                             scheme_designator='DCM',
-                            meaning="Center"),
+                            meaning=f"Center coordinate"),
         graphic_type=GraphicTypeValues.POINT,
         graphic_data=point,
         relationship_type=RelationshipTypeValues.HAS_PROPERTIES
@@ -39,7 +69,7 @@ def get_center_container(point):
     center_item = ScoordContentItem(
         name=CodedConcept(value='113000', 
                             scheme_designator='DCM',
-                            meaning="Center"),
+                            meaning=f"Center {label}"),
         graphic_type=GraphicTypeValues.POINT,
         graphic_data=point,
         relationship_type=RelationshipTypeValues.SELECTED_FROM
@@ -81,6 +111,7 @@ def get_polyline_container(polyline, label):
 
 def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
     dicomFile = dcm.dcmread(os.path.join(dicomPath, dicomFile))
+    pngImage = dicomFile.pixel_array[0]
     
     # Create a primary container for the SR
     root_item = ContainerContentItem(
@@ -125,11 +156,13 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
 
     # Nested 4./5. layer for DICOM SR with polylines
     polyline_sequence = Sequence()
-    center_container = get_center_container(np.array([[1748, 2457]]))
+    center_container = get_center_container(get_center_coordinate(polylines[0], pngImage.shape), "benign")
     polyline_sequence.append(center_container)
     polyline_container_ben = get_polyline_container(polylines[0], "benign")
-    polyline_container_mal = get_polyline_container(polylines[1], "malignant")
     polyline_sequence.append(polyline_container_ben)
+    center_container = get_center_container(get_center_coordinate(polylines[1], pngImage.shape),"malignant")
+    polyline_sequence.append(center_container)
+    polyline_container_mal = get_polyline_container(polylines[1], "malignant")
     polyline_sequence.append(polyline_container_mal)
 
     # Add polylines into containers regarding required number of layers
@@ -168,10 +201,10 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
 def createDicomSr(segPath: str, dicomPath:str, dicomFile:str, exam: str, image:str):
     """Create a DICOM Structured Report from given polylines."""
     examID = exam[image][0]
-    polylineBegnin = loadPolyline(segPath, examID, "begnin")
+    polylineBenign = loadPolyline(segPath, examID, "benign")
     polylineMalignant = loadPolyline(segPath, examID, "malignant")
 
-    polylines = [polylineBegnin, polylineMalignant]
+    polylines = [polylineBenign, polylineMalignant]
     savePolylinesToDicomSR(dicomPath, dicomFile, "outputDicomSR.dcm", polylines)
 
 
