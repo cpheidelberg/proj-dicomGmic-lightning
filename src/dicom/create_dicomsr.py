@@ -82,6 +82,24 @@ def get_polyline_item(polyline, point, label):
 
     return center_item, polyline_item
 
+def get_finding_container(polyline, label, shape):
+    # Nested 3. layer for DICOM SR
+    sub_content_container = ContainerContentItem(
+        name=CodedConcept(value='111059', 
+                          scheme_designator='DCM',
+                          meaning="Single Image Finding"),
+        relationship_type=RelationshipTypeValues.CONTAINS,
+    )
+    sub_content_container.ConceptCodeSequence = [CodedConcept(value='F-01796', scheme_designator='SRT', meaning="Mammography breast density")]
+
+    # Nested 4./5. layer for DICOM SR with polylines
+    polyline_sequence = get_polyline_item(polyline, get_center_coordinate(polyline, shape), label)
+
+    # Add polylines into containers regarding required number of layers
+    sub_content_container.ContentSequence = polyline_sequence
+
+    return sub_content_container
+
 
 def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
     dicomFile = dcm.dcmread(os.path.join(dicomPath, dicomFile))
@@ -119,23 +137,9 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
         is_content_continuous=False,
     )
 
-    # Nested 3. layer for DICOM SR
-    sub_content_container = ContainerContentItem(
-        name=CodedConcept(value='111059', 
-                          scheme_designator='DCM',
-                          meaning="Single Image Finding"),
-        relationship_type=RelationshipTypeValues.CONTAINS,
-    )
-    sub_content_container.ConceptCodeSequence = [CodedConcept(value='F-01796', scheme_designator='SRT', meaning="Mammography breast density")]
-
-    # Nested 4./5. layer for DICOM SR with polylines
-    polyline_sequence = []
-    polyline_sequence.extend(get_polyline_item(polylines[0], get_center_coordinate(polylines[0], pngImage.shape), "benign"))
-    polyline_sequence.extend(get_polyline_item(polylines[1], get_center_coordinate(polylines[1], pngImage.shape), "malignant"))
-
-    # Add polylines into containers regarding required number of layers
-    sub_content_container.ContentSequence = tuple(polyline_sequence)
-    main_content_container.ContentSequence = [sub_content_container]
+    finding_container_ben = get_finding_container(polylines[0], "benign", pngImage.shape)
+    finding_container_mal = get_finding_container(polylines[1], "malignent", pngImage.shape)
+    main_content_container.ContentSequence = (finding_container_ben, finding_container_mal)
     major_content_container.ContentSequence = [main_content_container]
     major_content_sequence.append(major_content_container)
 
