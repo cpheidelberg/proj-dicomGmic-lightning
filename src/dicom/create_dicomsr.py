@@ -56,18 +56,11 @@ def get_center_coordinate(polyline, shape):
 
     return center_point
 
-def get_center_container(point, label):
 
-    center_container = ScoordContentItem(
-        name=CodedConcept(value='111010', 
-                            scheme_designator='DCM',
-                            meaning=f"Center coordinate"),
-        graphic_type=GraphicTypeValues.POINT,
-        graphic_data=point,
-        relationship_type=RelationshipTypeValues.HAS_PROPERTIES
-    )
+def get_polyline_item(polyline, point, label):
+    # Create the point item to store the lesion center
     center_item = ScoordContentItem(
-        name=CodedConcept(value='113000', 
+        name=CodedConcept(value='113000',
                             scheme_designator='DCM',
                             meaning=f"Center {label}"),
         graphic_type=GraphicTypeValues.POINT,
@@ -75,22 +68,6 @@ def get_center_container(point, label):
         relationship_type=RelationshipTypeValues.SELECTED_FROM
     )
     center_item.ReferencedContentItemIdentifier = [1,1,1,1]
-    
-    # Nest the polyline inside the container's ContentSequence
-    center_container.ContentSequence = [center_item]
-    return center_container
-
-
-def get_polyline_container(polyline, label):
-    # Create a container for each polyline
-    polyline_container = ScoordContentItem(
-        name=CodedConcept(value='111041', 
-                            scheme_designator='DCM',
-                            meaning="Outline"),
-        graphic_type=GraphicTypeValues.POLYLINE,
-        graphic_data=polyline,
-        relationship_type=RelationshipTypeValues.HAS_PROPERTIES
-    )
 
     # Create the actual polyline item
     polyline_item = ScoordContentItem(
@@ -102,11 +79,8 @@ def get_polyline_container(polyline, label):
         relationship_type=RelationshipTypeValues.SELECTED_FROM,
     )
     polyline_item.ReferencedContentItemIdentifier = [1,1,1,1]
-    
-    # Nest the polyline inside the container's ContentSequence
-    polyline_container.ContentSequence = [polyline_item]
 
-    return polyline_container
+    return center_item, polyline_item
 
 
 def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
@@ -155,18 +129,12 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
     sub_content_container.ConceptCodeSequence = [CodedConcept(value='F-01796', scheme_designator='SRT', meaning="Mammography breast density")]
 
     # Nested 4./5. layer for DICOM SR with polylines
-    polyline_sequence = Sequence()
-    center_container = get_center_container(get_center_coordinate(polylines[0], pngImage.shape), "benign")
-    polyline_sequence.append(center_container)
-    polyline_container_ben = get_polyline_container(polylines[0], "benign")
-    polyline_sequence.append(polyline_container_ben)
-    center_container = get_center_container(get_center_coordinate(polylines[1], pngImage.shape),"malignant")
-    polyline_sequence.append(center_container)
-    polyline_container_mal = get_polyline_container(polylines[1], "malignant")
-    polyline_sequence.append(polyline_container_mal)
+    polyline_sequence = []
+    polyline_sequence.extend(get_polyline_item(polylines[0], get_center_coordinate(polylines[0], pngImage.shape), "benign"))
+    polyline_sequence.extend(get_polyline_item(polylines[1], get_center_coordinate(polylines[1], pngImage.shape), "malignant"))
 
     # Add polylines into containers regarding required number of layers
-    sub_content_container.ContentSequence = polyline_sequence
+    sub_content_container.ContentSequence = tuple(polyline_sequence)
     main_content_container.ContentSequence = [sub_content_container]
     major_content_container.ContentSequence = [main_content_container]
     major_content_sequence.append(major_content_container)
