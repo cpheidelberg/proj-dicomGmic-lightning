@@ -14,15 +14,19 @@ def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
     # create polyline path
     path = os.path.join(path, f"{exam}_polyline_{label}.txt")
 
-    with open(path, 'r') as f:
-        lines = f.readlines()
     polyline = []
-    for line in lines:
-        if line.startswith("---"):
-            break
-        if not line.startswith("Saliency Map"):
-            x, y = map(int, line.strip().split(","))
-            polyline.append((x, y))
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+        for line in lines:
+            if line.startswith("---"):
+                break
+            if not line.startswith("Saliency Map"):
+                x, y = map(int, line.strip().split(","))
+                polyline.append((x, y))
+    except Exception as error:
+        print(exam, "\n\tFailed to load polylin because no polyline was registered. Process with empty polyline", str(error))
+
     return np.array(polyline)
 
 

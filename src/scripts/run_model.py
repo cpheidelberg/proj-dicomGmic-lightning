@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import torch
 import tqdm
 import cv2
+import pydicom as dcm
 import matplotlib.cm as cm
 from src.utilities import pickling, tools
 from src.modeling import gmic as gmic
@@ -118,16 +119,22 @@ def visualize_example(input_img, saliency_maps, true_segs,
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, turn_on_visualization):
+def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, dicom_path, turn_on_visualization):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
+    ds = dcm.dcmread(dicom_path, force=True)
+    view = file_path.split('_')[1].split('.')[0]
 
-    saliency_maps_benign = (saliency_maps[0,0,:,:]*1e+2).astype(np.uint8)
+    saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
     saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
-    saliency_maps_malignant = (saliency_maps[0,1,:,:]*1e+2).astype(np.uint8)
+    saliency_maps_malignant = (saliency_maps[0,1,:,:]*500).astype(np.uint8)
     saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
+
+    if view.startswith('R') and ds.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip.startswith("N") or view.startswith('L') and ds.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip.startswith("Y"):
+        saliency_maps_benign = np.flip(saliency_maps_benign, axis=1)
+        saliency_maps_malignant = np.flip(saliency_maps_malignant, axis=1)
 
     process_saliency_map(input_img, saliency_maps_benign, save_dir, file_path, "benign", turn_on_visualization)
     process_saliency_map(input_img, saliency_maps_malignant, save_dir, file_path, "malignant", turn_on_visualization)
@@ -135,20 +142,23 @@ def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, turn_on_vi
 
 def process_saliency_map(input_img, saliency_map, save_dir, file_path, label, turn_on_visualization):
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    contour = max(contours, key=cv2.contourArea)
-    polyline = [point[0].tolist() for point in contour]
-    os.makedirs(save_dir, exist_ok=True)
-    with open(os.path.join(save_dir, "{0}_polyline_{1}.txt".format(file_path, label)), 'w') as f:
-        f.write(f"Saliency Map:\n")
-        for point in polyline:
-            f.write(f"{point[0]}, {point[1]}\n")
-        f.write("---\n")
-    
-    if turn_on_visualization:
-        image_with_contours = cv2.drawContours(saliency_map, contours, -1, 255, 3)
-        # plt.imshow(input_img, cmap='gray', aspect='equal')
-        plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-        plt.savefig(os.path.join(save_dir, "{0}_seg_{1}.png".format(file_path, label)))
+    try:
+        contour = max(contours, key=cv2.contourArea)
+        polyline = [point[0].tolist() for point in contour]
+        os.makedirs(save_dir, exist_ok=True)
+        with open(os.path.join(save_dir, "{0}_polyline_{1}.txt".format(file_path, label)), 'w') as f:
+            f.write(f"Saliency Map:\n")
+            for point in polyline:
+                f.write(f"{point[0]}, {point[1]}\n")
+            f.write("---\n")
+        
+        if turn_on_visualization:
+            image_with_contours = cv2.drawContours(saliency_map, contours, -1, 255, 3)
+            plt.imshow(input_img, cmap='gray', aspect='equal')
+            plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
+            plt.savefig(os.path.join(save_dir, "{0}_seg_{1}.png".format(file_path, label)))
+    except Exception as error:
+        print(file_path, "\n\tFailed to save lesion contours because model detected None. ", str(error))
 
 
 def fetch_cancer_label_by_view(view, cancer_label):
@@ -161,7 +171,7 @@ def fetch_cancer_label_by_view(view, cancer_label):
         return cancer_label["right_benign"], cancer_label["right_malignant"]
 
 
-def run_model(model, exam_list, parameters, turn_on_visualization):
+def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
     """
     Run the model over images in sample_data.
     Save the predictions as csv and visualizations as png.
@@ -181,6 +191,7 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
         for datum in tqdm.tqdm(exam_list):
             for view in VIEWS.LIST:
                 short_file_path = datum[view][0]
+                dicom_path = os.path.join(datum[str(view) + "_path"], dicom_file)
                 # load image
                 # the image is already flipped so no need to do it again
                 loaded_image = loading.load_image(
@@ -214,7 +225,7 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
                  
                 # save predicted regions of interest as polyline
                 save_seg_dir = parameters["segmentation_path"]
-                save_saliency_maps(loaded_image, saliency_maps, save_seg_dir, short_file_path, turn_on_visualization)
+                save_saliency_maps(loaded_image, saliency_maps, save_seg_dir, short_file_path, dicom_path, turn_on_visualization)
 
                 # propagate holders
                 benign_label, malignant_label = fetch_cancer_label_by_view(view, datum["cancer_label"])
@@ -227,7 +238,7 @@ def run_model(model, exam_list, parameters, turn_on_visualization):
     return pd.DataFrame(pred_dict)
 
 
-def run_single_model(model_path, data_path, parameters, turn_on_visualization):
+def run_single_model(model_path, data_path, dicom_file, parameters, turn_on_visualization):
     """
     Load a single model and run on sample data
     """
@@ -241,11 +252,11 @@ def run_single_model(model_path, data_path, parameters, turn_on_visualization):
     # load metadata
     exam_list = pickling.unpickle_from_file(data_path)
     # run the model on the dataset
-    output_df = run_model(model, exam_list, parameters, turn_on_visualization)
+    output_df = run_model(model, dicom_file, exam_list, parameters, turn_on_visualization)
     return output_df
 
 
-def start_experiment(model_path, data_path, output_path, model_index, parameters, turn_on_visualization):
+def start_experiment(model_path, data_path, dicom_file, output_path, model_index, parameters, turn_on_visualization):
     """
     Run the model on sample data and save the predictions as a csv file
     """
@@ -264,7 +275,7 @@ def start_experiment(model_path, data_path, output_path, model_index, parameters
             parameters["percent_t"] = PERCENT_T_DICT[str(i)]
             # only do visualization for the first model
             need_visualization = i==1 and turn_on_visualization
-            current_model_output = run_single_model(single_model_path, data_path, parameters, need_visualization)
+            current_model_output = run_single_model(single_model_path, data_path, dicom_file, parameters, need_visualization)
             output_df_list.append(current_model_output)
         all_prediction_df = pd.concat(output_df_list)
         output_df = all_prediction_df.groupby("image_index").apply(lambda rows: pd.Series({"benign_pred":np.nanmean(rows["benign_pred"]),
@@ -276,7 +287,7 @@ def start_experiment(model_path, data_path, output_path, model_index, parameters
         # set percent_t for the model
         parameters["percent_t"] = PERCENT_T_DICT[model_index]
         single_model_path = os.path.join(model_path, "sample_model_{0}.p".format(model_index))
-        output_df = run_single_model(single_model_path, data_path, parameters, turn_on_visualization)
+        output_df = run_single_model(single_model_path, data_path, dicom_file, parameters, turn_on_visualization)
 
     # save the predictions
     output_df.to_csv(os.path.join(output_path, "predictions.csv"), index=False, float_format='%.4f')
@@ -288,6 +299,7 @@ def main():
     parser = argparse.ArgumentParser(description='Run GMIC on the sample data')
     parser.add_argument('--model-path', required=True)
     parser.add_argument('--data-path', required=True)
+    parser.add_argument('--dicom-file', required=True)
     parser.add_argument('--image-path', required=True)
     parser.add_argument('--segmentation-path', required=True)
     parser.add_argument('--output-path', required=True)
@@ -316,6 +328,7 @@ def main():
     start_experiment(
         model_path=args.model_path,
         data_path=args.data_path,
+        dicom_file=args.dicom_file,
         output_path=args.output_path,
         model_index=args.model_index,
         parameters=parameters,

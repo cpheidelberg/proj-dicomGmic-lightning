@@ -44,6 +44,7 @@ python3 src/optimal_centers/get_optimal_centers.py \
 echo 'Stage 4: Run Classifier'
 python3 src/scripts/run_model.py \
     --model-path $MODEL_PATH \
+    --dicom-file $DICOM_FILE \
     --data-path $EXAM_LIST_PATH \
     --image-path $CROPPED_IMAGE_PATH \
     --segmentation-path $SEG_PATH \
