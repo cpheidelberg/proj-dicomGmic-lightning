@@ -28,8 +28,6 @@ def savePickle(metaData:dict, outPath:str=None):
 
 def savePng(dataset:dcm.FileDataset, idx:int, outPath:str):
     image = dataset.pixel_array[idx]
-    if 'R' in dataset.PatientOrientation[1]:
-        image = np.rot90(image, 2)
 
     os.makedirs(os.path.dirname(outPath), exist_ok=True)
     cv2.imwrite(outPath, image)
