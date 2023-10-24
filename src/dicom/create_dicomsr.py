@@ -1,12 +1,13 @@
 import numpy as np
 from tqdm import tqdm
+import pandas as pd
 
 import argparse, pickle, os, cv2
 
 import pydicom as dcm
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
-from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues
+from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues, NumContentItem
 
 
 def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
@@ -61,8 +62,20 @@ def get_center_coordinate(polyline, shape):
     return center_point
 
 
-def get_polyline_item(polyline, point, label):
+def get_polyline_item(prediction, polyline, point, label):
     # Create the point item to store the lesion center
+    prediction_item = NumContentItem(
+        name=CodedConcept(value='121070',
+                            scheme_designator='DCM',
+                            meaning="Numeric measurement"),
+        value=prediction*100,
+        unit=CodedConcept(value="%",
+                            scheme_designator="UCUM",
+                            meaning="Percent"),
+        relationship_type=RelationshipTypeValues.CONTAINS,
+    )
+    prediction_item.ReferencedContentItemIdentifier = [1,1,1,1]
+
     center_item = ScoordContentItem(
         name=CodedConcept(value='113000',
                             scheme_designator='DCM',
@@ -84,9 +97,10 @@ def get_polyline_item(polyline, point, label):
     )
     polyline_item.ReferencedContentItemIdentifier = [1,1,1,1]
 
-    return center_item, polyline_item
+    return prediction_item, center_item, polyline_item
 
-def get_finding_container(polyline, label, shape):
+
+def get_finding_container(prediction, polyline, label, shape):
     # Nested 3. layer for DICOM SR
     sub_content_container = ContainerContentItem(
         name=CodedConcept(value='111059', 
@@ -97,7 +111,8 @@ def get_finding_container(polyline, label, shape):
     sub_content_container.ConceptCodeSequence = [CodedConcept(value='F-01796', scheme_designator='SRT', meaning="Mammography breast density")]
 
     # Nested 4./5. layer for DICOM SR with polylines
-    polyline_sequence = get_polyline_item(polyline, get_center_coordinate(polyline, shape), label)
+    prediction = prediction[f"{label}_pred"].iloc[0]
+    polyline_sequence = get_polyline_item(prediction, polyline, get_center_coordinate(polyline, shape), label)
 
     # Add polylines into containers regarding required number of layers
     sub_content_container.ContentSequence = polyline_sequence
@@ -105,7 +120,7 @@ def get_finding_container(polyline, label, shape):
     return sub_content_container
 
 
-def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
+def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, prediction, polylines):
     dicomFile = dcm.dcmread(os.path.join(dicomPath, dicomFile))
     pngImage = dicomFile.pixel_array[0]
     
@@ -141,8 +156,8 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
         is_content_continuous=False,
     )
 
-    finding_container_ben = get_finding_container(polylines[0], "benign", pngImage.shape)
-    finding_container_mal = get_finding_container(polylines[1], "malignent", pngImage.shape)
+    finding_container_ben = get_finding_container(prediction, polylines[0], "benign", pngImage.shape)
+    finding_container_mal = get_finding_container(prediction, polylines[1], "malignant", pngImage.shape)
     main_content_container.ContentSequence = (finding_container_ben, finding_container_mal)
     major_content_container.ContentSequence = [main_content_container]
     major_content_sequence.append(major_content_container)
@@ -174,27 +189,30 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, polylines):
     sr.save_as(srPath)
 
 
-def createDicomSr(segPath: str, dicomPath:str, dicomFile:str, exam: str, image:str):
+def createDicomSr(segPath:str, dicomPath:str, dicomFile:str, prediction:pd.DataFrame, exam: str, image:str):
     """Create a DICOM Structured Report from given polylines."""
     examID = exam[image][0]
     polylineBenign = loadPolyline(segPath, examID, "benign")
     polylineMalignant = loadPolyline(segPath, examID, "malignant")
 
     polylines = [polylineBenign, polylineMalignant]
-    savePolylinesToDicomSR(dicomPath, dicomFile, "outputDicomSR.dcm", polylines)
+    savePolylinesToDicomSR(dicomPath, dicomFile, "outputDicomSR.dcm", prediction, polylines)
 
 
-def startConversion(segPath:str, examPath:str, dicomFile:str):
+def startConversion(segPath:str, resultPath:str, examPath:str, dicomFile:str):
     """Start the conversion process by iterating over the exams and images."""
     print("Start conversion ...")
     with open(examPath, "rb") as f:
         examList = pickle.load(f)
+    predictions = pd.read_csv(os.path.join(resultPath, "predictions.csv"))
+
 
     print("Loop over images ...")
     for exam in tqdm(examList, unit="exam"): # Loop over exams
         for image in ["L-MLO", "L-CC", "R-MLO", "R-CC"]: # Loop over images
             dicomPath = exam[f"{image}_path"]
-            createDicomSr(segPath, dicomPath, dicomFile, exam, image)
+            prediction = predictions[predictions["image_index"] == exam[image][0]]
+            createDicomSr(segPath, dicomPath, dicomFile, prediction, exam, image)
 
 
 def main():
@@ -203,15 +221,17 @@ def main():
     # Retrieve command line arguments
     parser = argparse.ArgumentParser(description='Extract model input from DICOM data')
     parser.add_argument('--segmentation-path', required=True)
+    parser.add_argument('--result-path', required=True)
     parser.add_argument('--dicom-file', required=True)
     parser.add_argument('--exam-list-path', required=True)
     args = parser.parse_args()
 
     segPath = args.segmentation_path
+    resultPath = args.result_path
     dicomFile = args.dicom_file
     examPath = args.exam_list_path
 
-    startConversion(segPath, examPath, dicomFile)
+    startConversion(segPath, resultPath, examPath, dicomFile)
 
 if __name__ == "__main__":
     main()
