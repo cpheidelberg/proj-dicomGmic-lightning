@@ -7,53 +7,35 @@ import argparse, pickle, os, cv2
 import pydicom as dcm
 from pydicom.dataset import Dataset
 from pydicom.sequence import Sequence
-from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues, NumContentItem
+from highdicom.sr import ComprehensiveSR, ScoordContentItem, GraphicTypeValues, CodedConcept, ContainerContentItem, RelationshipTypeValues, NumContentItem, TextContentItem
 
 
 def loadPolyline(path:str, exam:str, label:str) -> np.ndarray:
 
     # create polyline path
-    path = os.path.join(path, f"{exam}_polyline_{label}.txt")
+    # path = os.path.join(path, f"{exam}_polyline_{label}.txt")
+    files = [os.path.join(path, f) for f in os.listdir(path) if f.startswith(f"{exam}_polyline_{label}")]
 
-    polyline = []
-    try:
-        with open(path, 'r') as f:
-            lines = f.readlines()
-        for line in lines:
-            if line.startswith("---"):
-                break
-            if not line.startswith("Saliency Map"):
-                x, y = map(int, line.strip().split(","))
-                polyline.append((x, y))
-    except Exception as error:
-        print(exam, "\n\tFailed to load polylin because no polyline was registered. Process with empty polyline", str(error))
+    polylines = {}
+    for i, f in enumerate(files):
+        polyline = []
+        try:
+            with open(f, 'r') as f:
+                lines = f.readlines()
+            for line in lines:
+                if line.startswith("---"):
+                    break
+                if not line.startswith("Saliency Map"):
+                    x, y = map(int, line.strip().split(","))
+                    polyline.append((x, y))
+        except Exception as error:
+            print(exam, "\n\tFailed to load polylin because no polyline was registered. Process with empty polyline", str(error))
+        polylines[f"{label}_{i}"] = np.array(polyline)
 
-    return np.array(polyline)
+    return polylines
 
 
-def get_center_coordinate(polyline, shape):
-
-    # img = np.zeros(shape, dtype=np.uint8)
-    # print(polyline.shape)
-
-    # for point in polyline:
-    #     cv2.circle(img, tuple(point), 1, (255, 255, 255), -1)
-
-    # # Wenden Sie die Hough-Transformation an
-    # circles = cv2.HoughCircles(
-    #     img,
-    #     cv2.HOUGH_GRADIENT, dp=1, minDist=20,
-    #     param1=50, param2=20, minRadius=100, maxRadius=1000
-    # )
-    
-    # if circles is None:
-    #     return []
-
-    # circles = np.round(circles[0, :]).astype("int")
-    # center_points = []
-    # for circle in circles:
-    #     x, y, _ = circle
-    #     center_points.append((x, y))
+def get_center_coordinate(polyline):
 
     x_center = (np.min(polyline[:, 0]) + np.max(polyline[:, 0])) / 2
     y_center = (np.min(polyline[:, 1]) + np.max(polyline[:, 1])) / 2
@@ -100,7 +82,23 @@ def get_polyline_item(prediction, polyline, point, label):
     return prediction_item, center_item, polyline_item
 
 
-def get_finding_container(prediction, polyline, label, shape):
+def get_empty_item(label):
+    # Create an empty point item
+    polyline_item = TextContentItem(
+        name=CodedConcept(
+            value='113000', 
+            scheme_designator='DCM',
+            meaning=f"Polyline {label}"
+        ),
+        value=f"No polyline found for {label}", 
+        relationship_type=RelationshipTypeValues.CONTAINS,
+    )
+    polyline_item.ReferencedContentItemIdentifier = [1, 1, 1, 1]
+
+    return polyline_item,
+
+
+def get_finding_container(prediction, polyline, label):
     # Nested 3. layer for DICOM SR
     sub_content_container = ContainerContentItem(
         name=CodedConcept(value='111059', 
@@ -112,7 +110,10 @@ def get_finding_container(prediction, polyline, label, shape):
 
     # Nested 4./5. layer for DICOM SR with polylines
     prediction = prediction[f"{label}_pred"].iloc[0]
-    polyline_sequence = get_polyline_item(prediction, polyline, get_center_coordinate(polyline, shape), label)
+    for p in polyline:
+        polyline_sequence = get_polyline_item(prediction, polyline[p], get_center_coordinate(polyline[p]), label)
+    if len(polyline) == 0:
+        polyline_sequence = get_empty_item(label)
 
     # Add polylines into containers regarding required number of layers
     sub_content_container.ContentSequence = polyline_sequence
@@ -156,8 +157,8 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, prediction, polylines):
         is_content_continuous=False,
     )
 
-    finding_container_ben = get_finding_container(prediction, polylines[0], "benign", pngImage.shape)
-    finding_container_mal = get_finding_container(prediction, polylines[1], "malignant", pngImage.shape)
+    finding_container_ben = get_finding_container(prediction, polylines[0], "benign")
+    finding_container_mal = get_finding_container(prediction, polylines[1], "malignant")
     main_content_container.ContentSequence = (finding_container_ben, finding_container_mal)
     major_content_container.ContentSequence = [main_content_container]
     major_content_sequence.append(major_content_container)
@@ -230,6 +231,11 @@ def main():
     resultPath = args.result_path
     dicomFile = args.dicom_file
     examPath = args.exam_list_path
+
+    # segPath = 'sample_output/segmentation'
+    # resultPath = 'sample_output'
+    # examPath = 'sample_output/data.pkl'
+    # dicomFile = '1-1.dcm'
 
     startConversion(segPath, resultPath, examPath, dicomFile)
 
