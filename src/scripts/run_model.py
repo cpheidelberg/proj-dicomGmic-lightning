@@ -142,23 +142,56 @@ def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, dicom_path
 
 def process_saliency_map(input_img, saliency_map, save_dir, file_path, label, turn_on_visualization):
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    try:
-        contour = max(contours, key=cv2.contourArea)
+    
+    os.makedirs(save_dir, exist_ok=True)
+
+    max_intensity = np.max(saliency_map)
+    intensity_threshold = 0.1 * max_intensity  # 10% of the maximum intensity
+    top_contours = []  # List to store the top three contours, their intensities, and centroids
+    _, img_mask = cv2.threshold(input_img, 0, 255, cv2.THRESH_BINARY)
+
+    for contour in contours:
+        # Compute the average intensity of pixels within the contour
+        mask = np.zeros_like(saliency_map)
+        cv2.drawContours(mask, [contour], -1, 255, thickness=cv2.FILLED)
+        intensity = np.mean(saliency_map[mask == 255])
+
+        # Check if the current contour has higher intensity than the threshold
+        if intensity > intensity_threshold:
+            # Calculate the centroid of the current contour
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+
+                # Check if the centroid is within the non-black region of the input image
+                if img_mask[cY, cX] != 0:  # Assuming black regions have pixel value 0
+                    # Check if there are fewer than three contours in top_contours
+                    # or if the current contour has a higher intensity than the lowest intensity in the top three
+                    if len(top_contours) < 3 or intensity > top_contours[-1][1]:
+                        # Add the current contour, intensity, and centroid to the list
+                        top_contours.append((contour, intensity, (cX, cY)))
+                        # Sort the top_contours list based on intensities (highest to lowest)
+                        top_contours.sort(key=lambda x: x[1], reverse=True)
+                        # Keep only the top three contours
+                        top_contours = top_contours[:3]
+
+    for i, (contour, intensity, centroid) in enumerate(top_contours):
         polyline = [point[0].tolist() for point in contour]
-        os.makedirs(save_dir, exist_ok=True)
-        with open(os.path.join(save_dir, "{0}_polyline_{1}.txt".format(file_path, label)), 'w') as f:
+        with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
                 f.write(f"{point[0]}, {point[1]}\n")
             f.write("---\n")
         
         if turn_on_visualization:
-            image_with_contours = cv2.drawContours(saliency_map, contours, -1, 255, 3)
+            image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
             plt.imshow(input_img, cmap='gray', aspect='equal')
             plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-            plt.savefig(os.path.join(save_dir, "{0}_seg_{1}.png".format(file_path, label)))
-    except Exception as error:
-        print(file_path, "\n\tFailed to save lesion contours because model detected None. ", str(error))
+            plt.savefig(os.path.join(save_dir, "{0}_seg_{1}_{2}.png".format(file_path, label, i)))
+
+    if not contours:
+        print(file_path, "\n\tNo contours found in the saliency map.")
 
 
 def fetch_cancer_label_by_view(view, cancer_label):
