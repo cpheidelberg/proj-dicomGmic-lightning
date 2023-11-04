@@ -82,8 +82,17 @@ def get_polyline_item(prediction, polyline, point, label):
     return prediction_item, center_item, polyline_item
 
 
-def get_empty_item(label):
-    # Create an empty point item
+def get_empty_container(label):
+    # Nested 3. layer for DICOM SR
+    sub_content_container = ContainerContentItem(
+        name=CodedConcept(value='111059', 
+                          scheme_designator='DCM',
+                          meaning="Single Image Finding"),
+        relationship_type=RelationshipTypeValues.CONTAINS,
+    )
+    sub_content_container.ConceptCodeSequence = [CodedConcept(value='F-01796', scheme_designator='SRT', meaning="Mammography breast density")]
+    
+    # Nested 4./5. layer for DICOM SR with polylines
     polyline_item = TextContentItem(
         name=CodedConcept(
             value='113000', 
@@ -95,7 +104,10 @@ def get_empty_item(label):
     )
     polyline_item.ReferencedContentItemIdentifier = [1, 1, 1, 1]
 
-    return polyline_item,
+    # Add polylines into containers regarding required number of layers
+    sub_content_container.ContentSequence = [polyline_item]
+
+    return sub_content_container
 
 
 def get_finding_container(prediction, polyline, label):
@@ -110,10 +122,7 @@ def get_finding_container(prediction, polyline, label):
 
     # Nested 4./5. layer for DICOM SR with polylines
     prediction = prediction[f"{label}_pred"].iloc[0]
-    for p in polyline:
-        polyline_sequence = get_polyline_item(prediction, polyline[p], get_center_coordinate(polyline[p]), label)
-    if len(polyline) == 0:
-        polyline_sequence = get_empty_item(label)
+    polyline_sequence = get_polyline_item(prediction, polyline, get_center_coordinate(polyline), label)
 
     # Add polylines into containers regarding required number of layers
     sub_content_container.ContentSequence = polyline_sequence
@@ -156,10 +165,19 @@ def savePolylinesToDicomSR(dicomPath, dicomFile, srFile, prediction, polylines):
         relationship_type=RelationshipTypeValues.INFERRED_FROM,
         is_content_continuous=False,
     )
+    main_content_container.ContentSequence = []
 
-    finding_container_ben = get_finding_container(prediction, polylines[0], "benign")
-    finding_container_mal = get_finding_container(prediction, polylines[1], "malignant")
-    main_content_container.ContentSequence = (finding_container_ben, finding_container_mal)
+    for i, label in enumerate(["benign", "malignant"]):
+        for p in polylines[i]:
+            finding_container = get_finding_container(prediction, polylines[i][p], label)
+            main_content_container.ContentSequence.append(finding_container)
+        if len(polylines[i]) == 0:
+            main_content_container.ContentSequence.append(get_empty_container(label))
+
+
+    # finding_container_ben = get_finding_container(prediction, polylines[0], "benign")
+    # finding_container_mal = get_finding_container(prediction, polylines[1], "malignant")
+    # main_content_container.ContentSequence = (finding_container_ben, finding_container_mal)
     major_content_container.ContentSequence = [main_content_container]
     major_content_sequence.append(major_content_container)
 
