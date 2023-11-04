@@ -119,13 +119,14 @@ def visualize_example(input_img, saliency_maps, true_segs,
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, dicom_path, turn_on_visualization):
+def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, dicom_path, turn_on_visualization):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
     ds = dcm.dcmread(dicom_path, force=True)
     view = file_path.split('_')[1].split('.')[0]
+    window_location = datum["window_location"][view][0]
 
     saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
     saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
@@ -136,13 +137,13 @@ def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, dicom_path
         saliency_maps_benign = np.flip(saliency_maps_benign, axis=1)
         saliency_maps_malignant = np.flip(saliency_maps_malignant, axis=1)
 
-    process_saliency_map(input_img, saliency_maps_benign, save_dir, file_path, "benign", turn_on_visualization)
-    process_saliency_map(input_img, saliency_maps_malignant, save_dir, file_path, "malignant", turn_on_visualization)
+    process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", turn_on_visualization)
+    process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", turn_on_visualization)
 
 
-def process_saliency_map(input_img, saliency_map, save_dir, file_path, label, turn_on_visualization):
+def process_saliency_map(input_img, saliency_map, window_location, save_dir, file_path, label, turn_on_visualization):
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    
+
     os.makedirs(save_dir, exist_ok=True)
 
     max_intensity = np.max(saliency_map)
@@ -178,6 +179,17 @@ def process_saliency_map(input_img, saliency_map, save_dir, file_path, label, tu
 
     for i, (contour, intensity, centroid) in enumerate(top_contours):
         polyline = [point[0].tolist() for point in contour]
+        # print("polyline")
+        # print(len(polyline))
+        # print(len(polyline[0]))
+        # print(polyline[0][0])
+        # print(polyline[0][1])
+        for p in polyline:
+            p[0] -= window_location[2]
+            p[1] -= window_location[0]
+        # print(polyline[0][0])
+        # print(polyline[0][1])
+        # TODO: add shift from window_location to polyline coordinates
         with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
@@ -258,7 +270,7 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
                  
                 # save predicted regions of interest as polyline
                 save_seg_dir = parameters["segmentation_path"]
-                save_saliency_maps(loaded_image, saliency_maps, save_seg_dir, short_file_path, dicom_path, turn_on_visualization)
+                save_saliency_maps(loaded_image, saliency_maps, datum, save_seg_dir, short_file_path, dicom_path, turn_on_visualization)
 
                 # propagate holders
                 benign_label, malignant_label = fetch_cancer_label_by_view(view, datum["cancer_label"])
