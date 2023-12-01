@@ -1,0 +1,208 @@
+[{
+  "id": 197,
+  "caseId": 5,
+  "studyInstanceUid": "2.25.35933168403701974803318512032068839838",
+  "seriesInstanceUid": "2.25.55007820259200447859489119139725521607",
+  "sopInstanceUid": "2.25.198223682995259933581611728358606791309",
+  "frameNumber": 1,
+  "createdAt": "2023-10-09 16:13:35.95+00",
+  "points": [
+    {
+      "x": 2090.1342835451833,
+      "y": 1294.3242396390376
+    },
+    {
+      "x": 2659.6316097483914,
+      "y": 1846.0247743983957
+    }
+  ],
+  "radius": 396.4532395523982,
+  "lesionSize": {
+    "unit": "mm",
+    "length": "39.86"
+  },
+  "taxonomies": {
+    "name": "mass",
+    "options": [],
+    "bodyType": "Breast",
+    "imageType": "MG",
+    "mammoType": "ALL"
+  },
+  "centerPoint": {
+    "x": 2374.8829466467873,
+    "y": 1570.1745070187167
+  },
+  "measurementType": "ELLIPSE",
+  "linkedAnnotationIds": [
+    196
+  ],
+  "distanceToNipplePosition": {
+    "unit": "cm",
+    "length": "4.38"
+  }
+},
+{
+  "id": 196,
+  "caseId": 5,
+  "studyInstanceUid": "2.25.35933168403701974803318512032068839838",
+  "seriesInstanceUid": "2.25.7474282561838871658953143390531678970",
+  "sopInstanceUid": "2.25.305517570717833314600306190752968971201",
+  "frameNumber": 1,
+  "createdAt": "2023-10-09 15:45:00.051+00",
+  "points": [
+    {
+      "x": 2132.6484792780752,
+      "y": 253.21194017379696
+    },
+    {
+      "x": 2880.113719919786,
+      "y": 840.5060578208557
+    }
+  ],
+  "radius": 475.29429477703815,
+  "lesionSize": {
+    "unit": "mm",
+    "length": "52.32"
+  },
+  "taxonomies": {
+    "name": "mass",
+    "options": [],
+    "bodyType": "Breast",
+    "imageType": "MG",
+    "mammoType": "ALL"
+  },
+  "linkedAnnotationIds": [
+    197
+  ],
+  "centerPoint": {
+    "x": 2506.3810995989306,
+    "y": 546.8589989973264
+  },
+  "measurementType": "ELLIPSE",
+  "distanceToNipplePosition": {
+    "unit": "cm",
+    "length": "8.14"
+  }
+},
+{
+  "id": 191,
+  "caseId": 5,
+  "studyInstanceUid": "2.25.35933168403701974803318512032068839838",
+  "seriesInstanceUid": "2.25.7474282561838871658953143390531678970",
+  "sopInstanceUid": "2.25.305517570717833314600306190752968971201",
+  "frameNumber": 1,
+  "createdAt": "2023-10-03 16:25:16.119+00",
+  "points": [
+    {
+      "x": 1632.0769515458674,
+      "y": 2337
+    },
+    {
+      "x": 1863.9230484541326,
+      "y": 2577
+    }
+  ],
+  "radius": 166.84769450879202,
+  "lesionSize": {
+    "unit": "mm",
+    "length": "16.80"
+  },
+  "taxonomies": {
+    "name": "mass",
+    "options": [],
+    "bodyType": "Breast",
+    "imageType": "MG",
+    "mammoType": "ALL"
+  },
+  "cadMarkerId": "2.25.35933168403701974803318512032068839838_2.25.205118934907986946421559937179825755045_2.25.337469762723537024761561395327736231127_01",
+  "centerPoint": {
+    "x": 1748,
+    "y": 2457
+  },
+  "measurementType": "ELLIPSE",
+  "distanceToNipplePosition": {
+    "unit": "cm",
+    "length": "10.62"
+  }
+},
+{
+  "id": 190,
+  "caseId": 5,
+  "studyInstanceUid": "2.25.35933168403701974803318512032068839838",
+  "seriesInstanceUid": "2.25.7474282561838871658953143390531678970",
+  "sopInstanceUid": "2.25.305517570717833314600306190752968971201",
+  "frameNumber": 1,
+  "createdAt": "2023-10-03 16:25:16.119+00",
+  "points": [
+    {
+      "x": 1826.0769515458674,
+      "y": 2421
+    },
+    {
+      "x": 2057.9230484541326,
+      "y": 2661
+    }
+  ],
+  "radius": 166.84769450879202,
+  "lesionSize": {
+    "unit": "mm",
+    "length": "16.80"
+  },
+  "taxonomies": {
+    "name": "calcification",
+    "options": [],
+    "bodyType": "Breast",
+    "imageType": "MG",
+    "mammoType": "ALL"
+  },
+  "cadMarkerId": "2.25.35933168403701974803318512032068839838_2.25.205118934907986946421559937179825755045_2.25.337469762723537024761561395327736231127_02",
+  "centerPoint": {
+    "x": 1942,
+    "y": 2541
+  },
+  "measurementType": "ELLIPSE",
+  "distanceToNipplePosition": {
+    "unit": "cm",
+    "length": "9.91"
+  }
+},
+{
+  "id": 57,
+  "caseId": 5,
+  "studyInstanceUid": "2.25.154995500755644512565344226033750766732",
+  "seriesInstanceUid": "2.25.128273555704873635238526999765880242676",
+  "sopInstanceUid": "2.25.69763847460961724782912857753978038846",
+  "frameNumber": 1,
+  "createdAt": "2023-10-03 16:25:16.119+00",
+  "points": [
+    {
+      "x": 332.80000000000007,
+      "y": 1523.5878787878787
+    },
+    {
+      "x": 937.8909090909093,
+      "y": 2350.5454545454545
+    }
+  ],
+  "radius": 512.3460354992781,
+  "lesionSize": {
+    "unit": "mm",
+    "length": "57.89"
+  },
+  "taxonomies": {
+    "name": "mass",
+    "options": [],
+    "bodyType": "Breast",
+    "imageType": "MG",
+    "mammoType": "ALL"
+  },
+  "centerPoint": {
+    "x": 635.3454545454547,
+    "y": 1937.0666666666666
+  },
+  "measurementType": "ELLIPSE",
+  "distanceToNipplePosition": {
+    "unit": "cm",
+    "length": "11.42"
+  }
+}]
