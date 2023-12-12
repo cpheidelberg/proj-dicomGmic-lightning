@@ -56,6 +56,7 @@ class ActiveLearningGMIC(gmic.GMIC):
 
 
 def load_annotation_layer(json_path, height, width):
+
     with open(json_path, 'r') as json_file:
         data = json.load(json_file)
 
@@ -129,9 +130,9 @@ def run_active_learning(exam_list_path, model_path, json_path, model_index, para
             new_saliency_array = np.array([new_saliency_map, new_saliency_map])
 
             model = ActiveLearningGMIC(parameters)
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.5)
             loss = model.active_learning_step(x_original, new_saliency_array, optimizer)
-
+            print(loss)
     learned_path = os.path.join(model_path, "active_learning_model_{0}.p".format(model_index))
     model.save_model_weights(learned_path)
     print("Learned weights stored at {}".format(learned_path))
@@ -173,7 +174,7 @@ def main():
 
 
     model_path = "models"
-    json_path = "../Data/AnnotationJSON-Instances/medken-feedback-json.txt"
+    json_path = '/media/ayk/4644D1AB10BDC110/Medken/proj-dicomGmic-lightning-master/proj-dicomGmic-lightning/medken_feedback.json'
     exam_list_path = args.exam_path
     model_index=args.model_index
 
