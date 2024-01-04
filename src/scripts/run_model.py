@@ -133,9 +133,11 @@ def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, dic
     saliency_maps_malignant = (saliency_maps[0,1,:,:]*500).astype(np.uint8)
     saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
 
-    if view.startswith('R') and ds.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip.startswith("N") or view.startswith('L') and ds.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip.startswith("Y"):
-        saliency_maps_benign = np.flip(saliency_maps_benign, axis=1)
-        saliency_maps_malignant = np.flip(saliency_maps_malignant, axis=1)
+    # TODO: check orientation of resulting images / lesion
+
+    # if view.startswith('R') and ds.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip.startswith("N") or view.startswith('L') and ds.XRay3DAcquisitionSequence[0].FieldOfViewHorizontalFlip.startswith("Y"):
+    #     saliency_maps_benign = np.flip(saliency_maps_benign, axis=1)
+    #     saliency_maps_malignant = np.flip(saliency_maps_malignant, axis=1)
 
     process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", turn_on_visualization)
     process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", turn_on_visualization)
