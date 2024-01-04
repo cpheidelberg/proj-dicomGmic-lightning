@@ -1,5 +1,6 @@
 import os
 import shutil
+from tqdm import tqdm
 
 def rearrange_dicom_files(exam_folder):
     # Ensure the folder exists
@@ -25,7 +26,11 @@ def rearrange_dicom_files(exam_folder):
         
         # Move and rename the DICOM file
         shutil.move(old_file_path, new_file_path)
-        print(f"Moved {file} to {new_file_path}")
 
-# Replace 'path_to_exam_folder' with the actual path to your exam folder
-rearrange_dicom_files('dicom_exams/ff02ce510218e943fba03aa113761fc4')
+
+if __name__ == "__main__":
+    path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/images/"
+    folders = [os.path.join(path, f) for f in os.listdir(path) if not "." in f]
+
+    for folder in tqdm(folders):
+        rearrange_dicom_files(folder)

@@ -6,15 +6,15 @@ GPU_NUMBER=0
 MODEL_INDEX='2'
 
 MODEL_PATH='models/'
-DICOM_FOLDER='single_data/dicom_exams'
+DICOM_FOLDER='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/dicom_exams'
 DICOM_FILE='1-1.dcm'
-DATA_FOLDER='single_data/images'
-INITIAL_EXAM_LIST_PATH='single_data/exam_list.pkl'
-CROPPED_IMAGE_PATH='single_output/cropped_images'
-CROPPED_EXAM_LIST_PATH='single_output/cropped_images/cropped_exam_list.pkl'
-SEG_PATH='single_output/segmentation'
-EXAM_LIST_PATH='single_output/data.pkl'
-OUTPUT_PATH='single_output'
+DATA_FOLDER='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/images'
+INITIAL_EXAM_LIST_PATH='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/exam_list.pkl'
+CROPPED_IMAGE_PATH='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images'
+CROPPED_EXAM_LIST_PATH='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/cropped_exam_list.pkl'
+SEG_PATH='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
+EXAM_LIST_PATH='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
+OUTPUT_PATH='../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
@@ -42,18 +42,18 @@ python3 src/optimal_centers/get_optimal_centers.py \
     --output-exam-list-path $EXAM_LIST_PATH \
     --num-processes $NUM_PROCESSES
 
- echo 'Stage 4: Run Classifier'
- python3 src/scripts/run_model.py \
-     --model-path $MODEL_PATH \
-     --dicom-file $DICOM_FILE \
-     --data-path $EXAM_LIST_PATH \
-     --image-path $CROPPED_IMAGE_PATH \
-     --segmentation-path $SEG_PATH \
-     --output-path $OUTPUT_PATH \
-     --device-type $DEVICE_TYPE \
-     --gpu-number $GPU_NUMBER \
-     --model-index $MODEL_INDEX \
-     --visualization-flag
+#  echo 'Stage 4: Run Classifier'
+#  python3 src/scripts/run_model.py \
+#      --model-path $MODEL_PATH \
+#      --dicom-file $DICOM_FILE \
+#      --data-path $EXAM_LIST_PATH \
+#      --image-path $CROPPED_IMAGE_PATH \
+#      --segmentation-path $SEG_PATH \
+#      --output-path $OUTPUT_PATH \
+#      --device-type $DEVICE_TYPE \
+#      --gpu-number $GPU_NUMBER \
+#      --model-index $MODEL_INDEX \
+#      --visualization-flag
 
 # echo 'Stage 5: Create DICOM SR exams'
 # python3 src/dicom/create_dicomsr.py \
@@ -64,4 +64,4 @@ python3 src/optimal_centers/get_optimal_centers.py \
 
 end_time=$(date +%s)
 elapsed_time=$((end_time - start_time))
-echo "Gesamte Laufzeit: $elapsed_time Sekunden"
+echo "Gesamte Laufzeit: $elapsed_time Sekunden für 5000 Ordner"
