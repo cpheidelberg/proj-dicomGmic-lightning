@@ -4,7 +4,7 @@ from pydicom.data import get_testdata_file
 
 import argparse, pickle, os, cv2
 from tqdm import tqdm
-
+from multiprocessing import Pool
 
 def getMetadata(dataset:dcm.FileDataset, idx:int) -> tuple[str, str]:
     viewPosition = dataset.ViewPosition
@@ -33,21 +33,19 @@ def savePng(dataset:dcm.FileDataset, outPath:str):
     os.makedirs(os.path.dirname(outPath), exist_ok=True)
     cv2.imwrite(outPath, image)
 
-    print(f"\tPNG image saved to {outPath}")
+    # print(f"\tPNG image saved to {outPath}")
 
 
-def convertExam(dicomDir:os.DirEntry, dicomFile:str, idx:int, pngPath:str) -> dict:
+def convertExam(dicomDir:str, dicomFile:str, idx:int, pngPath:str) -> dict:
     metaData = {}
-    metaData["examID"] = dicomDir.name
-    print(metaData)
-    dicomDir = dicomDir.path
-    print(f"Dir: {dicomDir}")
+    metaData["examID"] = dicomDir.split("/")[-1]
+    # print(f"Read examID: {dicomDir.split("/")[-1]}")
     i = 0
     for root, dirs, files in os.walk(dicomDir):
         for file in files:
             if file == dicomFile:
                 filePath = os.path.join(root, file)
-                print(f"\tRead DICOM file: {filePath}")
+                # print(f"\tRead DICOM file: {filePath}")
     
                 ds = dcm.dcmread(filePath, force=True) # dicom dataset
                 metaStr, flip = getMetadata(ds, i)
@@ -58,22 +56,22 @@ def convertExam(dicomDir:os.DirEntry, dicomFile:str, idx:int, pngPath:str) -> di
                 savePng(ds, outPath)
                 i += 1
         
-    print("\tAll DICOM files processed")
+    # print("\tAll DICOM files processed")
     metaData = addCancerLabel(metaData)
     return metaData
 
+
 def convertList(dicomDir:str, dicomFile:str, pngPath:str=None, pklPath:str=None):
     """Walk through all DICOM files of an exam to get all required images for model input"""
-
-    metaData = []
-    for idx, dicomFolder in enumerate(tqdm(os.scandir(dicomDir))):
-        if dicomFolder.name.startswith("ff"):
-            print(dicomFolder)
-            metaData.append(convertExam(dicomFolder, dicomFile, idx, pngPath))
+    with Pool() as pool:
+        folders = [d.path for d in os.scandir(dicomDir) if "." not in d.name]
+        tasks = [(f, dicomFile, folders.index(f), pngPath) for f in folders]
+        results = list(pool.starmap(convertExam, tqdm(tasks, total=len(folders))))
 
     # TODO: save metadata in single pickle file
     savePickle(metaData, pklPath)
     print(f"\tPickle file saved: {pklPath}")
+
 
 
 def main():
