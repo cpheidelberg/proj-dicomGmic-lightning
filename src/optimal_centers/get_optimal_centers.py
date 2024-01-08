@@ -25,6 +25,7 @@ import numpy as np
 import os
 from itertools import repeat
 from multiprocessing import Pool
+from tqdm import tqdm
 
 from src.constants import INPUT_SIZE_DICT
 import src.utilities.pickling as pickling
@@ -67,13 +68,16 @@ def load_and_extract_center(datum, data_prefix):
     image = reading_images.read_image_png(full_image_path)
     return datum["short_file_path"], extract_center(datum, image)
 
+def load_and_extract_center_star(args):
+    return load_and_extract_center(*args)
 
 def get_optimal_centers(data_list, data_prefix, num_processes=1):
     """
     Compute optimal centers for each image in data list
     """
     pool = Pool(num_processes)
-    result = pool.starmap(load_and_extract_center, zip(data_list, repeat(data_prefix)))
+    data = zip(data_list, repeat(data_prefix))
+    result = tqdm(pool.imap(load_and_extract_center_star, data), total=len(data_list))
     return dict(result)
 
 

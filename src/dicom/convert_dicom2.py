@@ -69,11 +69,12 @@ def convertList(dicomDir:str, dicomFile:str, pngPath:str=None, pklPath:str=None)
     """Walk through all DICOM files of an exam to get all required images for model input"""
     with Pool() as pool:
         folders = [d.path for d in os.scandir(dicomDir) if "." not in d.name]
+        # folders = [d.path for d in os.scandir(dicomDir) if d.name.startswith("ff")]
         tasks = [(f, dicomFile, folders.index(f), pngPath) for f in folders]
         results = list(tqdm(pool.imap(convertExamStar, tasks), total=len(folders)))
 
     # TODO: save metadata in single pickle file
-    savePickle(metaData, pklPath)
+    savePickle(results, pklPath)
     print(f"\tPickle file saved: {pklPath}")
 
 
