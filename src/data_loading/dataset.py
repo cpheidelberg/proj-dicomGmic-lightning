@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, ast, pickle
+import os, ast, pickle, h5py
+from tqdm import tqdm
 from PIL import Image
+import multiprocessing
 
 import torch
 from torch.utils.data import Dataset
@@ -102,17 +104,78 @@ class ClassificationImages(Dataset):
         return df
 
 
+class HDF5Dataset(Dataset):
+    def __init__(self, dataFile):
+        self.dataFile = dataFile
+        with h5py.File(self.dataFile, "r") as hf:
+            self.num_samples = len(hf.keys())
+
+
+    def __len__(self):
+        return self.num_samples
+
+
+    def __getitem__(self, idx):
+        with h5py.File(self.dataFile, "r") as hf:
+            image = hf[f"image_{idx}"][:]
+            label = hf[f"label_{idx}"][:]
+
+        return image, label
+
+
+def save_data_to_hdf5(dataset, hdf5_file):
+
+    # Create a pool of worker processes
+    num_workers = multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=num_workers)
+    chunk_size = len(dataset) // num_workers
+
+
+    with tqdm(total=len(dataset)) as pbar:
+        args_list = [(hdf5_file, dataset, i * chunk_size, (i + 1) * chunk_size) for i in range(num_workers)]
+        results = pool.starmap(save_chunk_to_hdf5, args_list)
+        pool.close()
+        pool.join()
+
+
+def save_chunk_to_hdf5(hdf5_file, dataset, start_idx, end_idx):
+    with h5py.File(hdf5_file, "a") as hf:
+        for idx in tqdm(range(start_idx, end_idx)):
+            image_name = f"image_{idx}"
+            label_name = f"label_{idx}"
+
+            # Load and preprocess your image
+            image = dataset[idx][0][:]
+            label = dataset[idx][1][:]
+
+            hf.create_dataset(image_name, data=image)
+            hf.create_dataset(label_name, data=label)
+
+
+# with h5py.File(hdf5_file, "w") as hf:
+#     for idx, (image, labelEnc) in enumerate(tqdm(dataset)):
+#         if idx == 10:
+#             break
+#         image_name = f"image_{idx}"
+#         hf.create_dataset(image_name, data=image.numpy())
+#         label_name = f"label_{idx}"
+#         hf.create_dataset(label_name, data=labelEnc)
+
+
 def main(): 
-    imageFolder = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/images"
+    imageFolder = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images'
     imageDict = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/exam_list.pkl"
     labelFile = "sample_data/annotations/finding_annotations.csv"
 
     dataset = ClassificationImages(imageFolder, imageDict, labelFile)
-    img, label = dataset[0]
 
-    img = img/np.max(img)
-    plt.title(label)
-    plt.imshow(img, cmap="gray")
+    dataPath = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/"
+    hdf5_file = os.path.join(dataPath, "dataset.h5")
+    
+    save_data_to_hdf5(dataset, hdf5_file)
+
+    # data = HDF5Dataset(hdf5_file)
+    # print(data[0])
 
 
 if __name__ == "__main__":
