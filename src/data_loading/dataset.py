@@ -6,6 +6,7 @@ from PIL import Image
 
 import torch
 from torch.utils.data import Dataset
+from torchvision import transforms
     
 
 class ClassificationImages(Dataset):
@@ -17,9 +18,14 @@ class ClassificationImages(Dataset):
 
         self.labels = pd.read_csv(labelPath)
         self.labels = self.convertLabels(self.labels)
+        self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
 
-        print(len(self.flatDict))
-        print(len(self.labels))
+        self.transform = transforms.Compose([
+            transforms.Resize((2944, 1920)),
+            transforms.PILToTensor(),
+            transforms.ConvertImageDtype(torch.float),
+            transforms.Normalize((0.5), (0.5)),
+        ])
 
         # TODO: why more labels than images? -> multiple findings
 
@@ -32,12 +38,19 @@ class ClassificationImages(Dataset):
         
         imagePath = os.path.join(self.imageFolder, self.flatDict[idx]["image"][0]+".png")
         image = Image.open(imagePath)
+        plt.imshow(np.array(image)/np.max(np.array(image)), cmap="gray")
+        plt.savefig("tmp.png")
+
+        image = self.transform(image)
+
         studyID = self.flatDict[idx]["examID"]
         imageID = self.flatDict[idx]["dicom"].split('/')[-1]
 
-        labelList = self.labels[self.labels["study_id"] == studyID][self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
+        labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
         # metadata from preprocessing in self.imageDict[self.flatDict.iloc[idx]["examID"]]
-        return image, labelList
+        labelEnc = self.createHotEncoding(labelList)
+
+        return image, labelEnc
 
 
     def loadPickle(self, path):
@@ -69,7 +82,16 @@ class ClassificationImages(Dataset):
         imgDict["dicom"] = data[view+"_path"]
 
         return imgDict
-        
+
+
+    def createHotEncoding(self, labelList):
+        encoding = np.zeros(len(self.unique_categories), dtype=np.float32)
+
+        for label in labelList:
+            label_index = self.unique_categories.index(label)
+            encoding[label_index] = 1.0
+
+        return encoding
             
 
     def convertLabels(self, df):
