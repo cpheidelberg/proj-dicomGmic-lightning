@@ -94,10 +94,10 @@ class GMIC(nn.Module):
         batch_size, num_crops, _ = crop_positions.shape
         crop_h, crop_w = self.experiment_parameters["crop_shape"]
 
-        output = torch.ones((batch_size, num_crops, crop_h, crop_w))
-        if self.experiment_parameters["device_type"] == "gpu":
-            device = torch.device("cuda:{}".format(self.experiment_parameters["gpu_number"]))
-            output = output.to(device)
+        output = torch.ones((batch_size, num_crops, crop_h, crop_w)).type_as(x_original_pytorch)
+        # if self.experiment_parameters["device_type"] == "gpu":
+        #     device = torch.device("cuda:{}".format(self.experiment_parameters["gpu_number"]))
+        #     output = output.to(device)
         for i in range(batch_size):
             for j in range(num_crops):
                 tools.crop_pytorch(x_original_pytorch[i, 0, :, :],
