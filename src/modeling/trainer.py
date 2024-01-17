@@ -51,6 +51,19 @@ class GMICTrainer(pl.LightningModule):
 
         return loss
 
+
+    def validation_step(self, batch, batch_idx):
+        """Implementation of PyTorch training loop in Lightning called for each batch"""
+        img, y = batch
+
+        y_hat = self(img)
+
+        loss = self.criterion(y_hat, y)
+        
+        self.log("val_loss", loss, on_epoch=True, sync_dist=True)
+
+        return loss
+
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
@@ -66,8 +79,8 @@ class GMICTrainer(pl.LightningModule):
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.val_dataset:
-            return DataLoader(self.val_dataset, batch_size=self.hparams.batch_size)
+        if self.valid_dataset:
+            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size)
         return None
     
 
