@@ -340,7 +340,6 @@ def start_experiment(model_path, data_path, dicom_file, output_path, model_index
     output_df.to_csv(os.path.join(output_path, "predictions.csv"), index=False, float_format='%.4f')
 
 
-
 def main():
     # retrieve command line arguments
     parser = argparse.ArgumentParser(description='Run GMIC on the sample data')

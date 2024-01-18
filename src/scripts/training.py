@@ -56,7 +56,7 @@ if __name__ == "__main__":
         "device_type": device,
         "num_processes": num_processes,
         "gpu_number": gpu_id,
-        "epochs": 16,
+        "epochs": 64,
         "batch_size": 1,
         "learning_rate": 1e-3,
 
