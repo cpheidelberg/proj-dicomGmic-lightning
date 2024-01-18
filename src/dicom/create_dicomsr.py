@@ -78,8 +78,19 @@ def get_polyline_item(prediction, polyline, point, label):
         relationship_type=RelationshipTypeValues.SELECTED_FROM,
     )
     polyline_item.ReferencedContentItemIdentifier = [1,1,1,1]
+    
+    text_item = TextContentItem(
+        name=CodedConcept(
+            value='121071',
+            scheme_designator='DCM',
+            meaning="Text"
+        ),
+        value="Lesion: asymmetry",
+        relationship_type=RelationshipTypeValues.CONTAINS
+    )
+    text_item.ReferencedContentItemIdentifier = [1, 1, 1, 1]
 
-    return prediction_item, center_item, polyline_item
+    return prediction_item, center_item, polyline_item, text_item
 
 
 def get_empty_container(label):
