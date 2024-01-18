@@ -24,6 +24,13 @@ class GMICTrainer(pl.LightningModule):
         self.save_hyperparameters(parameters)
         self.gmic = gmic.GMIC(parameters)
 
+        pretrained_state_dict = torch.load("models/sample_model_2.p")
+        self.gmic.load_state_dict(pretrained_state_dict)
+        
+        # Freeze the pre-trained layers
+        for param in self.gmic.parameters():
+            param.requires_grad = False
+        print("Pre-trained layers frozen")
         self.criterion = nn.BCELoss()
 
         self.train_dataset = dataset_train
