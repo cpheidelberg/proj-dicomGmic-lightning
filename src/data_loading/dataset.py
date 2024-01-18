@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, ast, pickle, h5py
+import os, ast, pickle, h5py, time
 from tqdm import tqdm
 from PIL import Image
 import multiprocessing
@@ -15,6 +15,7 @@ class ClassificationImages(Dataset):
 
     def __init__(self, imageFolder:str, dictPath:str, labelPath:str):
         self.imageFolder = imageFolder
+        self.imageFiles = os.listdir(imageFolder)
         self.imageDict = self.loadPickle(dictPath)
         self.flatDict = self.flattenDict(self.imageDict)
 
@@ -33,15 +34,13 @@ class ClassificationImages(Dataset):
 
 
     def __len__(self):
-        return len(self.flatDict)
+        return len(self.imageFiles)
 
 
     def __getitem__(self, idx):
         
-        imagePath = os.path.join(self.imageFolder, self.flatDict[idx]["image"][0]+".png")
+        imagePath = os.path.join(self.imageFolder, self.imageFiles[idx])
         image = Image.open(imagePath)
-        plt.imshow(np.array(image)/np.max(np.array(image)), cmap="gray")
-        plt.savefig("tmp.png")
 
         image = self.transform(image)
 
@@ -105,61 +104,56 @@ class ClassificationImages(Dataset):
 
 
 class HDF5Dataset(Dataset):
-    def __init__(self, dataFile):
-        self.dataFile = dataFile
-        with h5py.File(self.dataFile, "r") as hf:
-            self.num_samples = len(hf.keys())
+    def __init__(self, dataFolder, batchSize=32):
+        self.dataFolder = dataFolder
+        self.batchSize = batchSize
+        self.dataFiles = [f for f in sorted(os.listdir(dataFolder))]
 
 
     def __len__(self):
-        return self.num_samples
+        return 1000 #len(self.dataFiles) * self.batchSize
 
 
     def __getitem__(self, idx):
-        with h5py.File(self.dataFile, "r") as hf:
+        batchId = idx // self.batchSize
+        dataFile = os.path.join(self.dataFolder, self.dataFiles[batchId])
+        with h5py.File(dataFile, "r") as hf:
             image = hf[f"image_{idx}"][:]
             label = hf[f"label_{idx}"][:]
 
         return image, label
 
 
-def save_data_to_hdf5(dataset, hdf5_file):
-
-    # Create a pool of worker processes
+def save_data_to_hdf5(h5Path, dataset):
+    totalSize = len(dataset)
+    batchSize = 32
+    numBatches = totalSize // batchSize
     num_workers = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(processes=num_workers)
-    chunk_size = len(dataset) // num_workers
+
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+        args = [(h5Path, dataset, batchId, batchSize) for batchId in range(numBatches)]
+        results = list(tqdm(pool.imap(save_batch_to_hdf5_star, args), total=len(args)))
 
 
-    with tqdm(total=len(dataset)) as pbar:
-        args_list = [(hdf5_file, dataset, i * chunk_size, (i + 1) * chunk_size) for i in range(num_workers)]
-        results = pool.starmap(save_chunk_to_hdf5, args_list)
-        pool.close()
-        pool.join()
+def save_batch_to_hdf5_star(args):
+    return save_batch_to_hdf5(*args)
 
 
-def save_chunk_to_hdf5(hdf5_file, dataset, start_idx, end_idx):
-    with h5py.File(hdf5_file, "a") as hf:
-        for idx in tqdm(range(start_idx, end_idx)):
-            image_name = f"image_{idx}"
-            label_name = f"label_{idx}"
+def save_batch_to_hdf5(h5Path, dataset, batchId, batchSize):
+    startId = batchId * batchSize
+    endId = (batchId + 1) * batchSize
+    
+    start = time.time()
+    h5File = os.path.join(h5Path, f"study_{batchId}.h5")
+    with h5py.File(h5File, "w") as hf:
+        for i in range(startId, endId):
+            nameImage = f"image_{i}"
+            nameLabel = f"label_{i}"
+            setImage = hf.create_dataset(nameImage, data=dataset[startId+i][0])
+            setLabel = hf.create_dataset(nameLabel, data=dataset[startId+i][1])
 
-            # Load and preprocess your image
-            image = dataset[idx][0][:]
-            label = dataset[idx][1][:]
-
-            hf.create_dataset(image_name, data=image)
-            hf.create_dataset(label_name, data=label)
-
-
-# with h5py.File(hdf5_file, "w") as hf:
-#     for idx, (image, labelEnc) in enumerate(tqdm(dataset)):
-#         if idx == 10:
-#             break
-#         image_name = f"image_{idx}"
-#         hf.create_dataset(image_name, data=image.numpy())
-#         label_name = f"label_{idx}"
-#         hf.create_dataset(label_name, data=labelEnc)
+    stop = time.time()
+    print("Writing file {}: {:.1g}s".format(batchId, stop - start))
 
 
 def main(): 
@@ -169,16 +163,16 @@ def main():
 
     dataset = ClassificationImages(imageFolder, imageDict, labelFile)
 
-    dataPath = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/"
-    hdf5_file = os.path.join(dataPath, "dataset.h5")
+    dataPath = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images_pickle"
     
-    save_data_to_hdf5(dataset, hdf5_file)
+    save_data_to_hdf5(dataPath, dataset)
+    # with multiprocessing.Pool(12) as pool:
+    #     args = [(dataPath, d, i) for i,d in enumerate(dataset)]
+    #     results = list(tqdm(pool.imap(saveItemStar, args), total=len(args)))
 
-    # data = HDF5Dataset(hdf5_file)
+    # data = HDF5Dataset(hdf5File)
     # print(data[0])
 
 
 if __name__ == "__main__":
     main()
-
-    plt.show()
