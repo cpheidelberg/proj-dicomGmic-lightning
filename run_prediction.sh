@@ -5,17 +5,31 @@ DEVICE_TYPE='cpu'
 GPU_NUMBER=0
 MODEL_INDEX='2'
 
-MODEL_PATH="tb_logs/GMIC_cat/version_12/checkpoints/epoch=63-step=64000.ckpt"
-DICOM_FOLDER='test_data_vindr/dicom_exams'
-DICOM_FILE='1-1.dcm'
+# MODEL_PATH="tb_logs/GMIC_transfer/version_1/checkpoints/epoch=7-step=42656.ckpt"
+MODEL_PATH='models/'
+DICOM_FOLDER='sample_data/dicom_exams'
+DICOM_FILE='1-1.dcm'    
 # DICOM_FILE='Example-Image.dcm'
-DATA_FOLDER='test_data_vindr/images'
-INITIAL_EXAM_LIST_PATH='test_data_vindr/exam_list.pkl'
-CROPPED_IMAGE_PATH='test_data_vindr/cropped_images'
-CROPPED_EXAM_LIST_PATH='test_data_vindr/cropped_images/cropped_exam_list.pkl'
-SEG_PATH='test_data_vindr/segmentation'
-EXAM_LIST_PATH='test_data_vindr/data.pkl'
-OUTPUT_PATH='test_data_vindr'
+DATA_FOLDER='sample_data/images'
+INITIAL_EXAM_LIST_PATH='sample_data/exam_list.pkl'
+CROPPED_IMAGE_PATH='sample_data/cropped_images'
+CROPPED_EXAM_LIST_PATH='sample_data/cropped_images/cropped_exam_list.pkl'
+SEG_PATH='sample_data/segmentation'
+EXAM_LIST_PATH='sample_data/data.pkl'
+OUTPUT_PATH='sample_data'
+
+# Testing new model with vin_dr data
+# MODEL_PATH="tb_logs/GMIC_transfer/version_1/checkpoints/epoch=7-step=42656.ckpt"
+# DICOM_FOLDER='test_data_vindr/dicom_exams'
+# DICOM_FILE='1-1.dcm'
+# # DICOM_FILE='Example-Image.dcm'
+# DATA_FOLDER='test_data_vindr/images'
+# INITIAL_EXAM_LIST_PATH='test_data_vindr/exam_list.pkl'
+# CROPPED_IMAGE_PATH='test_data_vindr/cropped_images'
+# CROPPED_EXAM_LIST_PATH='test_data_vindr/cropped_images/cropped_exam_list.pkl'
+# SEG_PATH='test_data_vindr/segmentation'
+# EXAM_LIST_PATH='test_data_vindr/data.pkl'
+# OUTPUT_PATH='test_data_vindr'
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
@@ -23,29 +37,30 @@ start_time=$(date +%s)
 
 echo 'Stage 1: Convert DICOM exams'
 # use convert_dicom.py for DBT dataset, convert_dicom2.py script for vindr dataset
-python3 src/dicom/convert_dicom2.py \
-    --dicom-data-folder $DICOM_FOLDER \
-    --dicom-file $DICOM_FILE \
-    --image-data-folder $DATA_FOLDER \
-    --exam-list-path $INITIAL_EXAM_LIST_PATH
+# python3 src/dicom/convert_dicom.py \
+#     --dicom-data-folder $DICOM_FOLDER \
+#     --dicom-file $DICOM_FILE \
+#     --image-data-folder $DATA_FOLDER \
+#     --exam-list-path $INITIAL_EXAM_LIST_PATH
 
-echo 'Stage 2: Crop Mammograms'
-python3 src/cropping/crop_mammogram.py \
-    --input-data-folder $DATA_FOLDER \
-    --output-data-folder $CROPPED_IMAGE_PATH \
-    --exam-list-path $INITIAL_EXAM_LIST_PATH  \
-    --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
-    --num-processes $NUM_PROCESSES
+# echo 'Stage 2: Crop Mammograms'
+# python3 src/cropping/crop_mammogram.py \
+#     --input-data-folder $DATA_FOLDER \
+#     --output-data-folder $CROPPED_IMAGE_PATH \
+#     --exam-list-path $INITIAL_EXAM_LIST_PATH  \
+#     --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
+#     --num-processes $NUM_PROCESSES
 
-echo 'Stage 3: Extract Centers'
-python3 src/optimal_centers/get_optimal_centers.py \
-    --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
-    --data-prefix $CROPPED_IMAGE_PATH \
-    --output-exam-list-path $EXAM_LIST_PATH \
-    --num-processes $NUM_PROCESSES
+# echo 'Stage 3: Extract Centers'
+# python3 src/optimal_centers/get_optimal_centers.py \
+#     --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
+#     --data-prefix $CROPPED_IMAGE_PATH \
+#     --output-exam-list-path $EXAM_LIST_PATH \
+#     --num-processes $NUM_PROCESSES
 
  echo 'Stage 4: Run Classifier'
- python3 src/scripts/test_model.py \
+#  python3 src/scripts/test_model.py \
+python3 src/scripts/run_model.py \
      --model-path $MODEL_PATH \
      --dicom-file $DICOM_FILE \
      --data-path $EXAM_LIST_PATH \
