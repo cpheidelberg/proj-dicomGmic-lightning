@@ -1,15 +1,20 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, ast, pickle, h5py, time
+import os, ast, pickle, h5py, time, sys
 from tqdm import tqdm
 from PIL import Image
 import multiprocessing
 
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
-    
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = "/".join(current_dir.split("/")[:-2])
+print(parent_dir)
+sys.path.append(parent_dir)
+from src.data_loading import loading
+
 
 class ClassificationImages(Dataset):
 
@@ -22,13 +27,7 @@ class ClassificationImages(Dataset):
         self.labels = pd.read_csv(labelPath)
         self.labels = self.convertLabels(self.labels)
         self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
-
-        self.transform = transforms.Compose([
-            transforms.Resize((2944, 1920)),
-            transforms.PILToTensor(),
-            transforms.ConvertImageDtype(torch.float),
-            transforms.Normalize((0.5), (0.5)),
-        ])
+        print(len(self.unique_categories))
 
         # TODO: why more labels than images? -> multiple findings
 
@@ -39,10 +38,20 @@ class ClassificationImages(Dataset):
 
     def __getitem__(self, idx):
         
+        # file path 1_L-CC
+        # load image from imagePath
         imagePath = os.path.join(self.imageFolder, self.imageFiles[idx])
-        image = Image.open(imagePath)
+        data = self.flatDict[idx]
+        view = data["view"]
 
-        image = self.transform(image)
+        loaded_image = loading.load_image(
+            image_path=imagePath,
+            view=view,
+            horizontal_flip=data["horizontal_flip"],
+        )
+        loaded_image = loading.process_image(loaded_image, view, data["best_center"][view][0])
+        loaded_image = np.expand_dims(loaded_image, 0).copy()
+        image = torch.Tensor(loaded_image)
 
         studyID = self.flatDict[idx]["examID"]
         imageID = self.flatDict[idx]["dicom"].split('/')[-1]
@@ -81,6 +90,8 @@ class ClassificationImages(Dataset):
         imgDict["view"] = view
         imgDict["image"] = data[view]
         imgDict["dicom"] = data[view+"_path"]
+        imgDict["horizontal_flip"] = data["horizontal_flip"]
+        imgDict["best_center"] = data["best_center"]
 
         return imgDict
 
@@ -111,7 +122,7 @@ class HDF5Dataset(Dataset):
 
 
     def __len__(self):
-        return 1000 #len(self.dataFiles) * self.batchSize
+        return len(self.dataFiles) * self.batchSize
 
 
     def __getitem__(self, idx):
