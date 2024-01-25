@@ -22,7 +22,7 @@ lib/
 lib64/
 parts/
 sdist/
-tb_logs/
+tb_logs*/
 var/
 wheels/
 share/python-wheels/
