@@ -44,7 +44,7 @@ print(np.max(loaded_image))
 print(loaded_image.shape)
 
 plt.imshow(loaded_image, cmap="gray")
-plt.show()
+plt.savefig("mammoOriginal.png")
 
 # %% [markdown]
 # Step 3: preprocess the image
@@ -60,7 +60,7 @@ print(loaded_image.shape)
 print(np.max(loaded_image))
 plt.imshow(loaded_image, cmap="Greys_r")
 plt.axis("off")
-plt.show()
+plt.savefig("mammoCropped.png")
 
 # %% [markdown]
 # Step 4: load the model
@@ -109,7 +109,7 @@ plt.figure()
 plt.imshow(loaded_image, cmap="Greys_r")
 plt.imshow(cv2.resize(malignant_saliency_map, (1920, 2944)), alpha=0.3, cmap=alpha_red, clim=[0.0, 1.0])
 plt.axis("off")
-plt.show()
+plt.savefig("mammoResult.png")
 
 # %%
 
