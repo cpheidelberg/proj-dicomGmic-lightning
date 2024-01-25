@@ -32,8 +32,8 @@ class GMICTrainer(pl.LightningModule):
             # load pretrained state dict into original model
             checkpoint_path = "models/sample_model_2.p"
             self.gmic.load_state_dict(torch.load(checkpoint_path), strict=False)
-            for param in self.gmic.parameters():
-                param.requires_grad = False
+            # for param in self.gmic.parameters(): # Do not freeze layers for fine-tuning
+            #     param.requires_grad = False
             
             # overwrite last layer with wanted number of classes
             self.gmic.fusion_dnn = nn.Linear(parameters["post_processing_dim"]+512, num_classes)
