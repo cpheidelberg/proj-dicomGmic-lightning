@@ -5,31 +5,18 @@ DEVICE_TYPE='cpu'
 GPU_NUMBER=0
 MODEL_INDEX='2'
 
-# MODEL_PATH="tb_logs/GMIC_transfer/version_1/checkpoints/epoch=7-step=42656.ckpt"
-MODEL_PATH='models/'
-DICOM_FOLDER='sample_data/dicom_exams'
-DICOM_FILE='1-1.dcm'    
+MODEL_PATH="models/"
+MODEL_PATH2="tb_logs/GMIC_cat/version_12/checkpoints/epoch=63-step=64000.ckpt"
+DICOM_FOLDER='sample_data_vindr/dicom_exams'
+DICOM_FILE='1-1.dcm'
 # DICOM_FILE='Example-Image.dcm'
-DATA_FOLDER='sample_data/images'
-INITIAL_EXAM_LIST_PATH='sample_data/exam_list.pkl'
-CROPPED_IMAGE_PATH='sample_data/cropped_images'
-CROPPED_EXAM_LIST_PATH='sample_data/cropped_images/cropped_exam_list.pkl'
-SEG_PATH='sample_data/segmentation'
-EXAM_LIST_PATH='sample_data/data.pkl'
-OUTPUT_PATH='sample_data'
-
-# Testing new model with vin_dr data
-# MODEL_PATH="tb_logs/GMIC_transfer/version_1/checkpoints/epoch=7-step=42656.ckpt"
-# DICOM_FOLDER='test_data_vindr/dicom_exams'
-# DICOM_FILE='1-1.dcm'
-# # DICOM_FILE='Example-Image.dcm'
-# DATA_FOLDER='test_data_vindr/images'
-# INITIAL_EXAM_LIST_PATH='test_data_vindr/exam_list.pkl'
-# CROPPED_IMAGE_PATH='test_data_vindr/cropped_images'
-# CROPPED_EXAM_LIST_PATH='test_data_vindr/cropped_images/cropped_exam_list.pkl'
-# SEG_PATH='test_data_vindr/segmentation'
-# EXAM_LIST_PATH='test_data_vindr/data.pkl'
-# OUTPUT_PATH='test_data_vindr'
+DATA_FOLDER='sample_data_vindr/images'
+INITIAL_EXAM_LIST_PATH='sample_data_vindr/exam_list.pkl'
+CROPPED_IMAGE_PATH='sample_data_vindr/cropped_images'
+CROPPED_EXAM_LIST_PATH='sample_data_vindr/cropped_images/cropped_exam_list.pkl'
+SEG_PATH='sample_data_vindr/segmentation'
+EXAM_LIST_PATH='sample_data_vindr/data.pkl'
+OUTPUT_PATH='sample_data_vindr'
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
