@@ -181,17 +181,9 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
 
     for i, (contour, intensity, centroid) in enumerate(top_contours):
         polyline = [point[0].tolist() for point in contour]
-        # print("polyline")
-        # print(len(polyline))
-        # print(len(polyline[0]))
-        # print(polyline[0][0])
-        # print(polyline[0][1])
         for p in polyline:
             p[0] -= window_location[2]
             p[1] -= window_location[0]
-        # print(polyline[0][0])
-        # print(polyline[0][1])
-        # TODO: add shift from window_location to polyline coordinates
         with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
@@ -236,9 +228,13 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
     with torch.no_grad():
         # iterate through each exam
         for datum in tqdm.tqdm(exam_list):
+            print("Datum")
+            print(datum)
             for view in VIEWS.LIST:
                 short_file_path = datum[view][0]
                 dicom_path = os.path.join(datum[str(view) + "_path"], dicom_file)
+                print("View")
+                print(os.path.join(parameters["image_path"], short_file_path + ".png"))
                 # load image
                 # the image is already flipped so no need to do it again
                 loaded_image = loading.load_image(

@@ -24,7 +24,7 @@ start_time=$(date +%s)
 
 echo 'Stage 1: Convert DICOM exams'
 # use convert_dicom.py for DBT dataset, convert_dicom2.py script for vindr dataset
-# python3 src/dicom/convert_dicom2.py \
+# python3 src/dicom/convert_dicom.py \
 #     --dicom-data-folder $DICOM_FOLDER \
 #     --dicom-file $DICOM_FILE \
 #     --image-data-folder $DATA_FOLDER \
@@ -46,7 +46,8 @@ echo 'Stage 1: Convert DICOM exams'
 #     --num-processes $NUM_PROCESSES
 
  echo 'Stage 4: Run Classifier'
- python3 src/scripts/run_model.py \
+#  python3 src/scripts/test_model.py \
+python3 src/scripts/run_model.py \
      --model-path $MODEL_PATH \
      --dicom-file $DICOM_FILE \
      --data-path $EXAM_LIST_PATH \
