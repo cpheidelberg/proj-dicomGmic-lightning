@@ -14,7 +14,6 @@ import pydicom as dcm
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
-print(parent_dir)
 sys.path.append(parent_dir)
 
 from src.utilities import pickling, tools
@@ -37,7 +36,7 @@ if __name__ == "__main__":
 
     model_path = 'models/'
     dicom_file = '1-1.dcm'
-    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/exam_list.pkl'
+    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
     image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/training'
     image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/test'
     seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
@@ -45,6 +44,14 @@ if __name__ == "__main__":
     label_file = "sample_data/annotations/finding_annotations.csv"
 
     dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file)
+
+    # img, label = next(iter(dataTrain))
+    # print(img.size())
+    # img = img.squeeze()
+    # print(img.size())
+    # print(torch.max(img))
+    # print(torch.min(img))
+    # print(label)
     # data = dataset.HDF5Dataset(os.path.join(output_path, "cropped_images_pickle"))
     dataValid = dataset.ClassificationImages(imageFolder=image_path_test, dictPath=data_path, labelPath=label_file)
     # train_set, val_set, test_set = random_split(dataset, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42)) # generator fixed for reproducible results
@@ -56,8 +63,8 @@ if __name__ == "__main__":
         "device_type": device,
         "num_processes": num_processes,
         "gpu_number": gpu_id,
-        "epochs": 64,
-        "batch_size": 1,
+        "epochs": 16,
+        "batch_size": 8,
         "learning_rate": 1e-3,
 
         "max_crop_noise": (100, 100),
@@ -81,8 +88,9 @@ if __name__ == "__main__":
                         parameters=parameters,
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
+                        pretrained=True,
                     )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="GMIC_cat", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="GMIC_transfer", log_graph=True)
     trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,

@@ -19,12 +19,33 @@ from src.constants import VIEWS, PERCENT_T_DICT
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None):
+    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, pretrained=False):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
-        self.gmic = gmic.GMIC(parameters)
 
-        self.criterion = nn.BCELoss()
+        if pretrained:
+            #create base model with original number of classes
+            num_classes = parameters["num_classes"]
+            parameters["num_classes"] = 2
+            self.gmic = gmic.GMIC(parameters)
+
+            # load pretrained state dict into original model
+            checkpoint_path = "models/sample_model_2.p"
+            self.gmic.load_state_dict(torch.load(checkpoint_path), strict=False)
+            for param in self.gmic.parameters():
+                param.requires_grad = False
+            
+            # overwrite last layer with wanted number of classes
+            self.gmic.fusion_dnn = nn.Linear(parameters["post_processing_dim"]+512, num_classes)
+            self.gmic.fusion_dnn.requires_grad = True  # Enable gradient computation for the last layer
+
+            print(f"Use pretrained model from {checkpoint_path}")
+        else:
+            # randomly initialise original model with given number of classes
+            self.gmic = gmic.GMIC(parameters)
+
+
+        self.criterion = nn.CrossEntropyLoss()
 
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
@@ -45,8 +66,10 @@ class GMICTrainer(pl.LightningModule):
         y_hat = self(img)
 
         loss = self.criterion(y_hat, y)
+        diff = torch.sum(torch.abs(y_hat - y))
         
         self.log("train_loss", loss, on_epoch=True, sync_dist=True)
+        self.log("train_diff", diff, on_epoch=True, sync_dist=True)
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
 
         return loss

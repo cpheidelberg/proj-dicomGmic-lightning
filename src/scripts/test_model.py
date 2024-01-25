@@ -242,6 +242,7 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
         # iterate through each exam
         for datum in tqdm.tqdm(exam_list):
             for view in VIEWS.LIST:
+                print(datum)
                 short_file_path = datum[view][0]
                 dicom_path = os.path.join(datum[str(view) + "_path"], dicom_file)
                 # load image
@@ -349,7 +350,7 @@ def main():
             "K": 6,
             "crop_shape": (256, 256),
             "post_processing_dim":256,
-            "num_classes":2,
+            "num_classes":11,
             "use_v1_global":False,
         }
         start_experiment(
@@ -390,7 +391,7 @@ def main():
             "K": 6,
             "crop_shape": (256, 256),
             "post_processing_dim": 256,
-            "num_classes":2,
+            "num_classes":11,
             "use_v1_global":False,
         }
         start_experiment(
