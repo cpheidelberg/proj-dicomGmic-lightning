@@ -145,4 +145,4 @@ class GMIC(nn.Module):
         concat_vec = torch.cat([global_vec, z], dim=1)
         self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
-        return self.y_fusion
+        return self.y_fusion, self.y_global, self.y_local

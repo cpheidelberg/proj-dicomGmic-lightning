@@ -262,7 +262,8 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
                 loaded_image = np.expand_dims(np.expand_dims(loaded_image, 0), 0).copy()
                 tensor_batch = torch.Tensor(loaded_image)
                 # forward propagation
-                output = model(tensor_batch)
+                output = model(tensor_batch)[0]
+                print(output)
                 pred_numpy = output.data.cpu().numpy()
                 benign_pred, malignant_pred = pred_numpy[0, 0], pred_numpy[0, 1]
                 # save visualization
