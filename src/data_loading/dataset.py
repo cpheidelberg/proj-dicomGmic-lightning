@@ -11,7 +11,6 @@ from torch.utils.data import Dataset
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
-print(parent_dir)
 sys.path.append(parent_dir)
 from src.data_loading import loading
 
@@ -25,9 +24,11 @@ class ClassificationImages(Dataset):
         self.flatDict = self.flattenDict(self.imageDict)
 
         self.labels = pd.read_csv(labelPath)
+        self.filtered_categories = self.filterCategories(top_c=5)
         self.labels = self.convertLabels(self.labels)
         self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
-        print(len(self.unique_categories))
+
+        print("Number of classes: {}".format(len(self.unique_categories)))
 
         # TODO: why more labels than images? -> multiple findings
 
@@ -112,6 +113,44 @@ class ClassificationImages(Dataset):
         # df_single = df.explode(column, ignore_index=True)
 
         return df
+
+
+    def filterCategories(self, top_c=5):
+        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
+
+        class_counts = self.labels["finding_categories"].value_counts()
+        origLen = len(self.imageFiles)
+
+        class_counts = class_counts.sort_values(ascending=False)
+        top_labels = class_counts.head(top_c).index
+
+        filtered_labels = self.labels[self.labels['finding_categories'].apply(lambda x: any(label in x for label in top_labels))]
+        removed_labels = self.labels[~self.labels.index.isin(filtered_labels.index)]
+
+        self.labels = filtered_labels
+
+        removed_exams = list(set(removed_labels["study_id"].to_list())) # get unique study IDs from removed_labels
+
+        print(len(self.flatDict))
+        for study_id in removed_exams:
+            view = [d["image"][0] for d in self.flatDict if d["examID"] == study_id]
+            # TODO: remove element from flatDict
+            self.flatDict = [d for d in self.flatDict if d["examID"] != study_id]
+            # print(self.imageFiles.index[view[0]+".png"])
+            for v in view:
+                if v+".png" in self.imageFiles:
+                    self.imageFiles.remove(v+".png")
+            # break
+            
+            # if exam_id is not None:
+            #     view = self.flatDict["view"].get(exam_id, None)
+            #     if view is not None:
+            #         # Identifizieren und Löschen der Einträge in self.imageFiles
+            #         self.imageFiles = [file for file in self.imageFiles if not (file['examID'] == exam_id and file['view'] == view)]
+        print(len(self.flatDict))
+
+        newLen = len(self.imageFiles)
+        print("{}/{} images for {} retained categories".format(newLen, origLen, top_c))
 
 
 class HDF5Dataset(Dataset):
