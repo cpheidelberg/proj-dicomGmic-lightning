@@ -1,0 +1,3 @@
+[submodule "src/tool_dicomIO_python"]
+	path = src/dicom
+	url = git@github.com:cpheidelberg/tool_dicomIO_python.git
