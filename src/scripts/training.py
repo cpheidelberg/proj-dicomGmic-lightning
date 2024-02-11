@@ -3,14 +3,15 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from tqdm import tqdm
+import time
+import multiprocessing
+
 import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
-
-
-from tqdm import tqdm
 import pydicom as dcm
 
 # import own files 
@@ -31,11 +32,6 @@ if __name__ == "__main__":
     else: 
         device = "cpu"
 
-    num_processes = 10
-    gpu_id = 0
-    model_index='2'
-    visualization_flag = False
-
     model_path = 'models/'
     dicom_file = '1-1.dcm'
     data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
@@ -45,20 +41,16 @@ if __name__ == "__main__":
     output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     label_file = "sample_data/annotations/finding_annotations.csv"
 
-    dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file)
-    dataValid = dataset.ClassificationImages(imageFolder=image_path_test, dictPath=data_path, labelPath=label_file)
-    # train_set, val_set, test_set = random_split(dataset, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42)) # generator fixed for reproducible results
-
     parameters = {
         # training hyperparameters
         "device_type": device,
-        "num_processes": num_processes,
-        "gpu_number": gpu_id,
-        "epochs": 32,
+        "gpu_number": 0,
+        "epochs": 1,
         "batch_size": 1,
-        "learning_rate": 1e-3,
+        "learning_rate": 1e-4,
         "pretrained": True,
-        "fine-tuning": True,
+        "fine-tuning": False,
+        "model_idx": 2,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -70,19 +62,26 @@ if __name__ == "__main__":
         "cam_size": (46, 30),
         "K": 6, # num patches
         "crop_shape": (256, 256), # patch size
-        "percent_t": 0.03,
+        "percent_t": 0.04,
         "post_processing_dim": 256,
-        "num_classes": len(dataTrain.unique_categories), # output classes
+        "num_classes": 5, # output classes
         "use_v1_global": False,
     }
+
+    # dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+    # dataValid = dataset.ClassificationImages(imageFolder=image_path_test, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+    dataTrain = dataset.H5Dataset(h5_file="datasetTrain.h5")
+    dataValid = dataset.H5Dataset(h5_file="datasetValid.h5")
+    dataValid, dataTest = random_split(dataValid, [0.5, 0.5], generator=torch.Generator().manual_seed(42)) # generator fixed for reproducible results
 
     # Training
     lightningModule = trainer.GMICTrainer(
                         parameters=parameters,
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
+                        dataset_test=dataTest,
                     )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="GMIC_transfer", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="GMIC_cat", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
                     patience=5,
@@ -90,15 +89,20 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run=50, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
+                        # gradient_clip_val=1e-3,
                         accelerator=device, 
-                        devices=[0],
+                        devices=[parameters["gpu_number"]],
                         logger=logger,
                         # profiler="simple",
-                        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+                        # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
                         # callbacks=[ModelSummary(max_depth=2)],
                     )
     trainer.fit(model=lightningModule)
+    
+    print("Training finished at: {}".format(time.ctime()))
+
+    trainer.test(model=lightningModule)

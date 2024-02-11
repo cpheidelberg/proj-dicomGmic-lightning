@@ -17,21 +17,24 @@ from src.data_loading import loading
 
 class ClassificationImages(Dataset):
 
-    def __init__(self, imageFolder:str, dictPath:str, labelPath:str):
+    def __init__(self, imageFolder:str, dictPath:str, labelPath:str, top_c=None, h5_file=None):
         self.imageFolder = imageFolder
         self.imageFiles = os.listdir(imageFolder)
         self.imageDict = self.loadPickle(dictPath)
         self.flatDict = self.flattenDict(self.imageDict)
 
         self.labels = pd.read_csv(labelPath)
-        self.filtered_categories = self.filterCategories(top_c=5)
+        if top_c:
+            self.filterCategories(top_c)
         self.labels = self.convertLabels(self.labels)
         self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
 
         print("Number of classes: {}".format(len(self.unique_categories)))
 
-        # TODO: why more labels than images? -> multiple findings
-
+        self.h5_file = h5_file
+        if self.h5_file:
+            self.create_h5_dataset()
+        
 
     def __len__(self):
         return len(self.imageFiles)
@@ -39,8 +42,6 @@ class ClassificationImages(Dataset):
 
     def __getitem__(self, idx):
         
-        # file path 1_L-CC
-        # load image from imagePath
         imagePath = os.path.join(self.imageFolder, self.imageFiles[idx])
         data = self.flatDict[idx]
         view = data["view"]
@@ -58,8 +59,13 @@ class ClassificationImages(Dataset):
         imageID = self.flatDict[idx]["dicom"].split('/')[-1]
 
         labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
-        # metadata from preprocessing in self.imageDict[self.flatDict.iloc[idx]["examID"]]
         labelEnc = self.createHotEncoding(labelList)
+
+        print(image.shape)
+        print(labelEnc.shape)
+
+        if self.h5_file:
+            self.save_to_h5(image, labelEnc, idx)
 
         return image, labelEnc
 
@@ -69,6 +75,7 @@ class ClassificationImages(Dataset):
             data = pickle.load(f)
 
         return data
+
 
     def flattenDict(self, data):
         flatDict = []
@@ -114,6 +121,18 @@ class ClassificationImages(Dataset):
 
         return df
 
+    
+    def create_h5_dataset(self):
+        with h5py.File(self.h5_file, 'w') as hf:
+            hf.create_dataset('images', (len(self.imageFiles), 2944, 1920), dtype='i')
+            hf.create_dataset('labels', (len(self.imageFiles), len(self.unique_categories)), dtype='i')
+
+
+    def save_to_h5(self, image, label, idx):
+        with h5py.File(self.h5_file, 'a') as hf:
+            hf['images'][idx, ...] = image
+            hf['labels'][idx, ...] = label
+
 
     def filterCategories(self, top_c=5):
         """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
@@ -134,77 +153,47 @@ class ClassificationImages(Dataset):
         print(len(self.flatDict))
         for study_id in removed_exams:
             view = [d["image"][0] for d in self.flatDict if d["examID"] == study_id]
-            # TODO: remove element from flatDict
             self.flatDict = [d for d in self.flatDict if d["examID"] != study_id]
-            # print(self.imageFiles.index[view[0]+".png"])
             for v in view:
                 if v+".png" in self.imageFiles:
                     self.imageFiles.remove(v+".png")
-            # break
-            
-            # if exam_id is not None:
-            #     view = self.flatDict["view"].get(exam_id, None)
-            #     if view is not None:
-            #         # Identifizieren und Löschen der Einträge in self.imageFiles
-            #         self.imageFiles = [file for file in self.imageFiles if not (file['examID'] == exam_id and file['view'] == view)]
-        print(len(self.flatDict))
 
         newLen = len(self.imageFiles)
         print("{}/{} images for {} retained categories".format(newLen, origLen, top_c))
 
 
-class HDF5Dataset(Dataset):
-    def __init__(self, dataFolder, batchSize=32):
-        self.dataFolder = dataFolder
-        self.batchSize = batchSize
-        self.dataFiles = [f for f in sorted(os.listdir(dataFolder))]
+class H5Dataset(Dataset):
+    def __init__(self, h5_file, batch_size=1):
+        self.h5_file = h5_file
+        self.batch_size = batch_size
+
+        self.h5f = h5py.File(self.h5_file, 'r')
+        self.num_samples = len(self.h5f['images'])
 
 
     def __len__(self):
-        return len(self.dataFiles) * self.batchSize
+        return self.num_samples
 
 
     def __getitem__(self, idx):
-        batchId = idx // self.batchSize
-        dataFile = os.path.join(self.dataFolder, self.dataFiles[batchId])
-        with h5py.File(dataFile, "r") as hf:
-            image = hf[f"image_{idx}"][:]
-            label = hf[f"label_{idx}"][:]
+        start_idx = idx * self.batch_size
+        end_idx = min((idx + 1) * self.batch_size, self.num_samples)
 
-        return image, label
+        # Load images and labels for the current batch
+        images = self.h5f['images'][start_idx:end_idx]
+        images = torch.tensor(images, dtype=torch.float32)
+        labels = self.h5f['labels'][start_idx:end_idx]
+        labels = np.squeeze(torch.tensor(labels, dtype=torch.float32))
 
+        print(images.shape)
+        print(labels.shape)
 
-def save_data_to_hdf5(h5Path, dataset):
-    totalSize = len(dataset)
-    batchSize = 32
-    numBatches = totalSize // batchSize
-    num_workers = multiprocessing.cpu_count()
-
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
-        args = [(h5Path, dataset, batchId, batchSize) for batchId in range(numBatches)]
-        results = list(tqdm(pool.imap(save_batch_to_hdf5_star, args), total=len(args)))
+        return images, labels
 
 
-def save_batch_to_hdf5_star(args):
-    return save_batch_to_hdf5(*args)
-
-
-def save_batch_to_hdf5(h5Path, dataset, batchId, batchSize):
-    startId = batchId * batchSize
-    endId = (batchId + 1) * batchSize
-    
-    start = time.time()
-    h5File = os.path.join(h5Path, f"study_{batchId}.h5")
-    with h5py.File(h5File, "w") as hf:
-        for i in range(startId, endId):
-            nameImage = f"image_{i}"
-            nameLabel = f"label_{i}"
-            setImage = hf.create_dataset(nameImage, data=dataset[startId+i][0])
-            setLabel = hf.create_dataset(nameLabel, data=dataset[startId+i][1])
-
-    stop = time.time()
-    print("Writing file {}: {:.1g}s".format(batchId, stop - start))
-
+    def close(self):
+        self.h5f.close()
+        
 
 def main(): 
     imageFolder = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images'
