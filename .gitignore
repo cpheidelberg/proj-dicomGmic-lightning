@@ -1,6 +1,7 @@
 # exclude large data folder for manual editing
 *_data*/
 *_output*/
+*.h5
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
