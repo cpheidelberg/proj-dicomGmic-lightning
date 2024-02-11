@@ -372,7 +372,7 @@ def main():
             device = "cpu"
         device = "cpu"
         
-        model_path = "tb_logs/GMIC_cat/version_12/checkpoints/epoch=63-step=64000.ckpt"
+        model_path = "tb_logs/GMIC_transfer/version_15/checkpoints/epoch=31-step=486400.ckpt"
         dicom_file = '1-1.dcm'
         data_path = 'test_data_vindr/exam_list.pkl'
         image_path_test = 'test_data_vindr/cropped_images/'

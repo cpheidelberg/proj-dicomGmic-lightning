@@ -6,7 +6,7 @@ GPU_NUMBER=0
 MODEL_INDEX='2'
 
 MODEL_PATH="models/"
-MODEL_PATH2="tb_logs/GMIC_cat/version_12/checkpoints/epoch=63-step=64000.ckpt"
+MODEL_PATH="tb_logs/GMIC_transfer/version_16/checkpoints/epoch=127-step=243200.ckpt"
 DICOM_FOLDER='sample_data_vindr/dicom_exams'
 DICOM_FILE='1-1.dcm'
 # DICOM_FILE='Example-Image.dcm'
@@ -22,9 +22,9 @@ export PYTHONPATH=$(pwd):$PYTHONPATH
 
 start_time=$(date +%s)
 
-echo 'Stage 1: Convert DICOM exams'
-# use convert_dicom.py for DBT dataset, convert_dicom2.py script for vindr dataset
-# python3 src/dicom/convert_dicom.py \
+# echo 'Stage 1: Convert DICOM exams'
+# # use convert_dicom.py for DBT dataset, convert_dicom2.py script for vindr dataset
+# python3 src/dicom/convert_dicom2.py \
 #     --dicom-data-folder $DICOM_FOLDER \
 #     --dicom-file $DICOM_FILE \
 #     --image-data-folder $DATA_FOLDER \
@@ -45,9 +45,9 @@ echo 'Stage 1: Convert DICOM exams'
 #     --output-exam-list-path $EXAM_LIST_PATH \
 #     --num-processes $NUM_PROCESSES
 
- echo 'Stage 4: Run Classifier'
-#  python3 src/scripts/test_model.py \
-python3 src/scripts/run_model.py \
+echo 'Stage 4: Run Classifier'
+# python3 src/scripts/run_model.py \
+python3 src/scripts/test_model.py \
      --model-path $MODEL_PATH \
      --dicom-file $DICOM_FILE \
      --data-path $EXAM_LIST_PATH \
