@@ -35,8 +35,9 @@ if __name__ == "__main__":
     model_path = 'models/'
     dicom_file = '1-1.dcm'
     data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/training'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/test'
+    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
+    # image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/test'
+    image_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
     seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
     output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     label_file = "sample_data/annotations/finding_annotations.csv"
@@ -68,20 +69,24 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    # dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+    dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+
+    parameters["class_labels"] = dataTrain.unique_categories
+
     # dataValid = dataset.ClassificationImages(imageFolder=image_path_test, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
-    dataTrain = dataset.H5Dataset(h5_file="datasetTrain.h5")
-    dataValid = dataset.H5Dataset(h5_file="datasetValid.h5")
-    dataValid, dataTest = random_split(dataValid, [0.5, 0.5], generator=torch.Generator().manual_seed(42)) # generator fixed for reproducible results
+    # data = dataset.ClassificationImages(imageFolder=image_path, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+    # dataTrain = dataset.H5Dataset(h5_file="datasetTrain.h5")
+    # dataValid = dataset.H5Dataset(h5_file="datasetValid.h5")
+    # dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42)) # generator fixed for reproducible results
 
     # Training
     lightningModule = trainer.GMICTrainer(
                         parameters=parameters,
                         dataset_train=dataTrain,
-                        dataset_valid=dataValid,
-                        dataset_test=dataTest,
+                        # dataset_valid=dataValid,
+                        # dataset_test=dataTest,
                     )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="GMIC_cat", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="weighted", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
                     patience=5,
@@ -89,7 +94,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=50, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
@@ -105,4 +110,4 @@ if __name__ == "__main__":
     
     print("Training finished at: {}".format(time.ctime()))
 
-    trainer.test(model=lightningModule)
+    # trainer.test(model=lightningModule)

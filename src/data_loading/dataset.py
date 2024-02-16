@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os, ast, pickle, h5py, time, sys
+import os, ast, pickle, h5py, time, sys, shutil
 from tqdm import tqdm
 from PIL import Image
 import multiprocessing
@@ -28,13 +28,18 @@ class ClassificationImages(Dataset):
             self.filterCategories(top_c)
         self.labels = self.convertLabels(self.labels)
         self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
-
         print("Number of classes: {}".format(len(self.unique_categories)))
+        self.category_dict = dict.fromkeys(self.unique_categories, 0)
 
         self.h5_file = h5_file
         if self.h5_file:
             self.create_h5_dataset()
-        
+
+        # save image_label pairs
+        # self.label_counts = self.labels["finding_categories"].value_counts()
+        # self.max_count = self.label_counts.max()
+        # self.require_dict = {k[0]: (self.max_count - v) // v for k,v in zip(self.label_counts.keys(), self.label_counts.values)}
+
 
     def __len__(self):
         return len(self.imageFiles)
@@ -43,7 +48,23 @@ class ClassificationImages(Dataset):
     def __getitem__(self, idx):
         
         imagePath = os.path.join(self.imageFolder, self.imageFiles[idx])
-        data = self.flatDict[idx]
+
+        if len(self.imageFiles[idx].split("_")) > 2:
+            original_file_name = "_".join(self.imageFiles[idx].split("_")[:-1]).strip(".png")
+        else:
+            original_file_name = self.imageFiles[idx].strip(".png")
+        # Find the entry of the original filename in self.flatDict["image"]
+        data = None
+        # index = None
+        for i, entry in enumerate(self.flatDict):
+            if entry["image"][0] == original_file_name:
+                studyID = entry["examID"]
+                imageID = entry["dicom"].split('/')[-1]
+                data = entry
+                # index = i
+                break
+        if data is None:
+            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
         view = data["view"]
 
         loaded_image = loading.load_image(
@@ -55,17 +76,22 @@ class ClassificationImages(Dataset):
         loaded_image = np.expand_dims(loaded_image, 0).copy()
         image = torch.Tensor(loaded_image)
 
-        studyID = self.flatDict[idx]["examID"]
-        imageID = self.flatDict[idx]["dicom"].split('/')[-1]
-
         labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
         labelEnc = self.createHotEncoding(labelList)
 
-        print(image.shape)
-        print(labelEnc.shape)
-
         if self.h5_file:
             self.save_to_h5(image, labelEnc, idx)
+
+        self.category_dict[labelList[0]] += 1
+        print(self.category_dict)
+
+        # save image label pairs
+        # req = self.require_dict[labelList[0]]
+        # print(f"For label {labelList[0]} at image {original_file_name}, {req} copies are required")
+        # for i in range(req):
+        #     newPath = "/".join(self.imageFolder.split("/")[:-2]) + "/balanced_cropped_top5/" + os.path.splitext(self.imageFiles[idx])[0] + "_" + str(i) + ".png"
+        #     shutil.copy(imagePath, newPath)
+        # self.flatDict[i]["finding_categories"] = labelList
 
         return image, labelEnc
 
@@ -184,9 +210,6 @@ class H5Dataset(Dataset):
         images = torch.tensor(images, dtype=torch.float32)
         labels = self.h5f['labels'][start_idx:end_idx]
         labels = np.squeeze(torch.tensor(labels, dtype=torch.float32))
-
-        print(images.shape)
-        print(labels.shape)
 
         return images, labels
 
