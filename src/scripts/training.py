@@ -36,7 +36,7 @@ if __name__ == "__main__":
     dicom_file = '1-1.dcm'
     data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
     image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    # image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/test'
+    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
     image_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
     seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
     output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
@@ -46,11 +46,11 @@ if __name__ == "__main__":
         # training hyperparameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 1,
-        "batch_size": 1,
-        "learning_rate": 1e-4,
+        "epochs": 32,
+        "batch_size": 4,
+        "learning_rate": 1e-3,
         "pretrained": True,
-        "fine-tuning": False,
+        "fine-tuning": True,
         "model_idx": 2,
 
         "max_crop_noise": (100, 100),
@@ -63,30 +63,25 @@ if __name__ == "__main__":
         "cam_size": (46, 30),
         "K": 6, # num patches
         "crop_shape": (256, 256), # patch size
-        "percent_t": 0.04,
+        "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 5, # output classes
+        "num_classes": 6, # output classes
         "use_v1_global": False,
     }
 
-    dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+    dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
 
-    parameters["class_labels"] = dataTrain.unique_categories
-
-    # dataValid = dataset.ClassificationImages(imageFolder=image_path_test, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
-    # data = dataset.ClassificationImages(imageFolder=image_path, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
-    # dataTrain = dataset.H5Dataset(h5_file="datasetTrain.h5")
-    # dataValid = dataset.H5Dataset(h5_file="datasetValid.h5")
-    # dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42)) # generator fixed for reproducible results
+    # dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
+    dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
 
     # Training
     lightningModule = trainer.GMICTrainer(
                         parameters=parameters,
                         dataset_train=dataTrain,
-                        # dataset_valid=dataValid,
-                        # dataset_test=dataTest,
+                        dataset_valid=dataValid,
+                        dataset_test=dataTest,
                     )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="weighted", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
                     patience=5,
@@ -100,7 +95,8 @@ if __name__ == "__main__":
                         max_epochs=parameters["epochs"], 
                         # gradient_clip_val=1e-3,
                         accelerator=device, 
-                        devices=[parameters["gpu_number"]],
+                        # devices=[parameters["gpu_number"]],
+                        devices=[1,2],
                         logger=logger,
                         # profiler="simple",
                         # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
@@ -110,4 +106,4 @@ if __name__ == "__main__":
     
     print("Training finished at: {}".format(time.ctime()))
 
-    # trainer.test(model=lightningModule)
+    trainer.test(model=lightningModule)

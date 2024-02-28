@@ -40,7 +40,8 @@ def objective(trial, dataTrain, dataValid):
     trainInst = pl.Trainer(fast_dev_run=False,
                         max_epochs=parameters["epochs"], 
                         accelerator=device, 
-                        devices=[parameters["gpu_number"]],
+                        # devices=[parameters["gpu_number"]],
+                        devices=[1,2],
                         logger=logger,
                         strategy=DDPStrategy(find_unused_parameters=True),
                     )
@@ -76,9 +77,9 @@ if __name__ == "__main__":
         "gpu_number": 2,
         "epochs": 4,
         "batch_size": 1,
-        "learning_rate": 2e-5,
+        "learning_rate": 1e-3,
         "pretrained": True,
-        "fine-tuning": False,
+        "fine-tuning": True,
         "model_idx": 2,
 
         "max_crop_noise": (100, 100),
@@ -91,14 +92,14 @@ if __name__ == "__main__":
         "cam_size": (46, 30),
         "K": 6, # num patches
         "crop_shape": (256, 256), # patch size
-        "percent_t": 0.04,
+        "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 5, # output classes
+        "num_classes": 6, # output classes
         "use_v1_global": False,
     }
 
-    dataTrain = dataset.ClassificationImages(imageFolder=image_path_train, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
-    dataValid = dataset.ClassificationImages(imageFolder=image_path_test, dictPath=data_path, labelPath=label_file, top_c=parameters["num_classes"])
+    dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
+    dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
 
     # Optimize hyperparameters using Optuna
     study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner(
