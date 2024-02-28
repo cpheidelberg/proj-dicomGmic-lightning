@@ -11,7 +11,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 import multiprocessing
-import torchmetrics
+from torchmetrics.functional import accuracy
 
 from src.utilities import pickling, tools
 from src.modeling import gmic
@@ -40,21 +40,11 @@ class GMICTrainer(pl.LightningModule):
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
 
-        # class weights
-        # if dataset_train:
-        #     print(dataset.size)
-        #     labels = [label for _, label in dataset_train]
-        #     print(labels.shape)
-        #     class_counts = np.bincount(labels)
-        #     class_weights = 1.0 / torch.tensor(class_counts, dtype=torch.float)
-        #     class_weights /= class_weights.sum()  # Normalize to sum up to 1
-        #     self.class_weights = class_weights.to(parameters['device'])
-        # else:
-        #     self.class_weights = None
-
         # metrics
-        # self.train_acc = torchmetrics.Accuracy(task="binary")
+        # self.train_acc = accuracy(task="binary")
         # self.train_f1 = torchmetrics.F1Score(task="binary")
+
+        # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
 
     def initPretrainedWeights(self, state_dict):
@@ -86,16 +76,19 @@ class GMICTrainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
+        # y_index = int(torch.max(y, 1)[1])
+        # self.class_labels[y_index] += 1
 
         y_global, y_local, y_fusion = self(img)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
+        
         loss = loss_fusion + loss_global + loss_local
 
-        # if loss > 10 and self.current_epoch > 1:
-        #     print(batch)
+        # self.train_acc.update(y_fusion, y)
+        # self.train_f1.update(y_fusion, y)
         
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
@@ -112,12 +105,17 @@ class GMICTrainer(pl.LightningModule):
     #     train_accuracy = self.train_acc.compute()
     #     train_f1 = self.train_f1.compute()
     #     # log metrics
-    #     self.log("epoch_train_accuracy", train_accuracy)
-    #     self.log("epoch_train_f1", train_f1)
+    #     if self.trainer.is_global_zero:
+    #         self.log("epoch_train_accuracy", train_accuracy, rank_zero_only=True)
+    #         self.log("epoch_train_f1", train_f1, rank_zero_only=True)
     #     # reset all metrics
     #     self.train_acc.reset()
     #     self.train_f1.reset()
-    #     print(f"\ntraining accuracy: {train_accuracy:.4}, f1: {train_f1:.4}")
+    #     print(f"\nTraining accuracy: {train_accuracy:.4}, F1: {train_f1:.4}")
+        # print(self.train_dataset.label_counts)
+        # print(self.train_dataset.require_dict)
+        # print(self.train_dataset.unique_categories)
+        # print(self.class_labels)
 
 
     def validation_step(self, batch, batch_idx):
@@ -129,6 +127,7 @@ class GMICTrainer(pl.LightningModule):
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
+
         loss = loss_fusion + loss_global + loss_local
         
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
@@ -154,35 +153,26 @@ class GMICTrainer(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        # Use different learning rates for different classes
-        # if self.class_weights:
-        #     parameters = [{'params': self.gmic.parameters()},
-        #                   {'params': self.other_parameters, 'lr': self.hparams.learning_rate}]  # Adjust as needed
-        #     optimizer = torch.optim.Adam(parameters, lr=self.hparams.learning_rate)
-        #     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20], gamma=0.1)  # Adjust milestones as needed
-        #     return {'optimizer': optimizer, 'lr_scheduler': scheduler}
-        # else:
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.hparams.learning_rate)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10, 20], gamma=0.1)  # Adjust milestones as needed
-        return {'optimizer': optimizer, 'lr_scheduler': scheduler}
+        return optimizer
 
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=1, shuffle=False)
+            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=1, shuffle=False)
+            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=1, shuffle=False)
+            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
