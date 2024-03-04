@@ -14,6 +14,7 @@ from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
 import pydicom as dcm
 
+print('hello world')    
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
@@ -32,15 +33,30 @@ if __name__ == "__main__":
     else: 
         device = "cpu"
 
+
+  #      model_path = 'models/'
+   #     dicom_file = '1-1.dcm'
+   #     data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
+   #     image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
+   #     image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
+   #     image_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
+   #     seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
+   #     output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
+   #     label_file = "sample_data/annotations/finding_annotations.csv"
+
+
     model_path = 'models/'
     dicom_file = '1-1.dcm'
-    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    image_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
-    seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-    output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
+    data_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
+    image_path_train = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
+    image_path_test = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
+    image_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
+    seg_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
+    output_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     label_file = "sample_data/annotations/finding_annotations.csv"
+
+
+    print('hello world')
 
     parameters = {
         # training hyperparameters
@@ -89,7 +105,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run = True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
@@ -107,3 +123,7 @@ if __name__ == "__main__":
     print("Training finished at: {}".format(time.ctime()))
 
     trainer.test(model=lightningModule)
+
+
+print('hello world')
+
