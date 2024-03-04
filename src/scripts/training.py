@@ -66,7 +66,7 @@ if __name__ == "__main__":
         "batch_size": 4,
         "learning_rate": 1e-3,
         "pretrained": True,
-        "fine-tuning": True,
+        "fine-tuning": False,
         "model_idx": 2,
 
         "max_crop_noise": (100, 100),
@@ -85,9 +85,9 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
+    # dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
 
-    # dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
+    dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
     dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
 
     # Training
