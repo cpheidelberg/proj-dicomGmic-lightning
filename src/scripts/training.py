@@ -29,7 +29,11 @@ from src.constants import VIEWS, PERCENT_T_DICT
 if __name__ == "__main__":
 
     if torch.cuda.is_available():
+        print(f"{torch.cuda.device_count()} GPUs are available")
         device = "gpu"
+    elif torch.backends.mps.is_available():
+        print("Apple MPS is available")
+        device = "mps"
     else: 
         device = "cpu"
 
