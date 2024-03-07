@@ -22,7 +22,7 @@ class ClassificationImages(Dataset):
         self.imageFolder = imageFolder
         self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
         random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv("dictionary.csv", converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
+        self.flatDictDF = pd.read_csv("../../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv", converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
 
         if top_c:
             self.filterCategories(top_c)
