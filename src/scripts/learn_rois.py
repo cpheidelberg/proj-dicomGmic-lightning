@@ -1,4 +1,5 @@
 import os
+import sys
 import cv2
 import json
 import argparse
@@ -11,6 +12,11 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.nn.functional as F
+
+# import own files
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = "/".join(current_dir.split("/")[:-2])
+sys.path.append(parent_dir)
 
 from src.modeling import gmic as gmic
 from src.data_loading import loading
@@ -142,11 +148,11 @@ def main():
 
     # retrieve command line arguments
     parser = argparse.ArgumentParser(description='Run GMIC on the sample data')
-    parser.add_argument('--model-path', required=True)
-    parser.add_argument('--exam-path', required=True)
-    parser.add_argument('--image-path', required=True)
-    parser.add_argument('--segmentation-path', required=True)
-    parser.add_argument('--output-path', required=True)
+    parser.add_argument('--model-path', default='models/')
+    parser.add_argument('--exam-path', default='sample_output/data.pkl')
+    parser.add_argument('--image-path', default='sample_output/cropped_images')
+    parser.add_argument('--segmentation-path', default='sample_output/segmentation')
+    parser.add_argument('--output-path', default='sample_output')
     parser.add_argument('--device-type', default="cpu", choices=['gpu', 'cpu'])
     parser.add_argument("--gpu-number", type=int, default=0)
     parser.add_argument("--model-index", type=str, default="1")
@@ -171,7 +177,6 @@ def main():
         "num_classes":2,
         "use_v1_global":False,
     }
-
 
     model_path = "models"
     json_path = '/media/ayk/4644D1AB10BDC110/Medken/proj-dicomGmic-lightning-master/proj-dicomGmic-lightning/medken_feedback.json'
