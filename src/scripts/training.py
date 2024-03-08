@@ -28,6 +28,7 @@ from src.constants import VIEWS, PERCENT_T_DICT
 
 if __name__ == "__main__":
 
+    # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
         device = "gpu"
@@ -37,33 +38,23 @@ if __name__ == "__main__":
     else: 
         device = "cpu"
 
-
-  #      model_path = 'models/'
-   #     dicom_file = '1-1.dcm'
-   #     data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-   #     image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-   #     image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-   #     image_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
-   #     seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-   #     output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-   #     label_file = "sample_data/annotations/finding_annotations.csv"
-
-
+    # set path variables
     model_path = 'models/'
     dicom_file = '1-1.dcm'
-    data_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    image_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
-    seg_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-    output_path = '/home/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    label_file = "sample_data/annotations/finding_annotations.csv"
 
+    sds_path = '/home/student1/sds_hd/'
+    
+    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
+    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
+    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
+    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
+    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
+    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
+    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
 
-    print('hello world')
-
+    # set hyperparameters
     parameters = {
-        # training hyperparameters
+        # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
         "epochs": 32,
@@ -89,9 +80,8 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    # dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
-
-    dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
+    # dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
+    dataTrain = dataset.H5Dataset(h5_filepath=h5_path)
     dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
 
     # Training
@@ -127,7 +117,3 @@ if __name__ == "__main__":
     print("Training finished at: {}".format(time.ctime()))
 
     trainer.test(model=lightningModule)
-
-
-print('hello world')
-

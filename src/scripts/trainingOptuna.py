@@ -64,12 +64,16 @@ if __name__ == "__main__":
 
     model_path = 'models/'
     dicom_file = '1-1.dcm'
-    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/training'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/test'
-    seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-    output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    label_file = "sample_data/annotations/finding_annotations.csv"
+
+    sds_path = '/home/student1/sds_hd/'
+    
+    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
+    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
+    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
+    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
+    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
+    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
+    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
 
     parameters = {
         # training hyperparameters
@@ -98,7 +102,7 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
+    dataTrain = dataset.H5Dataset(h5_filepath=h5_path)
     dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
 
     # Optimize hyperparameters using Optuna
