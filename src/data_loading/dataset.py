@@ -202,24 +202,24 @@ class ClassificationImages(Dataset):
 
         print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
         print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
-#
+
+
 class H5Dataset(Dataset):
-    def __init__(self, h5_filepath, relevant_labels):
+    def __init__(self, h5_filepath, relevant_labels=None):
         self.valid_indices = []
         self.h5_filepath = h5_filepath
         self.relevant_labels = relevant_labels
-
-        self.encoding = {'No Finding': 0, 'Mass': 1, 'Asymmetry': 2, 'Focal Asymmetry': 3, 'Suspicious Calcification': 4, 'Architectural Distortion': 5}
 
         self.h5_file = h5py.File(self.h5_filepath, "r")
         self.images = self.h5_file['images']
         self.labels = self.h5_file['labels']
 
-        self.relevant_label_indices = [self.encoding[label] for label in relevant_labels]
-        self.new_encoding = {label: i for i, label in enumerate(relevant_labels)}
+        if relevant_labels:
+            self.encoding = {'No Finding': 0, 'Mass': 1, 'Asymmetry': 2, 'Focal Asymmetry': 3, 'Suspicious Calcification': 4, 'Architectural Distortion': 5}
+            self.relevant_label_indices = [self.encoding[label] for label in relevant_labels]
+            self.filter_data()
 
         print(self.getLabelCount())
-        self.filter_data()
 
     def getLabelCount(self):
         labelCount = {k: 0 for k in range(len(self.encoding))}
@@ -236,12 +236,21 @@ class H5Dataset(Dataset):
                 self.valid_indices.append(i)
 
     def __len__(self):
-        return len(self.valid_indices)
+        if self.relevant_labels:
+            return len(self.valid_indices)
+        else:
+            return len(self.labels)
 
     def __getitem__(self, idx):
-        idx = self.valid_indices[idx]
+        if self.relevant_labels:
+            idx = self.valid_indices[idx]
         image = torch.from_numpy(self.images[idx].astype('float32'))
-        label = torch.from_numpy(self.labels[idx][self.relevant_label_indices].astype('float32'))
+        label = torch.from_numpy(self.labels[idx].astype('float32'))
+
+        print(label)
+        if self.relevant_labels:
+            label = label[self.relevant_label_indices]
+        print(label)
         return image, label
 
     def close(self):
@@ -288,11 +297,15 @@ def main():
     label_file = "sample_data/annotations/finding_annotations.csv"
     data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
 
-    h5Path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/"
+    h5Path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5"
 
     # data = ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=6)
-    data = ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
+    # data = ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
+    data = H5Dataset(h5_filepath=h5Path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     # create_chunked_h5(data)
+
+    print(data[0])
+
 
 if __name__ == "__main__":
     main()
