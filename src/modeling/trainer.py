@@ -11,7 +11,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 import multiprocessing
-from torchmetrics.functional import accuracy
+from torchmetrics.classification import Accuracy, BinaryF1Score
 
 from src.utilities import pickling, tools
 from src.modeling import gmic
@@ -41,8 +41,8 @@ class GMICTrainer(pl.LightningModule):
         self.test_dataset = dataset_test
 
         # metrics
-        # self.train_acc = accuracy(task="binary")
-        # self.train_f1 = torchmetrics.F1Score(task="binary")
+        self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
+        self.train_f1 = BinaryF1Score()
 
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
@@ -87,8 +87,10 @@ class GMICTrainer(pl.LightningModule):
         
         loss = loss_fusion + loss_global + loss_local
 
-        # self.train_acc.update(y_fusion, y)
-        # self.train_f1.update(y_fusion, y)
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
         
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
@@ -98,24 +100,6 @@ class GMICTrainer(pl.LightningModule):
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
 
         return loss
-
-
-    # def on_train_epoch_end(self):
-    #     # compute metrics
-    #     train_accuracy = self.train_acc.compute()
-    #     train_f1 = self.train_f1.compute()
-    #     # log metrics
-    #     if self.trainer.is_global_zero:
-    #         self.log("epoch_train_accuracy", train_accuracy, rank_zero_only=True)
-    #         self.log("epoch_train_f1", train_f1, rank_zero_only=True)
-    #     # reset all metrics
-    #     self.train_acc.reset()
-    #     self.train_f1.reset()
-    #     print(f"\nTraining accuracy: {train_accuracy:.4}, F1: {train_f1:.4}")
-        # print(self.train_dataset.label_counts)
-        # print(self.train_dataset.require_dict)
-        # print(self.train_dataset.unique_categories)
-        # print(self.class_labels)
 
 
     def validation_step(self, batch, batch_idx):
@@ -160,7 +144,7 @@ class GMICTrainer(pl.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
         return None
 
 
