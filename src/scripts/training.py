@@ -46,7 +46,7 @@ if __name__ == "__main__":
         # training hyperparameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 32,
+        "epochs": 10,
         "batch_size": 4,
         "learning_rate": 1e-3,
         "pretrained": True,
@@ -69,10 +69,10 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    # dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
-
-    dataTrain = dataset.H5Dataset(h5_filepath="balanced_top6/dataset.h5")
-    dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
+    # data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
+    # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
+    data = dataset.H5Dataset(h5_filepath="../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5", relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
     lightningModule = trainer.GMICTrainer(
@@ -89,7 +89,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
                         devices=[1,2],
                         logger=logger,
                         # profiler="simple",
-                        # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+                        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
                         # callbacks=[ModelSummary(max_depth=2)],
                     )
     trainer.fit(model=lightningModule)
