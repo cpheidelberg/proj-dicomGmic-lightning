@@ -14,6 +14,7 @@ from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
 import pydicom as dcm
 
+print('hello world')    
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
@@ -27,23 +28,33 @@ from src.constants import VIEWS, PERCENT_T_DICT
 
 if __name__ == "__main__":
 
+    # check if GPU is available
     if torch.cuda.is_available():
+        print(f"{torch.cuda.device_count()} GPUs are available")
         device = "gpu"
+    elif torch.backends.mps.is_available():
+        print("Apple MPS is available")
+        device = "mps"
     else: 
         device = "cpu"
 
+    # set path variables
     model_path = 'models/'
     dicom_file = '1-1.dcm'
-    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    image_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
-    seg_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-    output_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    label_file = "sample_data/annotations/finding_annotations.csv"
 
+    sds_path = '/home/student1/sds_hd/'
+    
+    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
+    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
+    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
+    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
+    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
+    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
+    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+
+    # set hyperparameters
     parameters = {
-        # training hyperparameters
+        # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
         "epochs": 10,
@@ -89,7 +100,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run = True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 

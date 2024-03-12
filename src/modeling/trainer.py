@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from tqdm import tqdm
 import pydicom as dcm
+import sys
+import os
 
 import torch
 import torch.nn as nn
@@ -21,14 +23,16 @@ from src.constants import VIEWS, PERCENT_T_DICT
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None):
+    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, model_path = None):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
 
         self.gmic = gmic.GMIC(parameters)
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
-            checkpoint_path = "models/sample_model_" + str(parameters["model_idx"]) + ".p"
+            checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
+
+            #checkpoint_path = "/home/na236/Github_Repos/proj-dicomGmic-lightning/models/
             model_state_dict = torch.load(checkpoint_path)
             self.initPretrainedWeights(model_state_dict)
 
