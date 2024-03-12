@@ -22,13 +22,14 @@ class ClassificationImages(Dataset):
         self.imageFolder = imageFolder
         self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
         random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv("dictionary.csv", converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
+        self.flatDictDF = pd.read_csv("../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv", converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
 
         if top_c:
             self.filterCategories(top_c)
 
         self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
         print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
+        print(self.flatDictDF["finding_categories"].value_counts())
 
         # print(self.getLabelCount())
 
@@ -201,37 +202,50 @@ class ClassificationImages(Dataset):
 
         print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
         print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
-
-
+#
 class H5Dataset(Dataset):
-    def __init__(self, h5_filepath):
-        self.data = []
-        self.labels = []
+    def __init__(self, h5_filepath, relevant_labels):
+        self.valid_indices = []
         self.h5_filepath = h5_filepath
+        self.relevant_labels = relevant_labels
+
+        self.encoding = {'No Finding': 0, 'Mass': 1, 'Asymmetry': 2, 'Focal Asymmetry': 3, 'Suspicious Calcification': 4, 'Architectural Distortion': 5}
 
         self.h5_file = h5py.File(self.h5_filepath, "r")
         self.images = self.h5_file['images']
         self.labels = self.h5_file['labels']
 
+        self.relevant_label_indices = [self.encoding[label] for label in relevant_labels]
+        self.new_encoding = {label: i for i, label in enumerate(relevant_labels)}
+
         print(self.getLabelCount())
+        self.filter_data()
 
     def getLabelCount(self):
-        labelCount = {k: 0 for k in range(6)}
+        labelCount = {k: 0 for k in range(len(self.encoding))}
         for l in self.labels:
-            l_index = l.argmax(axis=0)
-            labelCount[l_index] += 1
-        print(labelCount)
+            label_index = l.argmax(axis=0)
+            if label_index in self.relevant_label_indices:
+                labelCount[label_index] += 1
+        return labelCount
+
+    def filter_data(self):
+        for i, label in enumerate(self.labels):
+            label_index = label.argmax(axis=0)
+            if label_index in self.relevant_label_indices:
+                self.valid_indices.append(i)
 
     def __len__(self):
-        return len(self.images)
+        return len(self.valid_indices)
 
     def __getitem__(self, idx):
+        idx = self.valid_indices[idx]
         image = torch.from_numpy(self.images[idx].astype('float32'))
-        label = torch.from_numpy(self.labels[idx].astype('float32'))
+        label = torch.from_numpy(self.labels[idx][self.relevant_label_indices].astype('float32'))
         return image, label
 
     def close(self):
-        self.file.close()
+        self.h5_file.close()
 
 
 def create_chunked_h5(data):
@@ -270,11 +284,14 @@ def create_chunked_h5(data):
 def main(): 
 
     image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'    
+    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
+    label_file = "sample_data/annotations/finding_annotations.csv"
+    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
 
     h5Path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/"
 
-    data = ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=6)
+    # data = ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=6)
+    data = ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
     # create_chunked_h5(data)
 
 if __name__ == "__main__":
