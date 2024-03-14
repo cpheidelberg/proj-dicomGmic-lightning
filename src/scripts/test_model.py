@@ -262,7 +262,8 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
                 loaded_image = np.expand_dims(np.expand_dims(loaded_image, 0), 0).copy()
                 tensor_batch = torch.Tensor(loaded_image)
                 # forward propagation
-                output = model(tensor_batch)
+                output = model(tensor_batch)[0]
+                print(output)
                 pred_numpy = output.data.cpu().numpy()
                 benign_pred, malignant_pred = pred_numpy[0, 0], pred_numpy[0, 1]
                 # save visualization
@@ -371,7 +372,7 @@ def main():
             device = "cpu"
         device = "cpu"
         
-        model_path = "tb_logs/GMIC_cat/version_12/checkpoints/epoch=63-step=64000.ckpt"
+        model_path = "tb_logs/GMIC_transfer/version_15/checkpoints/epoch=31-step=486400.ckpt"
         dicom_file = '1-1.dcm'
         data_path = 'test_data_vindr/exam_list.pkl'
         image_path_test = 'test_data_vindr/cropped_images/'
