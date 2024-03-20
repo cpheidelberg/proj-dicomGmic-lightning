@@ -42,28 +42,9 @@ class ClassificationImages(Dataset):
         
         imagePath = self.imageFiles[idx]
 
-        if len(self.imageFiles[idx].split("/")[-1].split("_")) > 2:
-            original_file_name = "_".join(self.imageFiles[idx].split("/")[-1].split("_")[:-1]).strip(".png")
-        else:
-            original_file_name = self.imageFiles[idx].split("/")[-1].strip(".png")
-
-        # original_file_name = self.getOrigFilename(idx)
-        # data = self.getDataentry(original_file_name)
-        # loaded_image = self.getImage(imagePath, data)
-
-        data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
-        if data.empty:
-            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
-
-        view = data["view"].iloc[0]
-        loaded_image = loading.load_image(
-            image_path=imagePath,
-            view=view,
-            horizontal_flip=data["horizontal_flip"].iloc[0],
-        )
-        loaded_image = loading.process_image(loaded_image, view, data["best_center"].iloc[0][view][0])
-        loaded_image = np.expand_dims(loaded_image, 0).copy()
-        # loaded_image = torch.Tensor(loaded_image)
+        original_file_name = self.getOrigFilename(idx)
+        data = self.getDataentry(original_file_name)
+        loaded_image = self.getImage(imagePath, data)
 
         labelList = data["finding_categories"].iloc[0]
         labelEnc = self.createHotEncoding(labelList)
@@ -98,14 +79,13 @@ class ClassificationImages(Dataset):
         )
         loaded_image = loading.process_image(loaded_image, view, data["best_center"].iloc[0][view][0])
         loaded_image = np.expand_dims(loaded_image, 0).copy()
-        # loaded_image = torch.Tensor(loaded_image)
+        loaded_image = torch.Tensor(loaded_image)
 
         return loaded_image
 
             
     def getLabelCount(self):
         labelCount = {k: 0 for k in self.unique_categories}
-        print(labelCount)
         for f in self.imageFiles:
             
             if len(f.split("/")[-1].split("_")) > 2:
@@ -204,6 +184,21 @@ class ClassificationImages(Dataset):
         print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
 
 
+class PredictionClassificationImages(ClassificationImages):
+
+    def __getitem__(self, idx):
+        
+        imagePath = self.imageFiles[idx]
+        original_file_name = self.getOrigFilename(idx)
+        data = self.getDataentry(original_file_name)
+        loaded_image = self.getImage(imagePath, data)
+
+        labelList = data["finding_categories"].iloc[0]
+        labelEnc = self.createHotEncoding(labelList)
+
+        return loaded_image, labelEnc, data.to_dict("list")
+
+
 class H5Dataset(Dataset):
     def __init__(self, h5_filepath, relevant_labels=None):
         self.valid_indices = []
@@ -247,10 +242,8 @@ class H5Dataset(Dataset):
         image = torch.from_numpy(self.images[idx].astype('float32'))
         label = torch.from_numpy(self.labels[idx].astype('float32'))
 
-        print(label)
         if self.relevant_labels:
             label = label[self.relevant_label_indices]
-        print(label)
         return image, label
 
     def close(self):

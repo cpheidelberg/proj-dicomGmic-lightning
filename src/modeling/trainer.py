@@ -19,20 +19,22 @@ from src.utilities import pickling, tools
 from src.modeling import gmic
 from src.data_loading import loading, dataset
 from src.constants import VIEWS, PERCENT_T_DICT
+from src.scripts import predict
 
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, model_path = None):
+    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
 
         self.gmic = gmic.GMIC(parameters)
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
-            checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
-
-            #checkpoint_path = "/home/na236/Github_Repos/proj-dicomGmic-lightning/models/
+            if parameters["model_idx"]: # use a pretrained model
+                checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
+            elif model_path and not parameters["model_idx"]: # use a self trained model
+                checkpoint_path = os.path.join(model_path)
             model_state_dict = torch.load(checkpoint_path)
             self.initPretrainedWeights(model_state_dict)
 
@@ -43,6 +45,7 @@ class GMICTrainer(pl.LightningModule):
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
+        self.predict_dataset = dataset_predict
 
         # metrics
         self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
@@ -80,6 +83,7 @@ class GMICTrainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
+        print(img.shape)
         # y_index = int(torch.max(y, 1)[1])
         # self.class_labels[y_index] += 1
 
@@ -99,7 +103,7 @@ class GMICTrainer(pl.LightningModule):
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
-        self.log("train_loss", loss, on_epoch=True, sync_dist=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
 
@@ -138,6 +142,48 @@ class GMICTrainer(pl.LightningModule):
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)
 
         return loss
+    
+    
+    def predict_step(self, batch, batch_idx):
+        """Predict the output for a single image."""
+        img, y, data = batch
+
+        pred_dict = {"image_index": [], "benign_pred": [], "malignant_pred": [],
+        "benign_label": [], "malignant_label": []}
+
+        true_segs = [None for _ in range(len(y[0]))]
+
+        # forward propagation
+        y_global, y_local, y_fusion = self(img)  # Add an extra dimension for batch
+        img_numpy = img.data.cpu().numpy()
+        pred_numpy = y_fusion.data.cpu().numpy()
+
+        # save visualization
+        saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
+        if self.hparams.turn_on_visualization:
+            patch_locations = self.gmic.patch_locations
+            patch_imgs = self.gmic.patches
+            print(len(patch_imgs[0]))
+            print(data)
+            patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
+            print(save_dir)
+            predict.visualize_example(img_numpy, saliency_maps, true_segs,
+                        patch_locations, patch_imgs, patch_attentions,
+                        save_dir, self.hparams)
+                
+        # save predicted regions of interest as polyline
+        predict.save_saliency_maps(img_numpy, saliency_maps, datum, self.hparams.segmentation_path, short_file_path, dicom_path, self.hparams.turn_on_visualization)
+
+        # propagate holders
+        # benign_label, malignant_label = fetch_cancer_label_by_view(view, datum["cancer_label"])
+        pred_dict["image_index"].append(short_file_path)
+        pred_dict["benign_pred"].append(benign_pred)
+        pred_dict["malignant_pred"].append(malignant_pred)
+        pred_dict["benign_label"].append(benign_label)
+        pred_dict["malignant_label"].append(malignant_label)
+
+        return y_fusion
 
 
     def configure_optimizers(self):
@@ -163,4 +209,10 @@ class GMICTrainer(pl.LightningModule):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
             return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+        return None
+
+    def predict_dataloader(self):
+        """Create DataLoader for Testing out of given DataSet"""
+        if self.predict_dataset:
+            return DataLoader(self.predict_dataset, batch_size=1, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
