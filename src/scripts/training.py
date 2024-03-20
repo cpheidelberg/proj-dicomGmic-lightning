@@ -31,17 +31,14 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
         device = "gpu"
-    elif torch.backends.mps.is_available():
-        print("Apple MPS is available")
-        device = "mps"
     else: 
         device = "cpu"
-
+    print('hello world')
     # set path variables
     model_path = 'models/'
     dicom_file = '1-1.dcm'
 
-    sds_path = '~/sdsHD/'
+    sds_path = '/home/na236/sds_hd'
     
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
     image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
@@ -50,6 +47,7 @@ if __name__ == "__main__":
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
     output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
     h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+    model_path= '/home/na236/Github_Repos/proj-dicomGmic-lightning/models'
 
     # set hyperparameters
     parameters = {
@@ -81,17 +79,20 @@ if __name__ == "__main__":
 
     # data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
     # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
-    data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    print('hello world')
+   # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c = parameters["num_classes"], dictPath = dict_path)
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
-
+    print('hello world')
     # Training
     lightningModule = trainer.GMICTrainer(
                         parameters=parameters,
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
                         dataset_test=dataTest,
-                        model_path=model_path
+                        model_path=model_path,
                     )
+    print('hello world')
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
@@ -100,14 +101,16 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run = 20, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+
+    print('hello world')                
+    trainer = pl.Trainer(fast_dev_run = False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
                         # gradient_clip_val=1e-3,
                         accelerator=device, 
                         # devices=[parameters["gpu_number"]],
-                        devices=[1,2],
+                        devices=[0],
                         logger=logger,
                         # profiler="simple",
                         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network

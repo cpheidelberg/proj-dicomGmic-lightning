@@ -219,7 +219,7 @@ class H5Dataset(Dataset):
             self.relevant_label_indices = [self.encoding[label] for label in relevant_labels]
             self.filter_data()
 
-        print(self.getLabelCount())
+       # print(self.getLabelCount())
 
     def getLabelCount(self):
         labelCount = {k: 0 for k in range(len(self.encoding))}

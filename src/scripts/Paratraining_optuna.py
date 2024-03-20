@@ -40,7 +40,7 @@ if __name__ == "__main__":
         device = "cpu"
 
 
-    path_to_sds = '/home/student1/'
+    path_to_sds = '/home/na236/'
 
     data_path = '../../../sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
     image_path_train = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                             # gradient_clip_val=1e-3,
                             accelerator=device, 
                             # devices=[parameters["gpu_number"]],
-                         #   devices=[0],
+                            devices=[0],
                             logger=logger,
                             # profiler="simple",
                             # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
