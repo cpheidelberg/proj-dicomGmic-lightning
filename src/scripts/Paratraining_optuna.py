@@ -39,16 +39,18 @@ if __name__ == "__main__":
     else: 
         device = "cpu"
 
-    #dicom_file = '1-1.dcm'
+
+    path_to_sds = '/home/student1/'
+
     data_path = '../../../sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    image_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
-    seg_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-    output_path = '/home/na236/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
+    image_path_train = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
+    image_path_test = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
+    image_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
+    seg_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
+    output_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     label_file = "sample_data/annotations/finding_annotations.csv"
-    dict_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv'
-    model_path= '/home/na236/Github_Repos/proj-dicomGmic-lightning/models'
+    dict_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv'
+    model_path= path_to_sds + 'Github_Repos/proj-dicomGmic-lightning/models'
 
 
     print('hello world')
@@ -116,7 +118,7 @@ if __name__ == "__main__":
                             # gradient_clip_val=1e-3,
                             accelerator=device, 
                             # devices=[parameters["gpu_number"]],
-                            devices=[0],
+                         #   devices=[0],
                             logger=logger,
                             # profiler="simple",
                             # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
@@ -132,7 +134,7 @@ if __name__ == "__main__":
 
 
     t1 = time.time()
-    study = optuna.create_study(direction="minimize", pruner=optuna.pruners, study_name ='Parameters_1000_6_2', storage='sqlite:///Paratuning_batch.db.sqlite3')
+    study = optuna.create_study(direction="minimize", pruner=optuna.pruners, study_name ='Parameters_1000_8_2', storage='sqlite:///Paratuning_batch.db.sqlite3', load_if_exists =True)
 
     study.optimize(lambda trial: objective(trial,dataTrain, dataValid, dataTest, parameters, model_path), n_trials=20, timeout=80000)
 
