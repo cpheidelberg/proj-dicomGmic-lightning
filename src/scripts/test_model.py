@@ -372,7 +372,7 @@ def main():
             device = "cpu"
         device = "cpu"
         
-        model_path = "tb_logs/GMIC_transfer/version_15/checkpoints/epoch=31-step=486400.ckpt"
+        model_path = "tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt"
         dicom_file = '1-1.dcm'
         data_path = 'test_data_vindr/exam_list.pkl'
         image_path_test = 'test_data_vindr/cropped_images/'
@@ -390,9 +390,9 @@ def main():
             # model related hyper-parameters
             "cam_size": (46, 30),
             "K": 6,
-            "crop_shape": (256, 256),
+            "crop_shape": (512, 512),
             "post_processing_dim": 256,
-            "num_classes":11,
+            "num_classes":6,
             "use_v1_global":False,
         }
         start_experiment(

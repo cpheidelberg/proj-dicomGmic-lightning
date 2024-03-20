@@ -41,7 +41,7 @@ if __name__ == "__main__":
     model_path = 'models/'
     dicom_file = '1-1.dcm'
 
-    sds_path = '~/sdsHD/'
+    sds_path = '../sdsHD/'
     
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
     image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
@@ -79,9 +79,9 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    # data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=parameters["num_classes"])
+    data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
     # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
-    data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
@@ -100,7 +100,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run = 20, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
