@@ -33,62 +33,66 @@ if __name__ == "__main__":
     import optuna
 
 
-    def objective(trial):
 
-        if torch.cuda.is_available():
-            device = "gpu"
-        else: 
-            device = "cpu"
+    if torch.cuda.is_available():
+        device = "gpu"
+    else: 
+        device = "cpu"
 
-        dicom_file = '1-1.dcm'
-        data_path = '../../../sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-        image_path_train = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-        image_path_test = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-        image_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
-        seg_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
-        output_path = '/home/na236/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-        label_file = "sample_data/annotations/finding_annotations.csv"
-        dict_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv'
-        model_path= '/home/na236/Github_Repos/proj-dicomGmic-lightning/models'
+    #dicom_file = '1-1.dcm'
+    data_path = '../../../sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
+    image_path_train = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
+    image_path_test = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
+    image_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
+    seg_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
+    output_path = '/home/na236/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
+    label_file = "sample_data/annotations/finding_annotations.csv"
+    dict_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv'
+    model_path= '/home/na236/Github_Repos/proj-dicomGmic-lightning/models'
 
 
-        print('hello world')
-        learning_rate = trial.suggest_uniform("learning_rate", 0.0001,0.05) 
-        parameters = {
-            # training hyperparameters
-            "device_type": device,
-            "gpu_number": 0,
-            "epochs": 5,
-            "batch_size": 4,
-            "learning_rate": learning_rate,
-            "pretrained": True,
-            "fine-tuning": False,
-            "model_idx": 2,
+    print('hello world')
+    
+    parameters = {
+        # training hyperparameters
+        "device_type": device,
+        "gpu_number": 0,
+        "epochs": 20,
+        "batch_size": 4,
+        "learning_rate": 0.001,
+        "pretrained": True,
+        "fine-tuning": False,
+        "model_idx": 2,
 
-            "max_crop_noise": (100, 100),
-            "max_crop_size_noise": 100,
-            "image_path": image_path_train,
-            "segmentation_path": seg_path,
-            "output_path": output_path,
+        "max_crop_noise": (100, 100),
+        "max_crop_size_noise": 100,
+        "image_path": image_path_train,
+        "segmentation_path": seg_path,
+        "output_path": output_path,
 
-            # model related hyper-parameters
-            "cam_size": (46, 30),
-            "K": 6, # num patches
-            "crop_shape": (256, 256), # patch size
-            "percent_t": 0.03,
-            "post_processing_dim": 256,
-            "num_classes": 6, # output classes
-            "use_v1_global": False,
-        }
+        # model related hyper-parameters
+        "cam_size": (46, 30),
+        "K": 6, # num patches
+        "crop_shape": (256, 256), # patch size
+        "percent_t": 0.03,
+        "post_processing_dim": 256,
+        "num_classes": 6, # output classes
+        "use_v1_global": False,
+    }
 
-        dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c = parameters["num_classes"], dictPath = dict_path)
+    dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c = parameters["num_classes"], dictPath = dict_path)
 
-        # dataTrain = dataset.H5Dataset(h5_filepath="/home/pb438/medken/balanced_top6/dataset.h5")
-        dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
+    # dataTrain = dataset.H5Dataset(h5_filepath="/home/pb438/medken/balanced_top6/dataset.h5")
+    dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
+
+    def objective(trial, dataTrain, dataValid, dataTest, parameters, model_path):
+        #Training
+
+        crop_shape_val = trial.suggest_int("crop_shape", 128, 500)
+        parameters["crop_shape"] = (crop_shape_val, crop_shape_val)
 
         from src.modeling import gmic, trainer
 
-        # Training
         lightningModule = trainer.GMICTrainer(
                             parameters=parameters,
                             dataset_train=dataTrain,
@@ -123,14 +127,21 @@ if __name__ == "__main__":
         print("Training finished at: {}".format(time.ctime()))
 
         best_val_loss = trainer.callback_metrics["train_loss"].item()
+
         return best_val_loss
 
 
-    study = optuna.create_study(direction="minimize", pruner=optuna.pruners, study_name ='Parameters_100_100_1.3', storage='sqlite:///example.db.sqlite3', load_if_exists = True)
+    t1 = time.time()
+    study = optuna.create_study(direction="minimize", pruner=optuna.pruners, study_name ='Parameters_1000_6_2', storage='sqlite:///Paratuning_batch.db.sqlite3')
 
-    study.optimize(objective, n_trials=5, timeout=50000)
+    study.optimize(lambda trial: objective(trial,dataTrain, dataValid, dataTest, parameters, model_path), n_trials=20, timeout=80000)
 
     print("Number of finished trials: {}".format(len(study.trials)))
 
     print("Best trial:")
     trial = study.best_trial
+
+    print(f"Best trial:{trial}")
+    t2 = time.time()
+
+    print(f"Cal. time:{t2 - t1}")
