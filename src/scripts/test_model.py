@@ -296,11 +296,9 @@ def run_single_model(model_path, data_path, dicom_file, parameters, turn_on_visu
     """
     Load a single model and run on sample data
     """
-
-    gmicTrainer = trainer.GMICTrainer.load_from_checkpoint(model_path, map_location=parameters["device_type"])
-    model = gmicTrainer.gmic
-    # load parameters
-    # model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
+    # gmicTrainer = trainer.GMICTrainer.load_from_checkpoint(model_path, map_location=parameters["device_type"])
+    model = trainer.GMICTrainer(parameters)
+    model.load_state_dict(torch.load(model_path, map_location=parameters["device_type"]), strict=False)
     # load metadata
     exam_list = pickling.unpickle_from_file(data_path)
     # run the model on the dataset
@@ -365,35 +363,47 @@ def main():
     else:
         print("No argument has been given")
 
-
         if torch.cuda.is_available():
             device = "gpu"
+        elif torch.backends.mps.is_available():
+            print("Apple MPS is available")
+            device = "mps"
         else: 
             device = "cpu"
         device = "cpu"
         
-        model_path = "tb_logs/GMIC_transfer/version_15/checkpoints/epoch=31-step=486400.ckpt"
+        model_path = "../tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt"
         dicom_file = '1-1.dcm'
-        data_path = 'test_data_vindr/exam_list.pkl'
-        image_path_test = 'test_data_vindr/cropped_images/'
-        seg_path = 'test_data_vindr/output/segmentation'
-        output_path = 'test_data_vindr/output'
+        data_path = 'sample_output/data.pkl'
+        image_path = 'sample_output/cropped_images/'
+        seg_path = 'sample_output/segmentation'
+        output_path = 'sample_output/'
 
         parameters = {
+            # training related hyper-parameters
             "device_type": device,
             "gpu_number": 0,
+            "epochs": 32,
+            "batch_size": 4,
+            "learning_rate": 1e-3,
+            "pretrained": False,
+            "fine-tuning": False,
+            "model_idx": 2,
+
             "max_crop_noise": (100, 100),
             "max_crop_size_noise": 100,
-            "image_path": image_path_test,
+            "image_path": image_path,
             "segmentation_path": seg_path,
             "output_path": output_path,
+
             # model related hyper-parameters
             "cam_size": (46, 30),
-            "K": 6,
-            "crop_shape": (256, 256),
+            "K": 6, # num patches
+            "crop_shape": (256, 256), # patch size
+            "percent_t": 0.03,
             "post_processing_dim": 256,
-            "num_classes":11,
-            "use_v1_global":False,
+            "num_classes": 6, # output classes
+            "use_v1_global": False,
         }
         start_experiment(
             model_path=model_path,
