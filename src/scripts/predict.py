@@ -63,6 +63,7 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     subfigure.axis('off')
 
     # patch map
+    print(patch_locations)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
     subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
     subfigure.imshow(tools.get_crop_mask(
@@ -98,6 +99,7 @@ def visualize_example(input_img, saliency_maps, seg_masks,
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
     
+    print(save_dir)
     plt.savefig(save_dir, bbox_inches='tight', format="png", dpi=500)
     plt.close()
 
@@ -108,8 +110,7 @@ def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, tur
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
     view = file_path.split('_')[1].split('.')[0]
-    print(datum["window_location"][view])
-    window_location = datum["window_location"][view][0]
+    window_location = datum["window_location"][0][view][0]
 
     saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
     saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
@@ -170,8 +171,8 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
         
         if turn_on_visualization:
             image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
-            plt.imshow(input_img, cmap='gray', aspect='equal')
-            # plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
+            # plt.imshow(input_img, cmap='gray', aspect='equal')
+            plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
             print("Polyline saved to: {}".format(os.path.join(save_dir, "{}_seg_{}_{}.png".format(file_path, label, i))))
             plt.savefig(os.path.join(save_dir, "{0}_seg_{1}_{2}.png".format(file_path, label, i)))
 
@@ -192,7 +193,8 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    model_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt'
+    model_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
+    # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
     dicom_file = '1-1.dcm'
 
     sds_path = '../sdsHD/'
@@ -226,7 +228,7 @@ if __name__ == "__main__":
         "crop_shape": (512, 512), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 6, # output classes
+        "num_classes": 3, # output classes
         "use_v1_global": False,
     }
 
