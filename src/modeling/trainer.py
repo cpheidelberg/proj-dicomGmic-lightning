@@ -31,9 +31,9 @@ class GMICTrainer(pl.LightningModule):
         self.gmic = gmic.GMIC(parameters)
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
-            if parameters["model_idx"]: # use a pretrained model
+            if "model_idx" in parameters: # use a pretrained model
                 checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
-            elif model_path and not parameters["model_idx"]: # use a self trained model
+            elif model_path: # use a self trained model
                 checkpoint_path = os.path.join(model_path)
             model_state_dict = torch.load(checkpoint_path)
             self.initPretrainedWeights(model_state_dict)
@@ -68,7 +68,7 @@ class GMICTrainer(pl.LightningModule):
         self.gmic.load_state_dict(state_dict, strict=False)
         # Freeze layers except for fine-tuning
         for name, param in self.gmic.named_parameters():
-            if name.startswith(remove_keywords) or self.hparams["fine-tuning"]:
+            if name.startswith(remove_keywords) or "fine-tuning" in self.hparams and self.hparams["fine-tuning"]:
                 param.requires_grad = True
             else:
                 param.requires_grad = False
@@ -148,9 +148,7 @@ class GMICTrainer(pl.LightningModule):
         """Predict the output for a single image."""
         img, y, data = batch
 
-        pred_dict = {"image_index": [], "benign_pred": [], "malignant_pred": [],
-        "benign_label": [], "malignant_label": []}
-
+        print(y)
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
@@ -163,25 +161,14 @@ class GMICTrainer(pl.LightningModule):
         if self.hparams.turn_on_visualization:
             patch_locations = self.gmic.patch_locations
             patch_imgs = self.gmic.patches
-            print(len(patch_imgs[0]))
-            print(data)
             patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
             save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
-            print(save_dir)
             predict.visualize_example(img_numpy, saliency_maps, true_segs,
                         patch_locations, patch_imgs, patch_attentions,
                         save_dir, self.hparams)
                 
         # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img_numpy, saliency_maps, datum, self.hparams.segmentation_path, short_file_path, dicom_path, self.hparams.turn_on_visualization)
-
-        # propagate holders
-        # benign_label, malignant_label = fetch_cancer_label_by_view(view, datum["cancer_label"])
-        pred_dict["image_index"].append(short_file_path)
-        pred_dict["benign_pred"].append(benign_pred)
-        pred_dict["malignant_pred"].append(malignant_pred)
-        pred_dict["benign_label"].append(benign_label)
-        pred_dict["malignant_label"].append(malignant_label)
+        predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
 
         return y_fusion
 

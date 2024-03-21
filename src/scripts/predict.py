@@ -102,13 +102,13 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, dicom_path, turn_on_visualization):
+def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, turn_on_visualization):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
-    # ds = dcm.dcmread(dicom_path, force=True)
     view = file_path.split('_')[1].split('.')[0]
+    print(datum["window_location"][view])
     window_location = datum["window_location"][view][0]
 
     saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
@@ -171,7 +171,8 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
         if turn_on_visualization:
             image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
             plt.imshow(input_img, cmap='gray', aspect='equal')
-            plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
+            # plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
+            print("Polyline saved to: {}".format(os.path.join(save_dir, "{}_seg_{}_{}.png".format(file_path, label, i))))
             plt.savefig(os.path.join(save_dir, "{0}_seg_{1}_{2}.png".format(file_path, label, i)))
 
     if not contours:
@@ -199,7 +200,7 @@ if __name__ == "__main__":
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
     image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
     image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
-    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
+    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionaryTop6.csv')
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
     output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
     h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
@@ -209,8 +210,8 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "batch_size": 2,
-        "pretrained": False,
+        "batch_size": 1,
+        "pretrained": True,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -225,7 +226,7 @@ if __name__ == "__main__":
         "crop_shape": (512, 512), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 3, # output classes
+        "num_classes": 6, # output classes
         "use_v1_global": False,
     }
 
@@ -246,7 +247,6 @@ if __name__ == "__main__":
                         devices=[parameters["gpu_number"]],
                     )
 
-    print(len(dataTest))
     prediction = trainer.predict(lightningModule)
     
     print(f"Categories: {data.unique_categories}")

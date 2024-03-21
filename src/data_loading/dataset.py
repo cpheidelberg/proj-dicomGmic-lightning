@@ -98,54 +98,6 @@ class ClassificationImages(Dataset):
         return labelCount
 
 
-    def addLabelstoDF(self):
-        for i, f in enumerate(tqdm(self.imageFiles)):
-            f = f.split("/")[-1]
-            entry = self.flatDictDF[self.flatDictDF["image"] == f.strip(".png")]
-            index = self.flatDictDF.index[self.flatDictDF["image"] == f.strip(".png")].tolist()[0]
-
-            studyID = entry["examID"].iloc[0]
-            imageID = entry["dicom"].iloc[0].split('/')[-1]
-
-            labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
-
-            self.flatDictDF["finding_categories"].iloc[index] = labelList
-
-
-    def loadPickle(self, path):
-        with open(path, "rb") as f:
-            data = pickle.load(f)
-
-        return data
-
-
-    def flattenDict(self, data):
-        flatDict = []
-        for d in data:
-            dictLCC = self.extractImageDict(d, "L-CC")
-            dictRCC = self.extractImageDict(d, "R-CC")
-            dictLMLO = self.extractImageDict(d, "L-MLO")
-            dictRMLO = self.extractImageDict(d, "R-MLO")
-            flatDict.append(dictLCC)
-            flatDict.append(dictRCC)
-            flatDict.append(dictLMLO)
-            flatDict.append(dictRMLO)
-
-        return flatDict 
-
-    
-    def extractImageDict(self, data, view):
-        imgDict = {}
-        imgDict["examID"] = data["examID"]
-        imgDict["view"] = view
-        imgDict["image"] = data[view][0]
-        imgDict["dicom"] = data[view+"_path"]
-        imgDict["horizontal_flip"] = data["horizontal_flip"]
-        imgDict["best_center"] = data["best_center"]
-
-        return imgDict
-
-
     def createHotEncoding(self, labelList):
         encoding = np.zeros(len(self.unique_categories), dtype=np.float32)
         for label in labelList:
@@ -184,7 +136,195 @@ class ClassificationImages(Dataset):
         print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
 
 
+class ClassificationImagesFromPickle(ClassificationImages):
+
+    def __init__(self, imageFolder:str, dictPath:str, labelPath:str, top_c=None):
+        self.imageFolder = imageFolder
+        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
+        random.shuffle(self.imageFiles)
+        self.imageDict = self.loadPickle(dictPath)
+        print(self.imageDict[0])
+        self.flatDict = self.flattenDict(self.imageDict)
+        self.flatDictDF = pd.DataFrame(self.flatDict)
+
+        print(self.flatDictDF.info())
+        print(self.flatDictDF.iloc[0])
+
+        self.labels = pd.read_csv(labelPath)
+
+        # if top_c:
+        #     self.filterCategories(top_c)
+
+        self.labels = self.convertLabels(self.labels)
+        self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
+        print(self.unique_categories)
+
+        self.flatDictDF["finding_categories"] = None
+        self.addLabelstoDF()
+        self.flatDictDF.to_csv(f"dictionaryTop{top_c}.csv")
+
+
+    def __getitem__(self, idx):
+        
+        imagePath = self.imageFiles[idx]
+
+        original_file_name = self.getOrigFilename(idx)
+        data = self.getDataentry(original_file_name)
+        loaded_image = self.getImage(imagePath, data)
+
+        labelList = data["finding_categories"]
+        labelEnc = self.createHotEncoding(labelList)
+
+        return loaded_image, labelEnc
+
+
+    def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
+
+        view = data["view"]
+        loaded_image = loading.load_image(
+            image_path=imagePath,
+            view=view,
+            horizontal_flip=data["horizontal_flip"],
+        )
+        loaded_image = loading.process_image(loaded_image, view, data["best_center"][view][0])
+        loaded_image = np.expand_dims(loaded_image, 0).copy()
+        loaded_image = torch.Tensor(loaded_image)
+
+        return loaded_image
+
+
+    def getDataentry(self, original_file_name: str) -> pd.DataFrame:
+        """Find the entry of the original filename in self.flatDict["image"]"""
+        data = None
+        # index = None
+        print(self.flatDict[0]["image"])
+        for i, entry in enumerate(self.flatDict):
+            if entry["image"] == original_file_name:
+                studyID = entry["examID"]
+                imageID = entry["dicom"].split('/')[-1]
+                data = entry
+                print(data)
+                # index = i
+                break
+        if data is None:
+            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
+        return data
+
+
+    def flattenDict(self, data):
+        flatDict = []
+        for d in data:
+            dictLCC = self.extractImageDict(d, "L-CC")
+            dictRCC = self.extractImageDict(d, "R-CC")
+            dictLMLO = self.extractImageDict(d, "L-MLO")
+            dictRMLO = self.extractImageDict(d, "R-MLO")
+            flatDict.append(dictLCC)
+            flatDict.append(dictRCC)
+            flatDict.append(dictLMLO)
+            flatDict.append(dictRMLO)
+
+        return flatDict
+
+
+    def addLabelstoDF(self):
+        for i, f in enumerate(tqdm(self.imageFiles)):
+            f = f.split("/")[-1]
+            entry = self.flatDictDF[self.flatDictDF["image"] == f.strip(".png")]
+            index = self.flatDictDF.index[self.flatDictDF["image"] == f.strip(".png")].tolist()[0]
+
+            studyID = entry["examID"].iloc[0]
+            imageID = entry["dicom"].iloc[0].split('/')[-1]
+
+            labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
+            self.flatDictDF["finding_categories"].iloc[index] = labelList
+
+    
+    def loadPickle(self, path):
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+
+        return data
+
+    
+    def extractImageDict(self, data, view):
+        imgDict = {}
+        imgDict["examID"] = data["examID"]
+        imgDict["imageID"] = data[view+"_path"].split("/")[-1]
+        imgDict["view"] = view
+        imgDict["image"] = data[view][0]
+        imgDict["dicom"] = data[view+"_path"]
+        imgDict["horizontal_flip"] = data["horizontal_flip"]
+        imgDict["best_center"] = data["best_center"]
+        imgDict["window_location"] = data["window_location"]
+
+        return imgDict
+
+
+    def filterCategories(self, top_c=5):
+        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
+
+        class_counts = self.labels["finding_categories"].value_counts()
+        origLen = len(self.imageFiles)
+        origLength = len(self.labels)
+        origLeng = len(self.flatDict)
+
+        class_counts = class_counts.sort_values(ascending=False)
+        top_labels = class_counts.head(top_c).index
+
+        filtered_labels = self.labels[self.labels['finding_categories'].apply(lambda x: any(label in x for label in top_labels))]
+        print(filtered_labels['finding_categories'].value_counts())
+        removed_labels = self.labels[~self.labels.index.isin(filtered_labels.index)]
+        assert len(self.labels) == len(filtered_labels) + len(removed_labels), "Filtering 'finding_annotations.csv' not successful"
+
+        self.labels = filtered_labels
+        filtered_exams_images = list(set((row["study_id"], row["image_id"]) for index, row in filtered_labels.iterrows()))
+
+        print(f"Anzahl der einzigartigen Studien- und Bild-IDs: {len(filtered_exams_images)}")
+
+        newImages = []
+        newDict = []
+        for exam_id, image_id in filtered_exams_images:
+            for d in self.flatDict:
+                if d["examID"] == exam_id and d["imageID"] == image_id:
+                    newDict.append(d)
+                    view = d["image"]
+                    break
+            for file in self.imageFiles:
+                if file.endswith(f"/{view}.png"):
+                    newImages.append(file)
+                    break
+
+        self.imageFiles = newImages
+        self.flatDict = newDict
+
+        print("{}/{} labels for {} retained categories".format(len(self.labels), origLength, top_c))
+        print("{}/{} dicts for {} retained categories".format(len(self.flatDict), origLeng, top_c))
+        print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
+
+
 class PredictionClassificationImages(ClassificationImages):
+
+    def __init__(self, imageFolder:str, dictPath: str, top_c=None, h5_file=None):
+        self.imageFolder = imageFolder
+        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
+        random.shuffle(self.imageFiles)
+        self.flatDictDF = pd.read_csv(dictPath, converters={"best_center": self.safe_literal_eval, "window_location": self.safe_literal_eval, "finding_categories": self.safe_literal_eval})
+
+        if top_c:
+            self.filterCategories(top_c)
+
+        self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
+        print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
+        print(self.flatDictDF["finding_categories"].value_counts())
+
+
+    def safe_literal_eval(self, s):
+        try:
+            string = ast.literal_eval(s)
+            return string
+        except ValueError as e:
+            print(f"Fehler beim Parsen des Strings: {s}")
+            raise e
 
     def __getitem__(self, idx):
         
