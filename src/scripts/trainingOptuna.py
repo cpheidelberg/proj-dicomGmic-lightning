@@ -27,8 +27,8 @@ from src.constants import VIEWS, PERCENT_T_DICT
 
 def objective(trial, dataTrain, dataValid):
     # Define hyperparameter search space
-    parameters["batch_size"] = trial.suggest_categorical("batch_size", [1,2,4,8,16,32])
-    # parameters["percent_t"] = trial.suggest_float("percent_t", 0.01, 0.06, log=True)
+    # parameters["batch_size"] = trial.suggest_categorical("batch_size", [1,2,4,8,16,32])
+    parameters["learning_rate"] = trial.suggest_float("learning_rate", 1e-6, 1e-2, log=True)
     # parameters["use_v1_global"] = trial.suggest_categorical("use_v1_global", [True, False])
 
     # Create and train the LightningModule
@@ -36,12 +36,12 @@ def objective(trial, dataTrain, dataValid):
                                 dataset_valid=dataValid,
                                 parameters=parameters,
                             )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="optBatchSize", log_graph=True)
-    trainInst = pl.Trainer(fast_dev_run=False,
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="optLR", log_graph=True)
+    trainInst = pl.Trainer(fast_dev_run=True,
                         max_epochs=parameters["epochs"], 
                         accelerator=device, 
                         # devices=[parameters["gpu_number"]],
-                        devices=[1,2],
+                        devices=[1],
                         logger=logger,
                         strategy=DDPStrategy(find_unused_parameters=True),
                     )

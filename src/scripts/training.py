@@ -14,7 +14,6 @@ from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
 import pydicom as dcm
 
-print('hello world')    
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
@@ -42,12 +41,13 @@ if __name__ == "__main__":
     model_path = 'models/'
     dicom_file = '1-1.dcm'
 
-    sds_path = '/home/student1/sds_hd/'
+    sds_path = '../sdsHD/'
     
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
     image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
     image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
     dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
+    label_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/finding_annotations.csv')
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
     output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
     h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 32,
+        "epochs": 10,
         "batch_size": 4,
         "learning_rate": 1e-3,
         "pretrained": True,
@@ -80,9 +80,10 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    # dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
-    dataTrain = dataset.H5Dataset(h5_filepath=h5_path)
-    dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
+    data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
+    # data = dataset.ClassificationImagesFromPickle(imageFolder=[image_path_test], dictPath=data_path, labelPath=label_path, top_c=parameters["num_classes"])
+    # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
     lightningModule = trainer.GMICTrainer(
@@ -90,6 +91,7 @@ if __name__ == "__main__":
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
                         dataset_test=dataTest,
+                        model_path=model_path
                     )
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
     early_stop_callback = EarlyStopping(
@@ -99,7 +101,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run = True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
@@ -109,7 +111,7 @@ if __name__ == "__main__":
                         devices=[1,2],
                         logger=logger,
                         # profiler="simple",
-                        # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+                        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
                         # callbacks=[ModelSummary(max_depth=2)],
                     )
     trainer.fit(model=lightningModule)

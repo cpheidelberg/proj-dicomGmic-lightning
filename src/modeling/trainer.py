@@ -5,30 +5,36 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from tqdm import tqdm
 import pydicom as dcm
+import sys
+import os
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 import multiprocessing
-from torchmetrics.functional import accuracy
+from torchmetrics.classification import Accuracy, BinaryF1Score
 
 from src.utilities import pickling, tools
 from src.modeling import gmic
 from src.data_loading import loading, dataset
 from src.constants import VIEWS, PERCENT_T_DICT
+from src.scripts import predict
 
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None):
+    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
 
         self.gmic = gmic.GMIC(parameters)
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
-            checkpoint_path = "models/sample_model_" + str(parameters["model_idx"]) + ".p"
+            if "model_idx" in parameters: # use a pretrained model
+                checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
+            elif model_path: # use a self trained model
+                checkpoint_path = os.path.join(model_path)
             model_state_dict = torch.load(checkpoint_path)
             self.initPretrainedWeights(model_state_dict)
 
@@ -39,10 +45,11 @@ class GMICTrainer(pl.LightningModule):
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
+        self.predict_dataset = dataset_predict
 
         # metrics
-        # self.train_acc = accuracy(task="binary")
-        # self.train_f1 = torchmetrics.F1Score(task="binary")
+        self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
+        self.train_f1 = BinaryF1Score()
 
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
@@ -61,7 +68,7 @@ class GMICTrainer(pl.LightningModule):
         self.gmic.load_state_dict(state_dict, strict=False)
         # Freeze layers except for fine-tuning
         for name, param in self.gmic.named_parameters():
-            if name.startswith(remove_keywords) or self.hparams["fine-tuning"]:
+            if name.startswith(remove_keywords) or "fine-tuning" in self.hparams and self.hparams["fine-tuning"]:
                 param.requires_grad = True
             else:
                 param.requires_grad = False
@@ -76,6 +83,7 @@ class GMICTrainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
+        print(img.shape)
         # y_index = int(torch.max(y, 1)[1])
         # self.class_labels[y_index] += 1
 
@@ -87,35 +95,19 @@ class GMICTrainer(pl.LightningModule):
         
         loss = loss_fusion + loss_global + loss_local
 
-        # self.train_acc.update(y_fusion, y)
-        # self.train_f1.update(y_fusion, y)
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
         
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
-        self.log("train_loss", loss, on_epoch=True, sync_dist=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
 
         return loss
-
-
-    # def on_train_epoch_end(self):
-    #     # compute metrics
-    #     train_accuracy = self.train_acc.compute()
-    #     train_f1 = self.train_f1.compute()
-    #     # log metrics
-    #     if self.trainer.is_global_zero:
-    #         self.log("epoch_train_accuracy", train_accuracy, rank_zero_only=True)
-    #         self.log("epoch_train_f1", train_f1, rank_zero_only=True)
-    #     # reset all metrics
-    #     self.train_acc.reset()
-    #     self.train_f1.reset()
-    #     print(f"\nTraining accuracy: {train_accuracy:.4}, F1: {train_f1:.4}")
-        # print(self.train_dataset.label_counts)
-        # print(self.train_dataset.require_dict)
-        # print(self.train_dataset.unique_categories)
-        # print(self.class_labels)
 
 
     def validation_step(self, batch, batch_idx):
@@ -150,6 +142,35 @@ class GMICTrainer(pl.LightningModule):
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)
 
         return loss
+    
+    
+    def predict_step(self, batch, batch_idx):
+        """Predict the output for a single image."""
+        img, y, data = batch
+
+        print(y)
+        true_segs = [None for _ in range(len(y[0]))]
+
+        # forward propagation
+        y_global, y_local, y_fusion = self(img)  # Add an extra dimension for batch
+        img_numpy = img.data.cpu().numpy()
+        pred_numpy = y_fusion.data.cpu().numpy()
+
+        # save visualization
+        saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
+        if self.hparams.turn_on_visualization:
+            patch_locations = self.gmic.patch_locations
+            patch_imgs = self.gmic.patches
+            patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
+            predict.visualize_example(img_numpy, saliency_maps, true_segs,
+                        patch_locations, patch_imgs, patch_attentions,
+                        save_dir, self.hparams)
+                
+        # save predicted regions of interest as polyline
+        predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
+
+        return y_fusion
 
 
     def configure_optimizers(self):
@@ -160,7 +181,7 @@ class GMICTrainer(pl.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
         return None
 
 
@@ -175,4 +196,10 @@ class GMICTrainer(pl.LightningModule):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
             return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+        return None
+
+    def predict_dataloader(self):
+        """Create DataLoader for Testing out of given DataSet"""
+        if self.predict_dataset:
+            return DataLoader(self.predict_dataset, batch_size=1, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
