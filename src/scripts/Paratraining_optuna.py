@@ -45,7 +45,7 @@ if __name__ == "__main__":
     data_path = '../../../sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
     image_path_train = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
     image_path_test = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    image_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
+   # image_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
     seg_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
     output_path = path_to_sds + 'sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     label_file = "sample_data/annotations/finding_annotations.csv"

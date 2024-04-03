@@ -46,17 +46,17 @@ if __name__ == "__main__":
     dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
     output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
-    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+   # h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
     model_path= '/home/na236/Github_Repos/proj-dicomGmic-lightning/models'
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
-        "gpu_number": 0,
-        "epochs": 10,
-        "batch_size": 4,
-        "learning_rate": 1e-3,
+        "gpu_number": 1,
+        "epochs": 6,
+        "batch_size": 64,
+        "learning_rate": 2.5e-5,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
@@ -93,7 +93,7 @@ if __name__ == "__main__":
                         model_path=model_path,
                     )
     print('hello world')
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced_2", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
                     patience=5,
@@ -109,8 +109,7 @@ if __name__ == "__main__":
                         max_epochs=parameters["epochs"], 
                         # gradient_clip_val=1e-3,
                         accelerator=device, 
-                        # devices=[parameters["gpu_number"]],
-                        devices=[0],
+                        devices=[parameters["gpu_number"]],
                         logger=logger,
                         # profiler="simple",
                         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network

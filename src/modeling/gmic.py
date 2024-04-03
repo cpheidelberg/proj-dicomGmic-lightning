@@ -26,6 +26,22 @@ import torch.nn as nn
 import numpy as np
 from src.utilities import tools
 import src.modeling.modules as m
+import albumentations as ab
+from torchvision.transforms import v2
+
+transform = ab.Compose([
+                       ab.HorizontalFlip(p = 0.5),
+                       ab.VerticalFlip(p = 0.5),
+
+]
+)
+
+transforms = v2.Compose([
+   # v2.RandomResizedCrop(size=(224, 224), antialias=True),
+    v2.RandomHorizontalFlip(p=0.5),
+    v2.RandomVerticalFlip(p=0.5),
+
+])
 
 
 class GMIC(nn.Module):
@@ -132,6 +148,8 @@ class GMIC(nn.Module):
         # detection network
         batch_size, num_crops, I, J = crops_variable.size()
         crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
+        crops_variable[:,0,:,:] = transforms(crops_variable[:,0,:,:])
+
         h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
 
         # MIL module
