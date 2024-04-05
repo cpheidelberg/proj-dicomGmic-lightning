@@ -53,8 +53,8 @@ if __name__ == "__main__":
     parameters = {
         # training related hyper-parameters
         "device_type": device,
-        "gpu_number": 1,
-        "epochs": 6,
+        "gpu_number": 2,
+        "epochs": 20,
         "batch_size": 64,
         "learning_rate": 2.5e-5,
         "pretrained": True,
@@ -93,7 +93,7 @@ if __name__ == "__main__":
                         model_path=model_path,
                     )
     print('hello world')
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced_2", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced_3", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
                     patience=5,

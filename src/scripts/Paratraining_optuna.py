@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parameters = {
         # training hyperparameters
         "device_type": device,
-        "gpu_number": 0,
+        "gpu_number": 2,
         "epochs": 20,
         "batch_size": 4,
         "learning_rate": 0.001,
