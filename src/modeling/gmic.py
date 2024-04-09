@@ -148,7 +148,7 @@ class GMIC(nn.Module):
         # detection network
         batch_size, num_crops, I, J = crops_variable.size()
         crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
-        crops_variable[:,0,:,:] = transforms(crops_variable[:,0,:,:])
+      #  crops_variable[:,0,:,:] = transforms(crops_variable[:,0,:,:])
 
         h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
 

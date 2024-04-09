@@ -53,12 +53,12 @@ if __name__ == "__main__":
     parameters = {
         # training related hyper-parameters
         "device_type": device,
-        "gpu_number": 2,
+        "gpu_number": 0,
         "epochs": 20,
-        "batch_size": 64,
+        "batch_size": 1,
         "learning_rate": 2.5e-5,
         "pretrained": True,
-        "fine-tuning": False,
+        "fine-tuning": True,
         "model_idx": 2,
 
         "max_crop_noise": (100, 100),

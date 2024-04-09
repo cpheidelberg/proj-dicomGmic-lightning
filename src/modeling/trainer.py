@@ -48,6 +48,11 @@ class GMICTrainer(pl.LightningModule):
         self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
         self.train_f1 = BinaryF1Score()
 
+        # metrics 
+        self.val_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
+        self.val_f1 = BinaryF1Score()
+
+
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
 
@@ -119,6 +124,12 @@ class GMICTrainer(pl.LightningModule):
         loss = loss_fusion + loss_global + loss_local
         
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
+        self.val_acc(y_fusion, y)
+        self.val_f1(y_fusion, y)
+        self.log("val_acc", self.val_acc, on_step=False, on_epoch=True)
+        self.log("val_f1", self.val_f1, on_step=False, on_epoch=True)
+        
+
 
         return loss
 
