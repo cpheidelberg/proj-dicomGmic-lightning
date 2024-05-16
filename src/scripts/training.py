@@ -1,28 +1,17 @@
-import argparse, os, cv2, sys
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from tqdm import tqdm
-import time
-import multiprocessing
+import os, sys, time
 
 import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
-import pydicom as dcm
+from lightning.pytorch.callbacks import EarlyStopping
 
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.utilities import pickling, tools
-from src.modeling import gmic, trainer
-from src.data_loading import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
+from src.modeling import trainer
+from src.data_loading import dataset
 
 
 if __name__ == "__main__":
@@ -87,7 +76,7 @@ if __name__ == "__main__":
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
-    lightningModule = trainer.GMICTrainer(
+    gmic_module = trainer.GMICTrainer(
                         parameters=parameters,
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
@@ -102,7 +91,7 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    training = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
@@ -115,8 +104,8 @@ if __name__ == "__main__":
                         # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
                         # callbacks=[ModelSummary(max_depth=2)],
                     )
-    trainer.fit(model=lightningModule)
+    training.fit(model=gmic_module)
     
     print("Training finished at: {}".format(time.ctime()))
 
-    trainer.test(model=lightningModule)
+    training.test(model=gmic_module)
