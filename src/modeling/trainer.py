@@ -83,7 +83,6 @@ class GMICTrainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
-        print(img.shape)
         # y_index = int(torch.max(y, 1)[1])
         # self.class_labels[y_index] += 1
 
@@ -181,25 +180,25 @@ class GMICTrainer(pl.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
+            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
         return None
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=False)
         return None
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.predict_dataset:
-            return DataLoader(self.predict_dataset, batch_size=1, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.predict_dataset, batch_size=1, num_workers=8, shuffle=False)
         return None

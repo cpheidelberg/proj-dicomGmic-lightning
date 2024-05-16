@@ -41,24 +41,25 @@ if __name__ == "__main__":
     model_path = 'models/'
     dicom_file = '1-1.dcm'
 
-    sds_path = '../sdsHD/'
+    # sds_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/'
+    sds_path = '/home/ubuntu/data'
     
-    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
-    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
-    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
-    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
-    label_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/finding_annotations.csv')
-    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
-    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
-    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+    data_path = os.path.join(sds_path, 'output/data.pkl')
+    image_path_train = os.path.join(sds_path, 'output/balanced_cropped_top5/')
+    image_path_test = os.path.join(sds_path, 'output/cropped_images/')
+    dict_path = os.path.join(sds_path, 'output/dictionary.csv')
+    label_path = os.path.join(sds_path, 'finding_annotations.csv')
+    seg_path = os.path.join(sds_path, 'output/segmentation')
+    output_path = os.path.join(sds_path, 'output')
+    h5_path = os.path.join(sds_path, 'output/balanced_top6/dataset.h5')
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 10,
-        "batch_size": 4,
+        "epochs": 8,
+        "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,
         "fine-tuning": False,
@@ -93,7 +94,7 @@ if __name__ == "__main__":
                         dataset_test=dataTest,
                         model_path=model_path
                     )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
     early_stop_callback = EarlyStopping(
                     monitor='val_loss',
                     patience=5,
@@ -101,17 +102,17 @@ if __name__ == "__main__":
                     verbose=False,
                     mode='min'
                 )
-    trainer = pl.Trainer(fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+    trainer = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
                         max_epochs=parameters["epochs"], 
                         # gradient_clip_val=1e-3,
                         accelerator=device, 
                         # devices=[parameters["gpu_number"]],
-                        devices=[1,2],
+                        devices=[0],
                         logger=logger,
                         # profiler="simple",
-                        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+                        # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
                         # callbacks=[ModelSummary(max_depth=2)],
                     )
     trainer.fit(model=lightningModule)
