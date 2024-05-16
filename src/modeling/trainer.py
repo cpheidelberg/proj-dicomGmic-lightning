@@ -13,7 +13,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
 import multiprocessing
-from torchmetrics.classification import Accuracy, BinaryF1Score
+from torchmetrics.classification import Accuracy, BinaryF1Score, AUROC
 
 from src.utilities import pickling, tools
 from src.modeling import gmic
@@ -50,6 +50,7 @@ class GMICTrainer(pl.LightningModule):
         # metrics
         self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
         self.train_f1 = BinaryF1Score()
+        self.train_rocauc = AUROC()
 
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
@@ -96,8 +97,10 @@ class GMICTrainer(pl.LightningModule):
 
         self.train_acc(y_fusion, y)
         self.train_f1(y_fusion, y)
+        self.train_rocauc(y_fusion, y)
         self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
         self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
+        self.log("train_rocauc", self.train_rocauc, on_step=False, on_epoch=True)
         
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
