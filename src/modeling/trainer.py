@@ -80,7 +80,7 @@ class GMICTrainer(pl.LightningModule):
         print(batch_idx, end=',')
 
         if self.feature_vector_storage:
-            self.feature_vector_storage.add_many(np.argmax(y, axis=1), feature_vector)
+            self.feature_vector_storage.add_many(np.argmax(y.cpu(), axis=1), feature_vector.cpu())
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
