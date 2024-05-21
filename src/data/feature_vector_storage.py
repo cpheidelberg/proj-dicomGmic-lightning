@@ -1,11 +1,11 @@
 import numpy as np
 import io
-import os
+import shutil
 import base64
 
 class FeatureVectorStorage:
     def __init__(self, path: str, no_finding: int):
-        os.remove(path)
+        shutil.rmtree(path, ignore_errors=True)
         self._path = path
         self._no_finding = no_finding
 
