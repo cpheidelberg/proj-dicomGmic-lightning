@@ -72,12 +72,10 @@ class GMICTrainer(pl.LightningModule):
         return self.gmic(image)
 
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, dataloader_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
         y_fusion, y_global, y_local, feature_vector = self(img)
-
-        print(batch_idx, end=',')
 
         if self.feature_vector_storage:
             self.feature_vector_storage.add_many(np.argmax(y.cpu(), axis=1), feature_vector.cpu())
@@ -103,6 +101,11 @@ class GMICTrainer(pl.LightningModule):
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
 
         return loss
+
+
+    def on_train_epoch_end(self):
+        # Do something with FVs before deleting them
+        self.feature_vector_storage.clear()
 
 
     def validation_step(self, batch, batch_idx):

@@ -5,9 +5,11 @@ import base64
 
 class FeatureVectorStorage:
     def __init__(self, path: str, no_finding: int):
-        shutil.rmtree(path, ignore_errors=True)
         self._path = path
         self._no_finding = no_finding
+
+    def clear(self):
+        shutil.rmtree(self._path, ignore_errors=True)
 
     def add(self, label: int, vector: np.ndarray):
         if label != self._no_finding:
