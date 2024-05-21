@@ -2,7 +2,6 @@ import numpy as np
 import io
 import shutil
 import base64
-import lzma
 
 class FeatureVectorStorage:
     def __init__(self, path: str, no_finding: int):
@@ -17,7 +16,7 @@ class FeatureVectorStorage:
     def add(self, label: int, vector: np.ndarray):
         if label != self._no_finding:
             self._labels.add(label)
-            with io.BytesIO() as buf, lzma.LZMAFile(f'{self._path}.{label}', mode='a') as file:
+            with io.BytesIO() as buf, open(f'{self._path}.{label}', mode='ab') as file:
                 np.save(buf, vector)
                 file.write(base64.b85encode(buf.getvalue()) + b'\n')
 
@@ -27,7 +26,7 @@ class FeatureVectorStorage:
 
     def read(self, label: int):
         try:
-            with lzma.LZMAFile(f'{self._path}.{label}') as file:
+            with open(f'{self._path}.{label}', mode='rb') as file:
                 return (np.load(io.BytesIO(base64.b85decode(ln))) for ln in file if ln)
         except OSError:
             return []
