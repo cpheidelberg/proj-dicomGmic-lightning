@@ -114,7 +114,9 @@ class GMIC(nn.Module):
         """
         # global network: x_small -> class activation map
         h_g, self.saliency_map = self.global_network.forward(x_original)
-        feature_vector = h_g.flatten()
+        feature_vector = h_g.reshape((h_g.shape[0], h_g.shape[1] * h_g.shape[2] * h_g.shape[3]))
+    
+        print(x_original.shape, h_g.shape, feature_vector.shape)
 
         # calculate y_global
         # note that y_global is not directly used in inference
