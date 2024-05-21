@@ -79,7 +79,7 @@ class GMICTrainer(pl.LightningModule):
 
         y_global, y_local, y_fusion, feature_vector = self(img)
 
-        print(y, feature_vector)
+        print(y)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
