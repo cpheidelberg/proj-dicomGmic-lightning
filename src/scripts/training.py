@@ -43,7 +43,7 @@ if __name__ == "__main__":
     output_path = os.path.join(sds_path, 'output')
     h5_path = os.path.join(sds_path, 'output/balanced_top6/dataset.h5')
 
-    feature_vectors_path = os.path.join(sds_path, 'output/feature_vectors.txt')
+    feature_vectors_path = os.path.join(sds_path, 'output/feature_vectors')
 
     # set hyperparameters
     parameters = {
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
-    feature_vector_storage=FeatureVectorStorage(feature_vectors_path, data.no_finding_idx)
+    feature_vector_storage = FeatureVectorStorage(feature_vectors_path, data.no_finding_idx)
 
     # Training
     gmic_module = trainer.GMICTrainer(
@@ -90,13 +90,9 @@ if __name__ == "__main__":
                         model_path=model_path
                     )
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
-    early_stop_callback = EarlyStopping(
-                    monitor='val_loss',
-                    patience=5,
-                    strict=False,
-                    verbose=False,
-                    mode='min'
-                )
+
+    early_stop_callback = EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
+
     training = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
                         # limit_val_batches=0,
                         # num_sanity_val_steps=0,
