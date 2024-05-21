@@ -12,6 +12,7 @@ sys.path.append(parent_dir)
 
 from src.modeling import trainer
 from src.data import dataset
+from src.data.feature_vector_storage import FeatureVectorStorage
 
 
 if __name__ == "__main__":
@@ -42,6 +43,8 @@ if __name__ == "__main__":
     output_path = os.path.join(sds_path, 'output')
     h5_path = os.path.join(sds_path, 'output/balanced_top6/dataset.h5')
 
+    feature_vectors_path = os.path.join(sds_path, 'output/feature_vectors.txt')
+
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
@@ -70,14 +73,17 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
+    data = dataset.ClassificationImages(image_dirs=[image_path_train, image_path_test], dict_file=dict_path, top_c=parameters["num_classes"])
     # data = dataset.ClassificationImagesFromPickle(imageFolder=[image_path_test], dictPath=data_path, labelPath=label_path, top_c=parameters["num_classes"])
     # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
+    feature_vector_storage=FeatureVectorStorage(feature_vectors_path, data.no_finding_idx)
+
     # Training
     gmic_module = trainer.GMICTrainer(
                         parameters=parameters,
+                        feature_vector_storage=feature_vector_storage,
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
                         dataset_test=dataTest,

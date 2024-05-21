@@ -1,15 +1,19 @@
 import numpy as np
 import io
+import os
 import base64
 
 class FeatureVectorStorage:
-    def __init__(self, path: str):
+    def __init__(self, path: str, no_finding: int):
+        os.remove(path)
         self._path = path
+        self._no_finding = no_finding
 
     def add(self, label: int, vector: np.ndarray):
-        with io.BytesIO() as buf, open(self._path, mode='a') as file:
-            np.save(buf, vector)
-            file.write(f'{label} {base64.b64encode(buf.getvalue()).decode()}\n')
+        if label != self._no_finding:
+            with io.BytesIO() as buf, open(self._path, mode='a') as file:
+                np.save(buf, vector)
+                file.write(f'{label} {base64.b64encode(buf.getvalue()).decode()}\n')
 
     def add_many(self, labels: np.ndarray, vectors: np.ndarray):
         for label, vector in zip(labels, vectors):

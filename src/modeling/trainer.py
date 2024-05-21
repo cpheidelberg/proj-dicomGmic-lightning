@@ -10,15 +10,18 @@ from torchmetrics.classification import Accuracy, BinaryF1Score, BinaryAUROC
 
 from src.modeling import gmic
 from src.scripts import predict
+from src.data.feature_vector_storage import FeatureVectorStorage
 
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
+    def __init__(self, parameters, feature_vector_storage: FeatureVectorStorage | None = None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
 
         self.gmic = gmic.GMIC(parameters)
+        self.feature_vector_storage = feature_vector_storage
+
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
             if "model_idx" in parameters: # use a pretrained model
@@ -73,6 +76,11 @@ class GMICTrainer(pl.LightningModule):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
         y_fusion, y_global, y_local, feature_vector = self(img)
+
+        print(batch_idx, end=',')
+
+        if self.feature_vector_storage:
+            self.feature_vector_storage.add_many(np.argmax(y, axis=1), feature_vector)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)

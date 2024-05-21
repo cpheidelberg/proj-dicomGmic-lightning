@@ -1,14 +1,11 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import os, ast, pickle, h5py, time, sys, shutil, random
+import os, ast, pickle, h5py, time, sys, random
 from tqdm import tqdm
-from PIL import Image
 import multiprocessing
-import resource
 
 import torch
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Dataset, DataLoader
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
@@ -18,29 +15,31 @@ from src.data import loading
 
 class ClassificationImages(Dataset):
 
-    def __init__(self, imageFolder:str, dictPath: str, top_c=None, h5_file=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv(dictPath, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
+    def __init__(self, image_dirs : list[str], dict_file: str, top_c=None, h5_file=None):
+        self.image_dirs = image_dirs
+        self.image_files = [os.path.join(img_dir, file) for img_dir in image_dirs for file in os.listdir(img_dir)]
+        random.shuffle(self.image_files)
+        self.dict_table = pd.read_csv(dict_file, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
 
         if top_c:
             self.filterCategories(top_c)
 
-        self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
-        print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
-        print(self.flatDictDF["finding_categories"].value_counts())
+        self.unique_categories = list(self.dict_table["finding_categories"].explode().unique())
+        self.no_finding_idx = self.unique_categories.index('No Finding')
+
+        print(f'{len(self.unique_categories)} classes: {self.unique_categories}')
+        print(self.dict_table["finding_categories"].value_counts())
 
         # print(self.getLabelCount())
 
 
     def __len__(self):
-        return len(self.imageFiles)
+        return len(self.image_files)
 
 
     def __getitem__(self, idx):
         
-        imagePath = self.imageFiles[idx]
+        imagePath = self.image_files[idx]
 
         original_file_name = self.getOrigFilename(idx)
         data = self.getDataentry(original_file_name)
@@ -53,17 +52,17 @@ class ClassificationImages(Dataset):
 
 
     def getOrigFilename(self, idx):
-        if len(self.imageFiles[idx].split("/")[-1].split("_")) > 2:
-            original_file_name = "_".join(self.imageFiles[idx].split("/")[-1].split("_")[:-1]).strip(".png")
+        if len(self.image_files[idx].split("/")[-1].split("_")) > 2:
+            original_file_name = "_".join(self.image_files[idx].split("/")[-1].split("_")[:-1]).strip(".png")
         else:
-            original_file_name = self.imageFiles[idx].split("/")[-1].strip(".png")
+            original_file_name = self.image_files[idx].split("/")[-1].strip(".png")
 
         return original_file_name
 
 
     def getDataentry(self, original_file_name: str) -> pd.DataFrame:
         """Find the entry of the original filename in self.flatDict["image"]"""
-        data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
+        data = self.dict_table[self.dict_table["image"] == original_file_name]
         if data.empty:
             raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
         return data
@@ -86,13 +85,13 @@ class ClassificationImages(Dataset):
             
     def getLabelCount(self):
         labelCount = {k: 0 for k in self.unique_categories}
-        for f in self.imageFiles:
+        for f in self.image_files:
             
             if len(f.split("/")[-1].split("_")) > 2:
                 original_file_name = "_".join(f.split("/")[-1].split("_")[:-1]).strip(".png")
             else:
                 original_file_name = f.split("/")[-1].strip(".png")
-            data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
+            data = self.dict_table[self.dict_table["image"] == original_file_name]
             labelList = data["finding_categories"].iloc[0]
             labelCount[labelList[0]] += 1
         return labelCount
@@ -119,21 +118,21 @@ class ClassificationImages(Dataset):
     def filterCategories(self, top_c=5):
         """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
 
-        class_counts = self.flatDictDF["finding_categories"].value_counts()
-        origLen = len(self.imageFiles)
-        origLength = len(self.flatDictDF)
+        class_counts = self.dict_table["finding_categories"].value_counts()
+        origLen = len(self.image_files)
+        origLength = len(self.dict_table)
 
         class_counts = class_counts.sort_values(ascending=False)
         top_labels = class_counts.head(top_c).index
 
-        removed_images = self.flatDictDF.loc[~self.flatDictDF['finding_categories'].isin(top_labels)]
+        removed_images = self.dict_table.loc[~self.dict_table['finding_categories'].isin(top_labels)]
         removed_images = removed_images['image'].tolist()
-        self.flatDictDF = self.flatDictDF[self.flatDictDF["finding_categories"].isin(top_labels)]
-        self.flatDictDF.to_csv("removedTop5.csv")
-        self.imageFiles = [f for f in self.imageFiles if "_".join(f.split("/")[-1].split("_")[:2]).strip(".png") not in removed_images]
+        self.dict_table = self.dict_table[self.dict_table["finding_categories"].isin(top_labels)]
+        self.dict_table.to_csv("removedTop5.csv")
+        self.image_files = [f for f in self.image_files if "_".join(f.split("/")[-1].split("_")[:2]).strip(".png") not in removed_images]
 
-        print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
-        print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
+        print("{}/{} images for {} retained categories".format(len(self.image_files), origLen, top_c))
+        print("{}/{} dictionary entries for {} retained categories".format(len(self.dict_table), origLength, top_c))
 
 
 class ClassificationImagesFromPickle(ClassificationImages):

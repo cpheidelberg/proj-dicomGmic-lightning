@@ -80,7 +80,7 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c = parameters["num_classes"], dictPath = dict_path)
+    dataTrain = dataset.ClassificationImages(image_dirs=[image_path_train, image_path_test], top_c = parameters["num_classes"], dict_file = dict_path)
 
     # dataTrain = dataset.H5Dataset(h5_filepath="/home/pb438/medken/balanced_top6/dataset.h5")
     dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
