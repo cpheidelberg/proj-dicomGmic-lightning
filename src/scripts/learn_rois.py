@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from src.modeling import gmic as gmic
-from src.data_loading import loading
+from src.data import loading
 from src.constants import VIEWS, PERCENT_T_DICT
 
 

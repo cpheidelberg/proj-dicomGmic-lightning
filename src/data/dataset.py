@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader, Subset
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
-from src.data_loading import loading
+from src.data import loading
 
 
 class ClassificationImages(Dataset):

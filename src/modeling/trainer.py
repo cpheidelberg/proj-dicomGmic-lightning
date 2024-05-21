@@ -25,8 +25,8 @@ class GMICTrainer(pl.LightningModule):
                 checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
             elif model_path: # use a self trained model
                 checkpoint_path = os.path.join(model_path)
-            model_state_dict = torch.load(checkpoint_path)
-            self.initPretrainedWeights(model_state_dict)
+
+            self.initPretrainedWeights(torch.load(checkpoint_path))
 
             print(f"Use pretrained model from {checkpoint_path}")
 
@@ -66,25 +66,18 @@ class GMICTrainer(pl.LightningModule):
 
 
     def forward(self, image):
-
-        y_fusion, y_global, y_local, feature_vector = self.gmic(image)
-        return y_global, y_local, y_fusion, feature_vector
+        return self.gmic(image)
 
 
     def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
-        # y_index = int(torch.max(y, 1)[1])
-        # self.class_labels[y_index] += 1
-
-        y_global, y_local, y_fusion, feature_vector = self(img)
-
-        print(y)
+        y_fusion, y_global, y_local, feature_vector = self(img)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
-        
+
         loss = loss_fusion + loss_global + loss_local
 
         self.train_acc(y_fusion, y)
@@ -108,7 +101,7 @@ class GMICTrainer(pl.LightningModule):
         """Implementation of PyTorch validation loop in Lightning called for each batch"""
         img, y = batch
 
-        y_global, y_local, y_fusion, _ = self(img)
+        y_fusion, y_global, y_local, _ = self(img)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
@@ -125,7 +118,7 @@ class GMICTrainer(pl.LightningModule):
         """Implementation of PyTorch test loop in Lightning called for each batch"""
         img, y = batch
 
-        y_global, y_local, y_fusion, _ = self(img)
+        y_fusion, y_global, y_local, _ = self(img)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
@@ -146,7 +139,7 @@ class GMICTrainer(pl.LightningModule):
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
-        y_global, y_local, y_fusion, _ = self(img)  # Add an extra dimension for batch
+        y_fusion, y_global, y_local, _ = self(img)  # Add an extra dimension for batch
         img_numpy = img.data.cpu().numpy()
         pred_numpy = y_fusion.data.cpu().numpy()
 

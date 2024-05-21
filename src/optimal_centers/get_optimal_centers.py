@@ -31,7 +31,7 @@ from src.constants import INPUT_SIZE_DICT
 import src.utilities.pickling as pickling
 import src.utilities.data_handling as data_handling
 import src.utilities.reading_images as reading_images
-import src.data_loading.loading as loading
+import src.data.loading as loading
 import src.optimal_centers.calc_optimal_centers as calc_optimal_centers
 
 

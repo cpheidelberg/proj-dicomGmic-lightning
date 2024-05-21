@@ -20,7 +20,7 @@
 import numpy as np
 from src.constants import VIEWS
 import imageio
-import src.data_loading.augmentations as augmentations
+import src.data.augmentations as augmentations
 
 
 def flip_image(image, view, horizontal_flip):

@@ -11,7 +11,7 @@ parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
 from src.modeling import trainer
-from src.data_loading import dataset
+from src.data import dataset
 
 
 if __name__ == "__main__":
