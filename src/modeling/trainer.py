@@ -72,7 +72,7 @@ class GMICTrainer(pl.LightningModule):
         return self.gmic(image)
 
 
-    def training_step(self, batch, batch_idx, dataloader_idx):
+    def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
         y_fusion, y_global, y_local, feature_vector = self(img)
