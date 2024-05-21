@@ -14,6 +14,7 @@ class FeatureVectorStorage:
     def add(self, label: int, vector: np.ndarray):
         if label != self._no_finding:
             with io.BytesIO() as buf, open(self._path, mode='a') as file:
+                print('FeatureVectorStorage.add ->', label, vector.shape)
                 np.save(buf, np.concatenate([label], vector))
                 print(base64.b85encode(buf.getvalue()).decode(), file=file)
 
