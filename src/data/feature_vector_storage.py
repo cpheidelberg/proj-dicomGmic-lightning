@@ -14,8 +14,8 @@ class FeatureVectorStorage:
     def add(self, label: int, vector: np.ndarray):
         if label != self._no_finding:
             with io.BytesIO() as buf, open(self._path, mode='a') as file:
-                np.save(buf, vector)
-                file.write(f'{label} {base64.b64encode(buf.getvalue()).decode()}\n')
+                np.save(buf, np.concatenate([label], vector))
+                print(base64.b85encode(buf.getvalue()).decode(), file=file)
 
     def add_many(self, labels: np.ndarray, vectors: np.ndarray):
         for label, vector in zip(labels, vectors):
@@ -23,8 +23,8 @@ class FeatureVectorStorage:
 
     def read(self):
         def parse(line: str) -> tuple[int, np.ndarray]:
-            label, vector = line.split(' ', maxsplit=1)
-            return int(label), np.load(io.BytesIO(base64.b64decode(vector)))
+            array = np.load(io.BytesIO(base64.b85decode(line)))
+            return round(array[0]), array[1:]
 
         with open(self._path) as file:
             return (parse(line) for line in file if line)

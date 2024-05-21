@@ -78,7 +78,9 @@ class GMICTrainer(pl.LightningModule):
         y_fusion, y_global, y_local, feature_vector = self(img)
 
         if self.feature_vector_storage:
-            self.feature_vector_storage.add_many(np.argmax(y.cpu(), axis=1), feature_vector.cpu())
+            y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
+            feature_vector = feature_vector.cpu().numpy(force=True)
+            self.feature_vector_storage.add_many(y_index, feature_vector)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
