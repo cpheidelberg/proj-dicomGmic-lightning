@@ -1,24 +1,14 @@
-import argparse, os, cv2
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from tqdm import tqdm
-import pydicom as dcm
-import sys
 import os
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import lightning.pytorch as pl
-import multiprocessing
 from torchmetrics.classification import Accuracy, BinaryF1Score, BinaryAUROC
 
-from src.utilities import pickling, tools
 from src.modeling import gmic
-from src.data_loading import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
 from src.scripts import predict
 
 
@@ -77,8 +67,8 @@ class GMICTrainer(pl.LightningModule):
 
     def forward(self, image):
 
-        y_fusion, y_global, y_local = self.gmic(image)
-        return y_global, y_local, y_fusion
+        y_fusion, y_global, y_local, feature_vector = self.gmic(image)
+        return y_global, y_local, y_fusion, feature_vector
 
 
     def training_step(self, batch, batch_idx):
@@ -87,7 +77,10 @@ class GMICTrainer(pl.LightningModule):
         # y_index = int(torch.max(y, 1)[1])
         # self.class_labels[y_index] += 1
 
-        y_global, y_local, y_fusion = self(img)
+        y_global, y_local, y_fusion, feature_vector = self(img)
+
+        print(feature_vector)
+        print(feature_vector.shape)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
