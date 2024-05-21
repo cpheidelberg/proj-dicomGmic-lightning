@@ -306,7 +306,7 @@ class GlobalNetwork(AbstractMILUnit):
         self.parent_module.ds_net = self.downsampling_branch
         self.parent_module.left_postprocess_net = self.postprocess_module
 
-    def forward(self, x):
+    def forward(self, x) -> tuple[np.ndarray, torch.Tensor]:
         # retrieve results from downsampling network at all 4 levels
         last_feature_map = self.downsampling_branch.forward(x)
         # feed into postprocessing network

@@ -114,6 +114,7 @@ class GMIC(nn.Module):
         """
         # global network: x_small -> class activation map
         h_g, self.saliency_map = self.global_network.forward(x_original)
+        feature_vector = h_g.reshape(h_g.size)
 
         # calculate y_global
         # note that y_global is not directly used in inference
@@ -145,4 +146,4 @@ class GMIC(nn.Module):
         concat_vec = torch.cat([global_vec, z], dim=1)
         self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
-        return self.y_fusion, self.y_global, self.y_local, h_g
+        return self.y_fusion, self.y_global, self.y_local, feature_vector
