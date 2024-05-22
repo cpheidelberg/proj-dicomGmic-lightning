@@ -71,18 +71,18 @@ class GMIC(lightning.LightningModule):
         y_global, global_vec, h_crops = self.cnn(image)
         y_fusion, y_local = self.classifier(global_vec, h_crops)
 
-        return y_fusion, y_global, y_local, h_crops
+        return y_fusion, y_global, y_local, global_vec, h_crops
 
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
-        y_fusion, y_global, y_local, feature_vector = self(img)
+        y_fusion, y_global, y_local, global_vec, h_crops = self(img)
 
         if self.feature_vector_storage:
             y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
             feature_vector = feature_vector.cpu().numpy(force=True)
-            self.feature_vector_storage.add(y_index, feature_vector)
+            self.feature_vector_storage.add(y_index, global_vec, h_crops)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
