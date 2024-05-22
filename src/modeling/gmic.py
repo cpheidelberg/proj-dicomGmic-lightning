@@ -116,7 +116,7 @@ class GMIC(lightning.LightningModule):
         """Implementation of PyTorch validation loop in Lightning called for each batch"""
         img, y = batch
 
-        y_fusion, y_global, y_local, _ = self(img)
+        y_fusion, y_global, y_local, _, _ = self(img)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
@@ -133,7 +133,7 @@ class GMIC(lightning.LightningModule):
         """Implementation of PyTorch test loop in Lightning called for each batch"""
         img, y = batch
 
-        y_fusion, y_global, y_local, _ = self(img)
+        y_fusion, y_global, y_local, _, _ = self(img)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
@@ -154,7 +154,7 @@ class GMIC(lightning.LightningModule):
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
-        y_fusion, y_global, y_local, _ = self(img)  # Add an extra dimension for batch
+        y_fusion, y_global, y_local, _, _ = self(img)  # Add an extra dimension for batch
         img_numpy = img.data.cpu().numpy()
         pred_numpy = y_fusion.data.cpu().numpy()
 
