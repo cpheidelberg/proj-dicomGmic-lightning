@@ -30,15 +30,15 @@ class Classifier(torch.nn.Module):
         self._cam_size = parameters["cam_size"]
         self._crop_shape = parameters["crop_shape"]
 
-        self.aggregation_function = m.TopTPercentAggregationFunction(parameters)
+        self.aggregation_function = m.TopTPercentAggregationFunction(parameters["percent_t"])
         self.retrieve_roi_module = m.RetrieveROIModule(parameters)
 
         # detection network
-        self.local_network = m.LocalNetwork(parameters)
+        self.local_network = m.LocalNetwork()
         self.dn_resnet = self.local_network.dn_resnet
 
         # MIL module
-        self.attention_module = m.AttentionModule(parameters)
+        self.attention_module = m.AttentionModule(parameters["num_classes"])
         self.mil_attn_V = self.attention_module.mil_attn_V
         self.mil_attn_U = self.attention_module.mil_attn_U
         self.mil_attn_w = self.attention_module.mil_attn_w
@@ -47,7 +47,7 @@ class Classifier(torch.nn.Module):
         self.classifier_linear = self.attention_module.classifier_linear
 
         # fusion branch
-        self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
+        self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"] + 512, parameters["num_classes"])
 
 
     def _convert_crop_position(self, crops_x_small, cam_size, x_original):

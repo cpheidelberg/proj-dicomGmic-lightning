@@ -236,19 +236,6 @@ class ResNetV1(nn.Module):
         return x
 
 
-class DownsampleNetworkResNet18V1(ResNetV1):
-    """
-    Downsampling using ResNet V1
-    First conv is 7*7, stride 2, padding 3, cut 1/2 resolution
-    """
-    def __init__(self):
-        super(DownsampleNetworkResNet18V1, self).__init__(
-            initial_filters=64,
-            block=BasicBlockV1,
-            layers=[2, 2, 2, 2],
-            input_channels=3)
-
-
 class PostProcessingStandard(nn.Module):
     """
     Unit in Global Network that takes in x_out and produce saliency maps
@@ -264,30 +251,35 @@ class PostProcessingStandard(nn.Module):
         return torch.sigmoid(self.gn_conv_last(x_out))
 
 
-class GlobalNetwork:
+class GlobalNetwork(nn.Module):
     """
     Implementation of Global Network using ResNet-22
     """
     def __init__(self, parameters):
-        # downsampling-branch
-        if "use_v1_global" in parameters and parameters["use_v1_global"]:
-            self.downsampling_branch = DownsampleNetworkResNet18V1()
+        super(GlobalNetwork, self).__init__()
+
+        if parameters.get("use_v1_global", False):
+            # First conv is 7*7, stride 2, padding 3, cut 1/2 resolution
+            self.downsampling_branch = ResNetV1(
+                initial_filters=64, block=BasicBlockV1,
+                layers=[2, 2, 2, 2], input_channels=3)
         else:
-            self.downsampling_branch = ResNetV2(input_channels=1, num_filters=16,
-                     # first conv layer
-                     first_layer_kernel_size=(7,7), first_layer_conv_stride=2,
-                     first_layer_padding=3,
-                     # first pooling layer
-                     first_pool_size=3, first_pool_stride=2, first_pool_padding=0,
-                     # res blocks architecture
-                     blocks_per_layer_list=[2, 2, 2, 2, 2],
-                     block_strides_list=[1, 2, 2, 2, 2],
-                     block_fn=BasicBlockV2,
-                     growth_factor=2)
-        # post-processing
+            self.downsampling_branch = ResNetV2(
+                input_channels=1, num_filters=16,
+                # first conv layer
+                first_layer_kernel_size=(7,7), first_layer_conv_stride=2,
+                first_layer_padding=3,
+                # first pooling layer
+                first_pool_size=3, first_pool_stride=2, first_pool_padding=0,
+                # res blocks architecture
+                blocks_per_layer_list=[2, 2, 2, 2, 2],
+                block_strides_list=[1, 2, 2, 2, 2],
+                block_fn=BasicBlockV2,
+                growth_factor=2)
+
         self.postprocess_module = PostProcessingStandard(parameters)
 
-    def forward(self, x) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x):
         # retrieve results from downsampling network at all 4 levels
         last_feature_map = self.downsampling_branch.forward(x)
         # feed into postprocessing network
@@ -301,8 +293,8 @@ class TopTPercentAggregationFunction:
     An aggregator that uses the SM to compute the y_global.
     Use the sum of topK value
     """
-    def __init__(self, parameters):
-        self.percent_t = parameters["percent_t"]
+    def __init__(self, percent_t: float):
+        self.percent_t = percent_t
 
     def forward(self, cam):
         batch_size, num_class, H, W = cam.size()
@@ -318,11 +310,10 @@ class RetrieveROIModule:
     Greedy select crops with largest sums
     """
     def __init__(self, parameters):
-        self.parameters = parameters
         self.crop_method = "upper_left"
         self.num_crops_per_class = parameters["K"]
         self.crop_shape = parameters["crop_shape"]
-        self.gpu_number = None if parameters["device_type"]!="gpu" else parameters["gpu_number"]
+        self.gpu_number = None if parameters["device_type"] != "gpu" else parameters["gpu_number"]
 
     def forward(self, x_original, cam_size, h_small):
         """
@@ -370,7 +361,7 @@ class LocalNetwork:
     The local network that takes a crop and computes its hidden representation
     Use ResNet
     """
-    def __init__(self, parameters):
+    def __init__(self):
         self.dn_resnet = ResNetV1(64, BasicBlockV1, [2,2,2,2], 3)
 
     def forward(self, x_crop):
@@ -382,8 +373,7 @@ class LocalNetwork:
         # forward propagte using ResNet
         res = self.dn_resnet(x_crop.expand(-1, 3, -1 , -1))
         # global average pooling
-        res = res.mean(dim=2).mean(dim=2)
-        return res
+        return res.mean(dim=2).mean(dim=2)
 
 
 class AttentionModule:
@@ -391,12 +381,12 @@ class AttentionModule:
     The attention module takes multiple hidden representations and compute the attention-weighted average
     Use Gated Attention Mechanism in https://arxiv.org/pdf/1802.04712.pdf
     """
-    def __init__(self, parameters):
+    def __init__(self, num_classes: int):
         self.mil_attn_V = nn.Linear(512, 128, bias=False)
         self.mil_attn_U = nn.Linear(512, 128, bias=False)
         self.mil_attn_w = nn.Linear(128, 1, bias=False)
         # classifier
-        self.classifier_linear = nn.Linear(512, parameters["num_classes"], bias=False)
+        self.classifier_linear = nn.Linear(512, num_classes, bias=False)
 
 
     def forward(self, h_crops):
