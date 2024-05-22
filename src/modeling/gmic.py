@@ -69,8 +69,8 @@ class GMIC(lightning.LightningModule):
 
     def forward(self, image):
         y_global, global_vec, h_crops = self.cnn(image)
-        print(f'GMIC.forward() :: {global_vec.shape=}; {h_crops.shape=}')
         y_fusion, y_local = self.classifier(global_vec, h_crops)
+
         return y_fusion, y_global, y_local, h_crops
 
 
@@ -82,7 +82,7 @@ class GMIC(lightning.LightningModule):
         if self.feature_vector_storage:
             y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
             feature_vector = feature_vector.cpu().numpy(force=True)
-            self.feature_vector_storage.add_many(y_index, feature_vector)
+            self.feature_vector_storage.add(y_index, feature_vector)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)

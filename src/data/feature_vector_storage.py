@@ -13,17 +13,13 @@ class FeatureVectorStorage:
         except:
             pass
 
-    def add(self, label: int, global_vec: np.ndarray, h_crops: np.ndarray):
-        if label != self._no_finding:
-            tab = pd.DataFrame({'label': [label], 'global_vec': [global_vec], 'h_crops': [h_crops]})
-            tab.to_csv(self._path, mode='a', header=not os.path.exists(self._path))
+    def add(self, labels: np.ndarray, global_vec: np.ndarray, h_crops: np.ndarray):
+        tab = pd.DataFrame({'label': labels, 'global_vec': list(global_vec), 'h_crops': list(h_crops)})
+        tab.to_csv(self._path, mode='a', header=not os.path.exists(self._path))
 
-    def add_many(self, labels: np.ndarray, vectors: np.ndarray):
-        for label, vector in zip(labels, vectors):
-            self.add(label, vector)
-
-    def read(self, label: int):
+    def read(self):
         try:
-            return pd.read_csv(self._path)
+            tab = pd.read_csv(self._path)
+            return list(tab.loc[:, 'label']), list(tab.loc[:, 'global_vec']), list(tab.loc[:, 'h_crops'])
         except:
             return []
