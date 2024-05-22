@@ -238,7 +238,7 @@ if __name__ == "__main__":
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
-    lightningModule = trainer.GMICTrainer(
+    lightningModule = gmic.GMIC(
                         parameters=parameters,
                         dataset_predict=dataTrain,
                         model_path=model_path

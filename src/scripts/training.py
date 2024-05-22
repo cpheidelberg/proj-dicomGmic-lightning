@@ -10,7 +10,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.modeling import trainer
+from src.modeling import gmic
 from src.data import dataset
 from src.data.feature_vector_storage import FeatureVectorStorage
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     feature_vector_storage = FeatureVectorStorage(feature_vectors_path, data.no_finding_idx)
 
     # Training
-    gmic_module = trainer.GMICTrainer(
+    gmic_module = gmic.GMIC(
                         parameters=parameters,
                         feature_vector_storage=feature_vector_storage,
                         dataset_train=dataTrain,

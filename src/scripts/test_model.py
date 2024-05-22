@@ -296,8 +296,8 @@ def run_single_model(model_path, data_path, dicom_file, parameters, turn_on_visu
     """
     Load a single model and run on sample data
     """
-    # gmicTrainer = trainer.GMICTrainer.load_from_checkpoint(model_path, map_location=parameters["device_type"])
-    model = trainer.GMICTrainer(parameters)
+    # gmicTrainer = gmic.GMIC.load_from_checkpoint(model_path, map_location=parameters["device_type"])
+    model = gmic.GMIC(parameters)
     model.load_state_dict(torch.load(model_path, map_location=parameters["device_type"]), strict=False)
     # load metadata
     exam_list = pickling.unpickle_from_file(data_path)

@@ -24,15 +24,16 @@ class CNN(torch.nn.Module):
     def __init__(self, parameters):
         super(CNN, self).__init__()
 
-        self._nn = m.GlobalNetwork(parameters, self)
-        self._nn.add_layers()
+        self.global_network = m.GlobalNetwork(parameters)
+        self.downsampling_branch = self.global_network.downsampling_branch
+        self.postprocess_module = self.global_network.postprocess_module
 
     def forward(self, x_original):
         """
         :param x_original: N x H x W x C array
         """
         # global network: x_small -> class activation map
-        h_g, self.saliency_map = self._nn.forward(x_original)
+        h_g, self.saliency_map = self.global_network.forward(x_original)
 
         # Collapse the dimensions (except the batch size) into one
         feature_vector = h_g.reshape((h_g.shape[0], h_g.shape[1] * h_g.shape[2] * h_g.shape[3]))

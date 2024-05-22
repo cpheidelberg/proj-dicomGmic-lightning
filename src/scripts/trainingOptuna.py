@@ -32,10 +32,8 @@ def objective(trial, dataTrain, dataValid):
     # parameters["use_v1_global"] = trial.suggest_categorical("use_v1_global", [True, False])
 
     # Create and train the LightningModule
-    lightningModule = trainer.GMICTrainer(dataset_train=dataTrain,
-                                dataset_valid=dataValid,
-                                parameters=parameters,
-                            )
+    lightningModule = gmic.GMIC(dataset_train=dataTrain, dataset_valid=dataValid, parameters=parameters)
+
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="optLR", log_graph=True)
     trainInst = pl.Trainer(fast_dev_run=True,
                         max_epochs=parameters["epochs"], 
@@ -124,7 +122,7 @@ if __name__ == "__main__":
 
 
     # Training
-    # lightningModule = trainer.GMICTrainer(
+    # lightningModule = gmic.GMIC(
     #                     parameters=parameters,
     #                     dataset_train=dataTrain,
     #                     dataset_valid=dataValid,

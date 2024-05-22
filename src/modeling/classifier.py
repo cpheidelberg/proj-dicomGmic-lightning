@@ -27,22 +27,27 @@ class Classifier(torch.nn.Module):
     def __init__(self, parameters):
         super(Classifier, self).__init__()
 
-        self.cam_size = parameters["cam_size"]
-        self.crop_shape = parameters["crop_shape"]
+        self._cam_size = parameters["cam_size"]
+        self._crop_shape = parameters["crop_shape"]
 
-        self._aggregation = m.TopTPercentAggregationFunction(parameters, self)
-        self._retrieve_roi = m.RetrieveROIModule(parameters, self)
+        self.aggregation_function = m.TopTPercentAggregationFunction(parameters)
+        self.retrieve_roi_module = m.RetrieveROIModule(parameters)
 
         # detection network
-        self._local = m.LocalNetwork(parameters, self)
-        self._local.add_layers()
+        self.local_network = m.LocalNetwork(parameters)
+        self.dn_resnet = self.local_network.dn_resnet
 
         # MIL module
-        self._attention = m.AttentionModule(parameters, self)
-        self._attention.add_layers()
+        self.attention_module = m.AttentionModule(parameters)
+        self.mil_attn_V = self.attention_module.mil_attn_V
+        self.mil_attn_U = self.attention_module.mil_attn_U
+        self.mil_attn_w = self.attention_module.mil_attn_w
+
+        # classifier
+        self.classifier_linear = self.attention_module.classifier_linear
 
         # fusion branch
-        self._fusion = torch.nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
+        self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
 
 
     def _convert_crop_position(self, crops_x_small, cam_size, x_original):
@@ -80,45 +85,45 @@ class Classifier(torch.nn.Module):
         :return:
         """
         batch_size, num_crops, _ = crop_positions.shape
-        crop_h, crop_w = self.crop_shape
+        crop_h, crop_w = self._crop_shape
 
         output = torch.ones((batch_size, num_crops, crop_h, crop_w)).type_as(x_original_pytorch)
 
         for i in range(batch_size):
             for j in range(num_crops):
-                utils.crop_pytorch(x_original_pytorch[i, 0, :, :], self.crop_shape, crop_positions[i,j,:], output[i,j,:,:], method=crop_method)
+                utils.crop_pytorch(x_original_pytorch[i, 0, :, :], self._crop_shape, crop_positions[i,j,:], output[i,j,:,:], method=crop_method)
         return output
 
 
     def forward(self, x_original, saliency_map, h_g):
         # calculate y_global
         # note that y_global is not directly used in inference
-        self.y_global = self._aggregation.forward(saliency_map)
+        self.y_global = self.aggregation_function.forward(saliency_map)
 
         # region proposal network
-        small_x_locations = self._retrieve_roi.forward(x_original, self.cam_size, saliency_map)
+        small_x_locations = self.retrieve_roi_module.forward(x_original, self._cam_size, saliency_map)
 
         # convert crop locations that is on self.cam_size to x_original
-        self.patch_locations = self._convert_crop_position(small_x_locations, self.cam_size, x_original)
+        self.patch_locations = self._convert_crop_position(small_x_locations, self._cam_size, x_original)
 
         # patch retriever
-        crops_variable = self._retrieve_crop(x_original, self.patch_locations, self._retrieve_roi.crop_method)
+        crops_variable = self._retrieve_crop(x_original, self.patch_locations, self.retrieve_roi_module.crop_method)
         self.patches = crops_variable.data.cpu().numpy()
 
         # detection network
         batch_size, num_crops, I, J = crops_variable.size()
         crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
-        h_crops = self._local.forward(crops_variable).view(batch_size, num_crops, -1)
+        h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
 
         # MIL module
         # y_local is not directly used during inference
-        z, self.patch_attns, self.y_local = self._attention.forward(h_crops)
+        z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
 
         # fusion branch
         # use max pooling to collapse the feature map
         g1, _ = torch.max(h_g, dim=2)
         global_vec, _ = torch.max(g1, dim=2)
         concat_vec = torch.cat([global_vec, z], dim=1)
-        self.y_fusion = torch.sigmoid(self._fusion(concat_vec))
+        self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
         return self.y_fusion, self.y_global, self.y_local

@@ -91,9 +91,9 @@ if __name__ == "__main__":
         crop_shape_val = trial.suggest_int("crop_shape", 128, 500)
         parameters["crop_shape"] = (crop_shape_val, crop_shape_val)
 
-        from src.modeling import gmic, trainer
+        from src.modeling import gmic
 
-        lightningModule = trainer.GMICTrainer(
+        lightningModule = gmic.GMIC(
                             parameters=parameters,
                             dataset_train=dataTrain,
                             dataset_valid=dataValid,
