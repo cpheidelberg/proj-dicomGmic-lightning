@@ -68,9 +68,9 @@ class GMIC(lightning.LightningModule):
 
 
     def forward(self, image):
-        h_g, h_crops = self.cnn(image)
+        y_global, h_g, h_crops = self.cnn(image)
         print(f'GMIC.forward() :: {h_g.shape=}; {h_crops.shape=}')
-        y_fusion, y_global, y_local = self.classifier(h_g, h_crops)
+        y_fusion, y_local = self.classifier(h_g, h_crops)
         return y_fusion, y_global, y_local, h_crops
 
 

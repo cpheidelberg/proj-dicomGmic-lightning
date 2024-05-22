@@ -39,7 +39,6 @@ class Classifier(torch.nn.Module):
 
 
     def forward(self, h_g, h_crops):
-
         # MIL module
         # y_local is not directly used during inference
         z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
@@ -51,4 +50,4 @@ class Classifier(torch.nn.Module):
         concat_vec = torch.cat([global_vec, z], dim=1)
         self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
-        return self.y_fusion, self.y_global, self.y_local
+        return self.y_fusion, self.y_local

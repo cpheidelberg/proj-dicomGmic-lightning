@@ -113,4 +113,4 @@ class CNN(torch.nn.Module):
         crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
         h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
 
-        return h_g, h_crops
+        return self.y_global, h_g, h_crops
