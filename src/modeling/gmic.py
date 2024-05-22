@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from src.utilities import tools
-import src.modeling.modules as m
+from src.modeling import modules, cnn
 
 
 class GMIC(nn.Module):
@@ -38,21 +38,20 @@ class GMIC(nn.Module):
 
         # construct networks
         # global network
-        self.global_network = m.GlobalNetwork(self.experiment_parameters, self)
-        self.global_network.add_layers()
+        self.cnn = cnn.CNN(parameters)
 
         # aggregation function
-        self.aggregation_function = m.TopTPercentAggregationFunction(self.experiment_parameters, self)
+        self.aggregation_function = modules.TopTPercentAggregationFunction(parameters, self)
 
         # detection module
-        self.retrieve_roi_crops = m.RetrieveROIModule(self.experiment_parameters, self)
+        self.retrieve_roi_crops = modules.RetrieveROIModule(parameters, self)
 
         # detection network
-        self.local_network = m.LocalNetwork(self.experiment_parameters, self)
+        self.local_network = modules.LocalNetwork(parameters, self)
         self.local_network.add_layers()
 
         # MIL module
-        self.attention_module = m.AttentionModule(self.experiment_parameters, self)
+        self.attention_module = modules.AttentionModule(parameters, self)
         self.attention_module.add_layers()
 
         # fusion branch
@@ -113,10 +112,7 @@ class GMIC(nn.Module):
         :param x_original: N,H,W,C numpy matrix
         """
         # global network: x_small -> class activation map
-        h_g, self.saliency_map = self.global_network.forward(x_original)
-
-        # Collapse the dimensions (except the batch size) into one
-        feature_vector = h_g.reshape((h_g.shape[0], h_g.shape[1] * h_g.shape[2] * h_g.shape[3]))
+        self.saliency_map, h_g, feature_vector = self.cnn.forward(x_original)
 
         # calculate y_global
         # note that y_global is not directly used in inference
