@@ -113,4 +113,8 @@ class CNN(torch.nn.Module):
         crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
         h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
 
-        return self.y_global, h_g, h_crops
+        # use max pooling to collapse the feature map
+        g1, _ = torch.max(h_g, dim=2)
+        global_vec, _ = torch.max(g1, dim=2)
+
+        return self.y_global, global_vec, h_crops

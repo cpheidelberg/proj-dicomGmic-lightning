@@ -38,15 +38,12 @@ class Classifier(torch.nn.Module):
         self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"] + 512, parameters["num_classes"])
 
 
-    def forward(self, h_g, h_crops):
+    def forward(self, global_vec, h_crops):
         # MIL module
         # y_local is not directly used during inference
         z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
 
         # fusion branch
-        # use max pooling to collapse the feature map
-        g1, _ = torch.max(h_g, dim=2)
-        global_vec, _ = torch.max(g1, dim=2)
         concat_vec = torch.cat([global_vec, z], dim=1)
         self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
