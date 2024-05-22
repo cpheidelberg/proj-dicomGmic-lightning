@@ -29,12 +29,12 @@ class CNN(torch.nn.Module):
 
     def forward(self, x_original):
         """
-        :param x_original: N,H,W,C numpy matrix
+        :param x_original: N x H x W x C array
         """
         # global network: x_small -> class activation map
-        h_g, saliency_map = self._nn.forward(x_original)
+        h_g, self.saliency_map = self._nn.forward(x_original)
 
         # Collapse the dimensions (except the batch size) into one
         feature_vector = h_g.reshape((h_g.shape[0], h_g.shape[1] * h_g.shape[2] * h_g.shape[3]))
 
-        return saliency_map, h_g, feature_vector
+        return self.saliency_map, h_g, feature_vector
