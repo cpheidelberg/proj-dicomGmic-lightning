@@ -81,7 +81,8 @@ class GMIC(lightning.LightningModule):
 
         if self.feature_vector_storage:
             y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
-            feature_vector = feature_vector.cpu().numpy(force=True)
+            global_vec = global_vec.cpu().numpy(force=True)
+            h_crops = h_crops.cpu().numpy(force=True)
             self.feature_vector_storage.add(y_index, global_vec, h_crops)
 
         loss_fusion = self.criterion(y_fusion, y)
