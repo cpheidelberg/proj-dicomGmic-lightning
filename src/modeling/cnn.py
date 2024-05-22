@@ -34,8 +34,4 @@ class CNN(torch.nn.Module):
         """
         # global network: x_small -> class activation map
         h_g, self.saliency_map = self.global_network.forward(x_original)
-
-        # Collapse the dimensions (except the batch size) into one
-        feature_vector = h_g.reshape((h_g.shape[0], h_g.shape[1] * h_g.shape[2] * h_g.shape[3]))
-
-        return self.saliency_map, h_g, feature_vector
+        return h_g, self.saliency_map

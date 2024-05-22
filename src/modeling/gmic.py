@@ -68,12 +68,12 @@ class GMIC(lightning.LightningModule):
 
 
     def forward(self, image):
-        saliency_map, h_g, feature_vector = self.cnn(image)
-        y_fusion, y_global, y_local = self.classifier(image, saliency_map, h_g)
-        return y_fusion, y_global, y_local, feature_vector
+        h_g, saliency_map = self.cnn(image)
+        y_fusion, y_global, y_local = self.classifier(image, h_g, saliency_map)
+        return y_fusion, y_global, y_local, h_g
 
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx, dataloader_idx=0):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         img, y = batch
         y_fusion, y_global, y_local, feature_vector = self(img)

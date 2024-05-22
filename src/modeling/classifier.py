@@ -77,7 +77,7 @@ class Classifier(torch.nn.Module):
         return top_k_interpolate_2d
 
 
-    def _retrieve_crop(self, x_original_pytorch, crop_positions, crop_method):
+    def _retrieve_crop(self, x_original, crop_positions, crop_method):
         """
         Function that takes in the original image and cropping position and returns the crops
         :param x_original_pytorch: PyTorch Tensor array (N,C,H,W)
@@ -87,15 +87,15 @@ class Classifier(torch.nn.Module):
         batch_size, num_crops, _ = crop_positions.shape
         crop_h, crop_w = self._crop_shape
 
-        output = torch.ones((batch_size, num_crops, crop_h, crop_w)).type_as(x_original_pytorch)
+        output = torch.ones((batch_size, num_crops, crop_h, crop_w)).type_as(x_original)
 
         for i in range(batch_size):
             for j in range(num_crops):
-                utils.crop_pytorch(x_original_pytorch[i, 0, :, :], self._crop_shape, crop_positions[i,j,:], output[i,j,:,:], method=crop_method)
+                utils.crop_pytorch(x_original[i, 0, :, :], self._crop_shape, crop_positions[i,j,:], output[i,j,:,:], method=crop_method)
         return output
 
 
-    def forward(self, x_original, saliency_map, h_g):
+    def forward(self, x_original, h_g, saliency_map):
         # calculate y_global
         # note that y_global is not directly used in inference
         self.y_global = self.aggregation_function.forward(saliency_map)
