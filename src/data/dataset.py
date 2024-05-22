@@ -14,10 +14,13 @@ from src.data import loading
 
 
 class ClassificationImages(Dataset):
-
     def __init__(self, image_dirs : list[str], dict_file: str, top_c=None, h5_file=None):
         self.image_dirs = image_dirs
         self.image_files = [os.path.join(img_dir, file) for img_dir in image_dirs for file in os.listdir(img_dir)]
+
+        # Temporary measure, to make the testing easier for now
+        self.image_files = self.image_files[:1000]
+
         random.shuffle(self.image_files)
         self.dict_table = pd.read_csv(dict_file, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
 
