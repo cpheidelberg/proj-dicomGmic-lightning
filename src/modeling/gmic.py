@@ -68,9 +68,10 @@ class GMIC(lightning.LightningModule):
 
 
     def forward(self, image):
-        h_g, saliency_map = self.cnn(image)
-        y_fusion, y_global, y_local = self.classifier(image, h_g, saliency_map)
-        return y_fusion, y_global, y_local, h_g
+        h_g, h_crops = self.cnn(image)
+        print(f'GMIC.forward() :: {h_g.shape=}; {h_crops.shape=}')
+        y_fusion, y_global, y_local = self.classifier(h_g, h_crops)
+        return y_fusion, y_global, y_local, h_crops
 
 
     def training_step(self, batch, batch_idx, dataloader_idx=0):
