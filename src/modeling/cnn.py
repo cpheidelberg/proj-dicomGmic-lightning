@@ -27,9 +27,19 @@ class CNN(torch.nn.Module):
     def __init__(self, parameters):
         super(CNN, self).__init__()
 
+        self._cam_size = parameters["cam_size"]
+        self._crop_shape = parameters["crop_shape"]
+
         self.global_network = m.GlobalNetwork(parameters)
         self.downsampling_branch = self.global_network.downsampling_branch
         self.postprocess_module = self.global_network.postprocess_module
+
+        self.aggregation_function = m.TopTPercentAggregationFunction(parameters["percent_t"])
+        self.retrieve_roi_module = m.RetrieveROIModule(parameters)
+
+        # detection network
+        self.local_network = m.LocalNetwork()
+        self.dn_resnet = self.local_network.dn_resnet
 
 
     def _convert_crop_position(self, crops_x_small, cam_size, x_original):

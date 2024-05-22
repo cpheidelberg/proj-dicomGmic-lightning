@@ -25,16 +25,6 @@ class Classifier(torch.nn.Module):
     def __init__(self, parameters):
         super(Classifier, self).__init__()
 
-        self._cam_size = parameters["cam_size"]
-        self._crop_shape = parameters["crop_shape"]
-
-        self.aggregation_function = m.TopTPercentAggregationFunction(parameters["percent_t"])
-        self.retrieve_roi_module = m.RetrieveROIModule(parameters)
-
-        # detection network
-        self.local_network = m.LocalNetwork()
-        self.dn_resnet = self.local_network.dn_resnet
-
         # MIL module
         self.attention_module = m.AttentionModule(parameters["num_classes"])
         self.mil_attn_V = self.attention_module.mil_attn_V
