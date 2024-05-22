@@ -14,12 +14,15 @@ class FeatureVectorStorage:
             pass
 
     def add(self, labels: np.ndarray, global_vec: np.ndarray, h_crops: np.ndarray):
-        tab = pd.DataFrame({'label': labels, 'global_vec': list(global_vec), 'h_crops': list(h_crops)})
+        tab = pd.DataFrame({'label': labels.tolist(), 'global_vec': global_vec.tolist(), 'h_crops': h_crops.tolist()})
         tab.to_csv(self._path, mode='a', header=not os.path.exists(self._path))
 
     def read(self):
         try:
             tab = pd.read_csv(self._path)
-            return list(tab.loc[:, 'label']), list(tab.loc[:, 'global_vec']), list(tab.loc[:, 'h_crops'])
+            labels = np.array(list(tab.loc[:, 'label']))
+            global_vec = np.array(list(tab.loc[:, 'global_vec']))
+            h_crops = np.array(list(tab.loc[:, 'h_crops']))
+            return labels, global_vec, h_crops
         except:
             return []
