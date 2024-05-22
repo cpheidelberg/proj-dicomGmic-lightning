@@ -22,7 +22,7 @@ parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
 from src.utilities import pickling, tools
-from src.modeling import gmic, trainer
+from src.modeling import gmic
 from src.data import loading, dataset
 from src.constants import VIEWS, PERCENT_T_DICT
 
