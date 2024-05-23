@@ -110,7 +110,7 @@ class GMIC(lightning.LightningModule):
 
     def on_train_epoch_end(self):
         # Do something with FVs before deleting them
-        self.feature_vector_storage.clear()
+        self.feature_vector_storage.reset()
 
 
     def validation_step(self, batch, batch_idx):
