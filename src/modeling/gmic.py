@@ -109,7 +109,6 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_end(self):
-        # Do something with FVs before deleting them
         self.feature_vector_storage.reset()
 
 
@@ -184,7 +183,9 @@ class GMIC(lightning.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            return torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+            original = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+            synthesised = torchdata.DataLoader(self.feature_vector_storage, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+            return [original, synthesised]
         return None
 
 
