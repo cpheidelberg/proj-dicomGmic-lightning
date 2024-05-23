@@ -11,8 +11,7 @@ parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
 from src.modeling import gmic
-from src.data import dataset
-from src.data.feature_vector_storage import FeatureVectorStorage
+from src.data import dataset, feature_vector
 
 
 if __name__ == "__main__":
@@ -78,7 +77,7 @@ if __name__ == "__main__":
     # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
-    feature_vector_storage = FeatureVectorStorage(feature_vectors_path, data.no_finding_idx)
+    feature_vector_storage = feature_vector.Storage(feature_vectors_path, data.no_finding_idx)
 
     # Training
     gmic_module = gmic.GMIC(

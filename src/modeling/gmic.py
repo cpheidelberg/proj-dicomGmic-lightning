@@ -8,12 +8,12 @@ import torchmetrics.classification as metrics
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
-from src.data.feature_vector_storage import FeatureVectorStorage
+from src.data import feature_vector
 
 
 class GMIC(lightning.LightningModule):
 
-    def __init__(self, parameters, feature_vector_storage: FeatureVectorStorage | None = None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
+    def __init__(self, parameters, feature_vector_storage: feature_vector.Storage | None = None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
         super(GMIC, self).__init__()
         self.save_hyperparameters(parameters)
 
