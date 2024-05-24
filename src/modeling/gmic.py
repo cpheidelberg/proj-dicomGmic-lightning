@@ -108,7 +108,9 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_end(self):
+        print('epoch end before reset, len:', len(self.feature_vectors))
         self.feature_vectors.reset()
+        print('epoch end after  reset, len:', len(self.feature_vectors))
 
 
     def validation_step(self, batch, batch_idx):
@@ -185,6 +187,7 @@ class GMIC(lightning.LightningModule):
             return None
 
         ds = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        print('train_dataloader, len:', len(self.feature_vectors))
         if len(self.feature_vectors) == 0:
             return ds
 
