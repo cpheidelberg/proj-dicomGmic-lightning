@@ -53,6 +53,9 @@ class Storage(torch.utils.data.Dataset):
         self._con.close()
 
     def _get_original_vectors(self, label: int):
+        print(f"all    {label=}; {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+        print(f"label {label=}; {self._cur.execute('SELECT COUNT(*) FROM original WHERE label = ?', (label,)).fetchone()[0]=}")
+
         vectors = []
         for vector, in self._cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
             vectors.append(pickle.loads(vector))
@@ -78,8 +81,6 @@ class Storage(torch.utils.data.Dataset):
         return global_vec, h_crops
 
     def reset(self):
-        print(f"reset {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-        print(f"reset {self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
         self._cur.execute('DELETE FROM synthetic')
 
         for label in range(self._class_num):
@@ -89,14 +90,10 @@ class Storage(torch.utils.data.Dataset):
         self._con.commit()
 
     def add(self, labels, global_vec, h_crops):
-        print(f"pre-add {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-        print(f"pre-add {self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
         for label, gv, hc in zip(labels, global_vec, h_crops):
             if label != self._no_finding:
                 self._cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
         self._con.commit()
-        print(f"post-add {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-        print(f"post-add {self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
 
     def __len__(self):
         return self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
