@@ -77,36 +77,36 @@ if __name__ == "__main__":
     # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
-    feature_vector_storage = feature_vector.Storage(feature_vectors_path, data.no_finding_idx, parameters["num_classes"])
+    with feature_vector.Storage(feature_vectors_path, data.no_finding_idx, parameters["num_classes"]) as feature_vectors:
+        # Training
+        gmic_module = gmic.GMIC(
+            parameters=parameters,
+            feature_vectors=feature_vectors,
+            dataset_train=dataTrain,
+            dataset_valid=dataValid,
+            dataset_test=dataTest,
+            model_path=model_path
+        )
+        logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
 
-    # Training
-    gmic_module = gmic.GMIC(
-                        parameters=parameters,
-                        feature_vectors=feature_vector_storage,
-                        dataset_train=dataTrain,
-                        dataset_valid=dataValid,
-                        dataset_test=dataTest,
-                        model_path=model_path
-                    )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
+        early_stop_callback = EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
 
-    early_stop_callback = EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
+        training = pl.Trainer(
+            fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+            # limit_val_batches=0,
+            # num_sanity_val_steps=0,
+            max_epochs=parameters["epochs"], 
+            # gradient_clip_val=1e-3,
+            accelerator=device, 
+            # devices=[parameters["gpu_number"]],
+            devices=[0],
+            logger=logger,
+            # profiler="simple",
+            # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+            # callbacks=[ModelSummary(max_depth=2)],
+        )
+        training.fit(model=gmic_module)
+        
+        print("Training finished at: {}".format(time.ctime()))
 
-    training = pl.Trainer(fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-                        # limit_val_batches=0,
-                        # num_sanity_val_steps=0,
-                        max_epochs=parameters["epochs"], 
-                        # gradient_clip_val=1e-3,
-                        accelerator=device, 
-                        # devices=[parameters["gpu_number"]],
-                        devices=[0],
-                        logger=logger,
-                        # profiler="simple",
-                        # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
-                        # callbacks=[ModelSummary(max_depth=2)],
-                    )
-    training.fit(model=gmic_module)
-    
-    print("Training finished at: {}".format(time.ctime()))
-
-    training.test(model=gmic_module)
+        training.test(model=gmic_module)
