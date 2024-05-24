@@ -56,7 +56,9 @@ class Storage(torch.utils.data.Dataset):
         vectors = []
         for vector, in self._cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
             vectors.append(pickle.loads(vector))
-        return np.array(vectors)
+        vectors = np.array(vectors)
+        print(f'{vectors.shape=}')
+        return vectors
 
     def _synthesise_vectors(self, label: int, n: int, k: int):
         smote = SMOTE(self._get_original_vectors(label))
