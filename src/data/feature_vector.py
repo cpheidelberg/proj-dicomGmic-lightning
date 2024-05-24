@@ -60,7 +60,7 @@ class Storage(torch.utils.data.Dataset):
 
     def _synthesise_vectors(self, label: int, n: int, k: int):
         vectors = self._get_original_vectors(label)
-        if vectors:
+        if len(vectors) > k + 1:
             for vec in SMOTE(vectors).generate(n, k):
                 self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, pickle.dumps(vec)))
 
