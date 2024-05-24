@@ -103,7 +103,25 @@ class GMIC(lightning.LightningModule):
 
 
     def _train_on_feature_vector(self, global_vec, h_crops, y):
-        pass
+        y_fusion, y_local = self.classifier(global_vec, h_crops)
+
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_local = self.criterion(y_local, y)
+
+        loss = loss_fusion + loss_local
+
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.train_auc(y_fusion, y)
+
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
+        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
+        self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
+        self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
+        return loss
 
 
     def training_step(self, batch, batch_idx):
@@ -111,20 +129,14 @@ class GMIC(lightning.LightningModule):
         x, y = batch
 
         if isinstance(x, list):
-            print('|')
-            self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
+            return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
         else:
-            print('_')
-            self._train_on_image(image=x, y=y)
+            return self._train_on_image(image=x, y=y)
 
 
     def on_train_epoch_end(self):
         if self.current_epoch % 2 == 0:
-            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
             self.feature_vectors.reset()
-            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
 
 
     def validation_step(self, batch, batch_idx):
@@ -179,13 +191,11 @@ class GMIC(lightning.LightningModule):
             patch_imgs = self.gmic.patches
             patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
             save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
-            predict.visualize_example(img_numpy, saliency_maps, true_segs,
-                        patch_locations, patch_imgs, patch_attentions,
-                        save_dir, self.hparams)
+            predict.visualize_example(img_numpy, saliency_maps, true_segs, patch_locations,
+                                      patch_imgs, patch_attentions, save_dir, self.hparams)
                 
         # save predicted regions of interest as polyline
         predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
-
         return y_fusion
 
 
@@ -195,14 +205,10 @@ class GMIC(lightning.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if not self.train_dataset:
-            return None
-
-        print(f'{self.current_epoch=}')
-        if self.current_epoch % 2 == 0:
-            return torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-
-        return torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        if self.train_dataset:
+            ds = self.train_dataset if self.current_epoch % 2 == 0 else self.feature_vectors
+            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        return None
 
 
     def val_dataloader(self):
