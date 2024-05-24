@@ -106,6 +106,6 @@ class Storage(torch.utils.data.Dataset):
         label, vector = self._cur.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (index,)).fetchone()
 
         x = self._unmarshall(vector)
-        y = np.zeros(self._class_num)
+        y = np.zeros(self._class_num, dtype='float32')
         y[label] = 1
         return x, y
