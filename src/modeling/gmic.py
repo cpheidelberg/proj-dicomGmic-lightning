@@ -73,8 +73,10 @@ class GMIC(lightning.LightningModule):
         return y_fusion, y_global, y_local, global_vec, h_crops
 
 
-    def training_step(self, batch, batch_idx, dataloader_idx=0):
+    def training_step(self, batch, batch_idx, dataloader_idx=7):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
+        print(f'training_step: {dataloader_idx=}')
+
         img, y = batch
         y_fusion, y_global, y_local, global_vec, h_crops = self(img)
 
@@ -186,9 +188,12 @@ class GMIC(lightning.LightningModule):
         if not self.train_dataset:
             return None
 
-        print('train_dataloader, len:', len(self.feature_vectors))
-        data = torchdata.ConcatDataset([self.feature_vectors, self.train_dataset])
-        return torchdata.DataLoader(data, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        ds = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        if len(self.feature_vectors) == 0:
+            return ds
+
+        fv = torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        return [fv, ds]
 
 
     def val_dataloader(self):
