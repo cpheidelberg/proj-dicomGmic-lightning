@@ -29,6 +29,13 @@ class SMOTE:
                 yield self._random_linear_combination(point, neighbour)
 
 
+def _to_bytes(array: np.ndarray) -> bytes:
+    return pickle.dumps(array.tolist())
+
+def _to_array(array: bytes) -> np.ndarray:
+    return np.array(pickle.loads(array), dtype='float32')
+
+
 class Storage(torch.utils.data.Dataset):
     def __init__(self, path: str, no_finding: int, class_num: int):
         self._no_finding = no_finding
@@ -55,27 +62,25 @@ class Storage(torch.utils.data.Dataset):
     def _get_original_vectors(self, label: int):
         vectors = []
         for vector, in self._cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
-            vectors.append(pickle.loads(vector))
+            vectors.append(_to_array(vector))
         return np.array(vectors)
 
     def _synthesise_vectors(self, label: int, n: int, k: int):
         vectors = self._get_original_vectors(label)
         if len(vectors) > k + 1:
             for vec in SMOTE(vectors).generate(n, k):
-                self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, pickle.dumps(vec)))
+                self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _to_bytes(vec)))
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
         self._global_vec_shape = global_vec.shape
         self._h_crops_shape = h_crops.shape
-        print(f'Marshall {global_vec.dtype=}; {h_crops.dtype=}')
-        return pickle.dumps(np.concatenate((global_vec.flatten(), h_crops.flatten())))
+        return _to_bytes(np.concatenate((global_vec.flatten(), h_crops.flatten())))
 
     def _unmarshall(self, vector: bytes):
-        vector = pickle.loads(vector)
+        vector = _to_array(vector)
         split_index = np.prod(self._global_vec_shape)
         global_vec = vector[:split_index].reshape(self._global_vec_shape)
         h_crops = vector[split_index:].reshape(self._h_crops_shape)
-        print(f'Unmarshall {global_vec.dtype=}; {h_crops.dtype=}')
         return global_vec, h_crops
 
     def reset(self):
