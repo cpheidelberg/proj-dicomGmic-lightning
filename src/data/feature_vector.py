@@ -89,7 +89,6 @@ class Storage(torch.utils.data.Dataset):
             if label != self._no_finding:
                 self._cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
         self._con.commit()
-        print('Count(*) original:', self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0])
 
     def __len__(self):
         return self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
