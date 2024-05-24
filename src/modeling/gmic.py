@@ -75,9 +75,9 @@ class GMIC(lightning.LightningModule):
 
     def training_step(self, batch, batch_idx, dataloader_idx=7):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
-        print(f'training_step: {dataloader_idx=}')
 
         img, y = batch
+        print(f'{dataloader_idx=}; {img.shape=}')
         y_fusion, y_global, y_local, global_vec, h_crops = self(img)
 
         if self.feature_vectors is not None:
