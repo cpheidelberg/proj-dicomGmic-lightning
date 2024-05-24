@@ -69,16 +69,11 @@ class GMIC(lightning.LightningModule):
     def forward(self, image):
         y_global, global_vec, h_crops = self.cnn(image)
         y_fusion, y_local = self.classifier(global_vec, h_crops)
-
         return y_fusion, y_global, y_local, global_vec, h_crops
 
 
-    def training_step(self, batch, batch_idx, dataloader_idx=7):
-        """Implementation of PyTorch training loop in Lightning called for each batch"""
-
-        img, y = batch
-        print(f'{dataloader_idx=}; {repr(img)}')
-        y_fusion, y_global, y_local, global_vec, h_crops = self(img)
+    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
+        y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
         if self.feature_vectors is not None:
             y_index = np.argmax(y.cpu().numpy(force=True), axis=1).tolist()
@@ -95,18 +90,32 @@ class GMIC(lightning.LightningModule):
         self.train_acc(y_fusion, y)
         self.train_f1(y_fusion, y)
         self.train_auc(y_fusion, y)
+
         self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
         self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
         self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
-        
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
-
         return loss
+
+
+    def _train_on_feature_vector(self, global_vec, h_crops, y):
+        pass
+
+
+    def training_step(self, batch, batch_idx):
+        """Implementation of PyTorch training loop in Lightning called for each batch"""
+        x, y = batch
+
+        if isinstance(x, list):
+            self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
+            print('|')
+        else:
+            self._train_on_image(image=x, y=y)
+            print('_')
 
 
     def on_train_epoch_end(self):
@@ -153,7 +162,6 @@ class GMIC(lightning.LightningModule):
         """Predict the output for a single image."""
         img, y, data = batch
 
-        print(y)
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
