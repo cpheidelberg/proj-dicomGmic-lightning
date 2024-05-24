@@ -186,13 +186,9 @@ class GMIC(lightning.LightningModule):
         if not self.train_dataset:
             return None
 
-        ds = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
         print('train_dataloader, len:', len(self.feature_vectors))
-        if len(self.feature_vectors) == 0:
-            return ds
-
-        fv = torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-        return [fv, ds]
+        data = torchdata.ConcatDataset([self.feature_vectors, self.train_dataset])
+        return torchdata.DataLoader(data, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
 
 
     def val_dataloader(self):
