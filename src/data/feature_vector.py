@@ -56,12 +56,13 @@ class Storage(torch.utils.data.Dataset):
         vectors = []
         for vector, in self._cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
             vectors.append(pickle.loads(vector))
-        return np.array(vectors)
+        return vectors
 
     def _synthesise_vectors(self, label: int, n: int, k: int):
-        smote = SMOTE(self._get_original_vectors(label))
-        for vector in smote.generate(n, k):
-            self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, pickle.dumps(vector)))
+        vectors = self._get_original_vectors(label)
+        if vectors:
+            for vec in SMOTE(vectors).generate(n, k):
+                self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, pickle.dumps(vec)))
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
         self._global_vec_shape = global_vec.shape

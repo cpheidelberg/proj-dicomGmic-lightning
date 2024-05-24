@@ -111,17 +111,19 @@ class GMIC(lightning.LightningModule):
         x, y = batch
 
         if isinstance(x, list):
-            self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
             print('|')
+            self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
         else:
-            self._train_on_image(image=x, y=y)
             print('_')
+            self._train_on_image(image=x, y=y)
 
 
     def on_train_epoch_end(self):
-        print('epoch end before reset, len:', len(self.feature_vectors))
+        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}')
+        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}')
         self.feature_vectors.reset()
-        print('epoch end after  reset, len:', len(self.feature_vectors))
+        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}')
+        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}')
 
 
     def validation_step(self, batch, batch_idx):
@@ -187,8 +189,7 @@ class GMIC(lightning.LightningModule):
 
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.hparams.learning_rate)
-        return optimizer
+        return torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.hparams.learning_rate)
 
 
     def train_dataloader(self):
@@ -196,8 +197,9 @@ class GMIC(lightning.LightningModule):
         if not self.train_dataset:
             return None
 
+        print(f'{self.current_epoch=}')
         ds = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-        if len(self.feature_vectors) == 0:
+        if self.current_epoch == 0:
             return ds
 
         fv = torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
