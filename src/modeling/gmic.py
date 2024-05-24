@@ -119,11 +119,12 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_end(self):
-        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
-        self.feature_vectors.reset()
-        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
+        if self.current_epoch % 2 == 0:
+            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
+            self.feature_vectors.reset()
+            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+            print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
 
 
     def validation_step(self, batch, batch_idx):
@@ -198,12 +199,10 @@ class GMIC(lightning.LightningModule):
             return None
 
         print(f'{self.current_epoch=}')
-        ds = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-        if self.current_epoch == 0:
-            return ds
+        if self.current_epoch % 2 == 0:
+            return torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
 
-        fv = torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-        return [fv, ds]
+        return torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
 
 
     def val_dataloader(self):
