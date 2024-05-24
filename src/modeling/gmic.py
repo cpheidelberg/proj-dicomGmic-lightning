@@ -78,6 +78,7 @@ class GMIC(lightning.LightningModule):
         img, y = batch
         y_fusion, y_global, y_local, global_vec, h_crops = self(img)
 
+        print('Count vectors:', self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0])
         if self.feature_vectors:
             y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
             global_vec = global_vec.cpu().numpy(force=True)
