@@ -183,9 +183,13 @@ class GMIC(lightning.LightningModule):
         """Create DataLoader for Training out of given DataSet"""
         if not self.train_dataset:
             return None
+
         ds = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+        if len(self.feature_vectors) == 0:
+            return ds
+
         fv = torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-        return [fv, ds] if len(self.feature_vectors) > 0 else ds
+        return [fv, ds]
 
 
     def val_dataloader(self):
