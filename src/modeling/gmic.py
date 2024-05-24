@@ -119,11 +119,11 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_end(self):
-        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}')
-        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}')
+        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
         self.feature_vectors.reset()
-        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}')
-        print(f'{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}')
+        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+        print(f"{self.feature_vectors._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
 
 
     def validation_step(self, batch, batch_idx):
