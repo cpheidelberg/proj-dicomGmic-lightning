@@ -79,8 +79,9 @@ class Storage(torch.utils.data.Dataset):
 
     def _unmarshall(self, vector: bytes):
         vector = pickle.loads(vector)
-        global_vec = vector[:np.prod(self._global_vec_shape)].reshape(self._global_vec_shape)
-        h_crops = vector[:np.prod(self._h_crops_shape)].reshape(self._h_crops_shape)
+        split_index = np.prod(self._global_vec_shape)
+        global_vec = vector[:split_index].reshape(self._global_vec_shape)
+        h_crops = vector[split_index:].reshape(self._h_crops_shape)
         return global_vec, h_crops
 
     def add(self, labels, global_vec, h_crops):
@@ -88,6 +89,7 @@ class Storage(torch.utils.data.Dataset):
             if label != self._no_finding:
                 self._cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
         self._con.commit()
+        print('Count(*) original:', self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0])
 
     def __len__(self):
         return self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
