@@ -53,15 +53,10 @@ class Storage(torch.utils.data.Dataset):
         self._con.close()
 
     def _get_original_vectors(self, label: int):
-        print(f"all    {label=}; {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
-        print(f"label {label=}; {self._cur.execute('SELECT COUNT(*) FROM original WHERE label = ?', (label,)).fetchone()[0]=}")
-
         vectors = []
         for vector, in self._cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
             vectors.append(pickle.loads(vector))
-        vectors = np.array(vectors)
-        print(f'{vectors.shape=}')
-        return vectors
+        return np.array(vectors)
 
     def _synthesise_vectors(self, label: int, n: int, k: int):
         smote = SMOTE(self._get_original_vectors(label))
@@ -84,7 +79,8 @@ class Storage(torch.utils.data.Dataset):
         self._cur.execute('DELETE FROM synthetic')
 
         for label in range(self._class_num):
-            self._synthesise_vectors(label, n=2, k=5)
+            if label != self._no_finding:
+                self._synthesise_vectors(label, n=2, k=5)
 
         self._cur.execute('DELETE FROM original')
         self._con.commit()
