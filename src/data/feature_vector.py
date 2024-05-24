@@ -65,15 +65,6 @@ class Storage(torch.utils.data.Dataset):
         for i, vector in enumerate(smote.generate(n, k)):
             self._cur.execute('INSERT INTO synthetic VALUES (?, ?, ?)', (i, label, pickle.dumps(vector)))
 
-    def reset(self):
-        self._cur.execute('DELETE FROM synthetic')
-
-        for label in range(self._class_num):
-            self._synthesise_vectors(label, n=2, k=5)
-
-        self._cur.execute('DELETE FROM original')
-        self._con.commit()
-
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
         self._global_vec_shape = global_vec.shape
         self._h_crops_shape = h_crops.shape
@@ -86,11 +77,26 @@ class Storage(torch.utils.data.Dataset):
         h_crops = vector[split_index:].reshape(self._h_crops_shape)
         return global_vec, h_crops
 
+    def reset(self):
+        print(f"reset {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+        print(f"reset {self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
+        self._cur.execute('DELETE FROM synthetic')
+
+        for label in range(self._class_num):
+            self._synthesise_vectors(label, n=2, k=5)
+
+        self._cur.execute('DELETE FROM original')
+        self._con.commit()
+
     def add(self, labels, global_vec, h_crops):
+        print(f"pre-add {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+        print(f"pre-add {self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
         for label, gv, hc in zip(labels, global_vec, h_crops):
             if label != self._no_finding:
                 self._cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
         self._con.commit()
+        print(f"post-add {self._cur.execute('SELECT COUNT(*) FROM original').fetchone()[0]=}")
+        print(f"post-add {self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]=}")
 
     def __len__(self):
         return self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
