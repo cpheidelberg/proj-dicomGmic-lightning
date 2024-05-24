@@ -19,7 +19,7 @@ class ClassificationImages(Dataset):
         self.image_files = [os.path.join(img_dir, file) for img_dir in image_dirs for file in os.listdir(img_dir)]
 
         # Temporary measure, to make the testing easier for now
-        self.image_files = self.image_files[:1600]
+        self.image_files = self.image_files[:800]
 
         random.shuffle(self.image_files)
         self.dict_table = pd.read_csv(dict_file, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})

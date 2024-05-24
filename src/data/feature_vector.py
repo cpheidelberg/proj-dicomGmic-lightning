@@ -41,8 +41,8 @@ class Storage(torch.utils.data.Dataset):
         self._cur.execute('DROP TABLE IF EXISTS original')
         self._cur.execute('DROP TABLE IF EXISTS synthetic')
 
-        self._cur.execute('CREATE TABLE original (label, vector)')
-        self._cur.execute('CREATE TABLE synthetic (i, label, vector)')
+        self._cur.execute('CREATE TABLE original  (label, vector)')
+        self._cur.execute('CREATE TABLE synthetic (label, vector)')
         self._con.commit()
 
     def __enter__(self):
@@ -60,8 +60,8 @@ class Storage(torch.utils.data.Dataset):
 
     def _synthesise_vectors(self, label: int, n: int, k: int):
         smote = SMOTE(self._get_original_vectors(label))
-        for i, vector in enumerate(smote.generate(n, k)):
-            self._cur.execute('INSERT INTO synthetic VALUES (?, ?, ?)', (i, label, pickle.dumps(vector)))
+        for vector in smote.generate(n, k):
+            self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, pickle.dumps(vector)))
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
         self._global_vec_shape = global_vec.shape
@@ -95,7 +95,7 @@ class Storage(torch.utils.data.Dataset):
         return self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
 
     def __getitem__(self, index):
-        label, vector = self._cur.execute('SELECT label, vector FROM synthetic WHERE i = ?', (index,)).fetchone()
+        label, vector = self._cur.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (index,)).fetchone()
 
         x = self._unmarshall(vector)
         y = np.zeros(self._class_num)
