@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # Training
     gmic_module = gmic.GMIC(
                         parameters=parameters,
-                        feature_vector_storage=feature_vector_storage,
+                        feature_vectors=feature_vector_storage,
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
                         dataset_test=dataTest,

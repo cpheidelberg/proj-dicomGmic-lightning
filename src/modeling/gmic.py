@@ -8,19 +8,18 @@ import torchmetrics.classification as metrics
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
-from src.data import feature_vector
 
 
 class GMIC(lightning.LightningModule):
 
-    def __init__(self, parameters, feature_vector_storage: feature_vector.Storage | None = None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
+    def __init__(self, parameters, feature_vectors=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
         super(GMIC, self).__init__()
         self.save_hyperparameters(parameters)
 
         self.cnn = cnn.CNN(parameters)
         self.classifier = classifier.Classifier(parameters)
 
-        self.feature_vector_storage = feature_vector_storage
+        self.feature_vectors = feature_vectors
 
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
@@ -79,11 +78,11 @@ class GMIC(lightning.LightningModule):
         img, y = batch
         y_fusion, y_global, y_local, global_vec, h_crops = self(img)
 
-        if self.feature_vector_storage:
+        if self.feature_vectors:
             y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
             global_vec = global_vec.cpu().numpy(force=True)
             h_crops = h_crops.cpu().numpy(force=True)
-            self.feature_vector_storage.add(y_index, global_vec, h_crops)
+            self.feature_vectors.add(y_index, global_vec, h_crops)
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
@@ -109,7 +108,7 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_end(self):
-        self.feature_vector_storage.reset()
+        self.feature_vectors.reset()
 
 
     def validation_step(self, batch, batch_idx):
@@ -182,11 +181,13 @@ class GMIC(lightning.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.train_dataset:
-            original = torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-            synthesised = torchdata.DataLoader(self.feature_vector_storage, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
-            return [original, synthesised]
-        return None
+        if not self.train_dataset:
+            return None
+
+        dl = [torchdata.DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)]
+        if len(self.feature_vectors) > 1:
+            dl.append(torchdata.DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True))
+        return dl
 
 
     def val_dataloader(self):
