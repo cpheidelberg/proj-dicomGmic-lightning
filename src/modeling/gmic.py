@@ -79,7 +79,7 @@ class GMIC(lightning.LightningModule):
         y_fusion, y_global, y_local, global_vec, h_crops = self(img)
 
         if self.feature_vectors is not None:
-            y_index = np.argmax(y.cpu().numpy(force=True), axis=1)
+            y_index = np.argmax(y.cpu().numpy(force=True), axis=1).tolist()
             global_vec = global_vec.cpu().numpy(force=True)
             h_crops = h_crops.cpu().numpy(force=True)
             self.feature_vectors.add(y_index, global_vec, h_crops)
