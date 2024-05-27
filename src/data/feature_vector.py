@@ -40,8 +40,6 @@ class Storage(torch.utils.data.Dataset):
     def __init__(self, path: str, no_finding: int, class_num: int):
         self._no_finding = no_finding
         self._class_num = class_num
-        self._global_vec_shape = (1, )
-        self._h_crops_shape = (1, )
 
         self._path = path
         with sql.connect(self._path) as con:
@@ -64,16 +62,12 @@ class Storage(torch.utils.data.Dataset):
                 cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _to_bytes(vec)))
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
-        self._global_vec_shape = global_vec.shape
-        self._h_crops_shape = h_crops.shape
-        print(global_vec.shape, h_crops.shape)
         return _to_bytes(np.concatenate((global_vec.flatten(), h_crops.flatten())))
 
     def _unmarshall(self, vector: bytes):
         vector = _to_array(vector)
-        split_index = np.prod(self._global_vec_shape)
-        global_vec = vector[:split_index].reshape(self._global_vec_shape)
-        h_crops = vector[split_index:].reshape(self._h_crops_shape)
+        global_vec = vector[:256].reshape((256,))
+        h_crops = vector[256:].reshape((6, 512))
         return global_vec, h_crops
 
     def reset(self):
