@@ -1,5 +1,5 @@
 import pickle
-import sqlite3
+import sqlite3 as sql
 import torch.utils.data
 import numpy as np
 import scipy.spatial
@@ -43,33 +43,25 @@ class Storage(torch.utils.data.Dataset):
         self._global_vec_shape = (1, )
         self._h_crops_shape = (1, )
 
-        self._con = sqlite3.connect(path)
-        self._cur = self._con.cursor()
-        self._cur.execute('DROP TABLE IF EXISTS original')
-        self._cur.execute('DROP TABLE IF EXISTS synthetic')
+        self._path = path
+        with sql.connect(self._path) as con:
+            con.execute('DROP TABLE IF EXISTS original')
+            con.execute('DROP TABLE IF EXISTS synthetic')
 
-        self._cur.execute('CREATE TABLE original  (label, vector)')
-        self._cur.execute('CREATE TABLE synthetic (label, vector)')
-        self._con.commit()
+            con.execute('CREATE TABLE original  (label, vector)')
+            con.execute('CREATE TABLE synthetic (label, vector)')
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        self._cur.close()
-        self._con.close()
-
-    def _get_original_vectors(self, label: int):
+    def _get_original_vectors(self, cur: sql.Cursor, label: int):
         vectors = []
-        for vector, in self._cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
+        for vector, in cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
             vectors.append(_to_array(vector))
         return np.array(vectors)
 
-    def _synthesise_vectors(self, label: int, n: int, k: int):
-        vectors = self._get_original_vectors(label)
+    def _synthesise_vectors(self, cur: sql.Cursor, label: int, n: int, k: int):
+        vectors = self._get_original_vectors(cur, label)
         if len(vectors) > k + 1:
             for vec in SMOTE(vectors).generate(n, k):
-                self._cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _to_bytes(vec)))
+                cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _to_bytes(vec)))
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
         self._global_vec_shape = global_vec.shape
@@ -84,28 +76,31 @@ class Storage(torch.utils.data.Dataset):
         return global_vec, h_crops
 
     def reset(self):
-        self._cur.execute('DELETE FROM synthetic')
+        with sql.connect(self._path) as con:
+            con.execute('DELETE FROM synthetic')
 
-        for label in range(self._class_num):
-            if label != self._no_finding:
-                self._synthesise_vectors(label, n=2, k=5)
+            for label in range(self._class_num):
+                if label != self._no_finding:
+                    self._synthesise_vectors(con.cursor(), label, n=2, k=5)
 
-        self._cur.execute('DELETE FROM original')
-        self._con.commit()
+            con.execute('DELETE FROM original')
 
     def add(self, labels, global_vec, h_crops):
-        for label, gv, hc in zip(labels, global_vec, h_crops):
-            if label != self._no_finding:
-                self._cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
-        self._con.commit()
+        with sql.connect(self._path) as con:
+            cur = con.cursor()
+            for label, gv, hc in zip(labels, global_vec, h_crops):
+                if label != self._no_finding:
+                    cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
 
     def __len__(self):
-        return self._cur.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
+        with sql.connect(self._path) as con:
+            return con.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
 
     def __getitem__(self, index):
-        label, vector = self._cur.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (index,)).fetchone()
+        with sql.connect(self._path) as con:
+            label, vector = con.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (index,)).fetchone()
 
-        x = self._unmarshall(vector)
-        y = np.zeros(self._class_num, dtype='float32')
-        y[label] = 1
-        return x, y
+            x = self._unmarshall(vector)
+            y = np.zeros(self._class_num, dtype='float32')
+            y[label] = 1
+            return x, y

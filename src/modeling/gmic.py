@@ -207,25 +207,25 @@ class GMIC(lightning.LightningModule):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
             ds = self.train_dataset if self.current_epoch % 2 == 0 else self.feature_vectors
-            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=4, shuffle=True)
+            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=6, shuffle=True)
         return None
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return torchdata.DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=4, shuffle=False)
+            return torchdata.DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=6, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return torchdata.DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=4, shuffle=False)
+            return torchdata.DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=6, shuffle=False)
         return None
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.predict_dataset:
-            return torchdata.DataLoader(self.predict_dataset, batch_size=1, num_workers=4, shuffle=False)
+            return torchdata.DataLoader(self.predict_dataset, batch_size=1, num_workers=6, shuffle=False)
         return None
