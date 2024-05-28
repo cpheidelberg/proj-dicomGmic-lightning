@@ -17,19 +17,19 @@ class ClassificationImages(Dataset):
     def __init__(self, image_dir: str, dict_path: str, top_c: int):
         tab = pd.read_csv(dict_path)
 
-        self.categories = list(tab['categories'].explode().unique())[:top_c]
+        self.categories = list(tab['category'].explode().unique())[:top_c]
         self.no_finding_idx = self.categories.index('No Finding')
 
-        self.category_counts = [sum(tab['categories'] == c) for c in self.categories]
+        self.category_counts = [sum(tab['category'] == c) for c in self.categories]
         self.category_starts = [sum(self.category_counts[:i]) for i in range(len(self.categories))]
 
         self.images = []
         for i in range(len(tab)):
-            if tab.loc[i, 'categories'] in self.categories:
+            if tab.loc[i, 'category'] in self.categories:
                 self.images.append({
                     'path': os.path.join(image_dir, tab.loc[i, 'image']) + '.png',
                     'view': tab.loc[i, 'view'],
-                    'category': tab.loc[i, 'categories'],
+                    'category': tab.loc[i, 'category'],
                     'center_x': tab.loc[i, 'center_x'],
                     'center_y': tab.loc[i, 'center_y']
                 })
