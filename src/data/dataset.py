@@ -14,128 +14,56 @@ from src.data import loading
 
 
 class ClassificationImages(Dataset):
-    def __init__(self, image_dirs : list[str], dict_file: str, top_c=None, h5_file=None):
-        self.image_dirs = image_dirs
-        self.image_files = [os.path.join(img_dir, file) for img_dir in image_dirs for file in os.listdir(img_dir)]
+    def __init__(self, image_dir: str, dict_path: str, top_c: int):
+        tab = pd.read_csv(dict_path)
 
-        # Temporary measure, to make the testing easier for now
-        # self.image_files = self.image_files[:800]
+        self.categories = list(tab['categories'].explode().unique())[:top_c]
+        self.no_finding_idx = self.categories.index('No Finding')
 
-        random.shuffle(self.image_files)
-        self.dict_table = pd.read_csv(dict_file, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
+        self.category_counts = [sum(tab['categories'] == c) for c in self.categories]
+        self.category_starts = [sum(self.category_counts[:i]) for i in range(len(self.categories))]
 
-        if top_c:
-            self.filterCategories(top_c)
-
-        self.unique_categories = list(self.dict_table["finding_categories"].explode().unique())
-        self.no_finding_idx = self.unique_categories.index('No Finding')
-
-        print(f'{len(self.unique_categories)} classes: {self.unique_categories}')
-        print(self.dict_table["finding_categories"].value_counts())
-
-        # print(self.getLabelCount())
-
+        self.images = []
+        for i in range(len(tab)):
+            if tab.loc[i, 'categories'] in self.categories:
+                self.images.append({
+                    'path': os.path.join(image_dir, tab.loc[i, 'image']) + '.png',
+                    'view': tab.loc[i, 'view'],
+                    'category': tab.loc[i, 'categories'],
+                    'center_x': tab.loc[i, 'center_x'],
+                    'center_y': tab.loc[i, 'center_y']
+                })
 
     def __len__(self):
-        return len(self.image_files)
+        return len(self.categories) * self.category_counts[0]
 
+    def __getitem__(self, index: int):
+        return self._nth_image(self._convert_index(index))
 
-    def __getitem__(self, idx):
-        
-        imagePath = self.image_files[idx]
+    def _convert_index(self, index: int):
+        category, scaled = divmod(index, self.category_counts[0])
+        scaled = scaled * self.category_counts[category] // self.category_counts[0]
+        return self.category_starts[category] + scaled
 
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
+    def _nth_image(self, index: int):
+        data = self.images[index]
 
-        labelList = data["finding_categories"].iloc[0]
-        labelEnc = self.createHotEncoding(labelList)
+        image = self._load_image(data['path'], data['view'], (data['center_x'], data['center_y']))
+        enc = self._hot_encoding(data['category'])
+        return image, enc
 
-        return loaded_image, labelEnc
+    def _load_image(self, path: str, view: str, best_center: tuple[int, int]):
+        img = loading.load_image(path, view, horizontal_flip='NO')
+        img = loading.process_image(img, view, best_center)
+        img = np.expand_dims(img, 0).copy()
+        return torch.Tensor(img)
 
-
-    def getOrigFilename(self, idx):
-        if len(self.image_files[idx].split("/")[-1].split("_")) > 2:
-            original_file_name = "_".join(self.image_files[idx].split("/")[-1].split("_")[:-1]).strip(".png")
-        else:
-            original_file_name = self.image_files[idx].split("/")[-1].strip(".png")
-
-        return original_file_name
-
-
-    def getDataentry(self, original_file_name: str) -> pd.DataFrame:
-        """Find the entry of the original filename in self.flatDict["image"]"""
-        data = self.dict_table[self.dict_table["image"] == original_file_name]
-        if data.empty:
-            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
-        return data
-
-
-    def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
-
-        view = data["view"].iloc[0]
-        loaded_image = loading.load_image(
-            image_path=imagePath,
-            view=view,
-            horizontal_flip=data["horizontal_flip"].iloc[0],
-        )
-        loaded_image = loading.process_image(loaded_image, view, data["best_center"].iloc[0][view][0])
-        loaded_image = np.expand_dims(loaded_image, 0).copy()
-        loaded_image = torch.Tensor(loaded_image)
-
-        return loaded_image
-
-            
-    def getLabelCount(self):
-        labelCount = {k: 0 for k in self.unique_categories}
-        for f in self.image_files:
-            
-            if len(f.split("/")[-1].split("_")) > 2:
-                original_file_name = "_".join(f.split("/")[-1].split("_")[:-1]).strip(".png")
-            else:
-                original_file_name = f.split("/")[-1].strip(".png")
-            data = self.dict_table[self.dict_table["image"] == original_file_name]
-            labelList = data["finding_categories"].iloc[0]
-            labelCount[labelList[0]] += 1
-        return labelCount
-
-
-    def createHotEncoding(self, labelList):
-        encoding = np.zeros(len(self.unique_categories), dtype=np.float32)
-        for label in labelList:
-            label_index = self.unique_categories.index(label)
-            encoding[label_index] = 1.0
-        if np.max(encoding) == 0:
-            print("No label found")
-
+    def _hot_encoding(self, category: str):
+        index = self.categories.index(category)
+        length = len(self.categories)
+        encoding = np.zeros(length, dtype=np.float32)
+        encoding[index] = 1.0
         return encoding
-            
-
-    def convertLabels(self, df):
-        column = "finding_categories"
-        df[column] = df[column].apply(ast.literal_eval)
-
-        return df
-
-
-    def filterCategories(self, top_c=5):
-        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
-
-        class_counts = self.dict_table["finding_categories"].value_counts()
-        origLen = len(self.image_files)
-        origLength = len(self.dict_table)
-
-        class_counts = class_counts.sort_values(ascending=False)
-        top_labels = class_counts.head(top_c).index
-
-        removed_images = self.dict_table.loc[~self.dict_table['finding_categories'].isin(top_labels)]
-        removed_images = removed_images['image'].tolist()
-        self.dict_table = self.dict_table[self.dict_table["finding_categories"].isin(top_labels)]
-        self.dict_table.to_csv("removedTop5.csv")
-        self.image_files = [f for f in self.image_files if "_".join(f.split("/")[-1].split("_")[:2]).strip(".png") not in removed_images]
-
-        print("{}/{} images for {} retained categories".format(len(self.image_files), origLen, top_c))
-        print("{}/{} dictionary entries for {} retained categories".format(len(self.dict_table), origLength, top_c))
 
 
 class ClassificationImagesFromPickle(ClassificationImages):

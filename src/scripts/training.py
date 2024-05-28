@@ -34,9 +34,8 @@ if __name__ == "__main__":
     sds_path = '/home/ubuntu/data'
     
     data_path = os.path.join(sds_path, 'output/data.pkl')
-    image_path_train = os.path.join(sds_path, 'output/balanced_cropped_top5/')
-    image_path_test = os.path.join(sds_path, 'output/cropped_images/')
-    dict_path = os.path.join(sds_path, 'output/dictionary.csv')
+    image_path = os.path.join(sds_path, 'output/cropped_images/')
+    dict_path = os.path.join(sds_path, 'output/sorted.csv')
     label_path = os.path.join(sds_path, 'finding_annotations.csv')
     seg_path = os.path.join(sds_path, 'output/segmentation')
     output_path = os.path.join(sds_path, 'output')
@@ -58,7 +57,7 @@ if __name__ == "__main__":
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path_train,
+        "image_path": image_path,
         "segmentation_path": seg_path,
         "output_path": output_path,
 
@@ -72,12 +71,12 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages(image_dirs=[image_path_train, image_path_test], dict_file=dict_path, top_c=parameters["num_classes"])
+    data = dataset.ClassificationImages(image_dir=image_path, dict_file=dict_path, top_c=parameters['num_classes'])
     # data = dataset.ClassificationImagesFromPickle(imageFolder=[image_path_test], dictPath=data_path, labelPath=label_path, top_c=parameters["num_classes"])
     # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
-    feature_vectors = feature_vector.Storage(feature_vectors_path, data.no_finding_idx, parameters["num_classes"])
+    feature_vectors = feature_vector.Storage(feature_vectors_path, data.no_finding_idx, parameters['num_classes'])
     # Training
     gmic_module = gmic.GMIC(
         parameters=parameters,
