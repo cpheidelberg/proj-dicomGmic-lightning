@@ -71,7 +71,7 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages(image_dir=image_path, dict_file=dict_path, top_c=parameters['num_classes'])
+    data = dataset.ClassificationImages(image_dir=image_path, dict_path=dict_path, top_c=parameters['num_classes'])
     # data = dataset.ClassificationImagesFromPickle(imageFolder=[image_path_test], dictPath=data_path, labelPath=label_path, top_c=parameters["num_classes"])
     # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
