@@ -33,7 +33,7 @@ def _read_csv_info(image_dir: str, dict_path: str, top_c: int):
     category_sizes = np.array([category_dict[name] for name in category_names], dtype=np.int32)
 
     images.sort(key=lambda image: -category_dict[image['category']])
-    images = images[:sum(category_sizes)]
+    images = images[:category_sizes.sum()]
 
     return category_names, category_sizes, images
 
