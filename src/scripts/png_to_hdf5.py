@@ -26,7 +26,7 @@ def _read_csv_info(image_dir: str, dict_path: str):
     tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
 
     images = _format_images(tab, image_dir)
-    images.sort(lambda image: image['category'])
+    images.sort(key=lambda image: image['category'])
 
     category_names = sorted({image['category'] for image in images})
     category_sizes = [sum(image['category'] == category for image in images) for category in category_names]
