@@ -55,7 +55,7 @@ def _load_image(data: dict):
 def main():
     image_dir = '/home/ubuntu/data/output/cropped_images'
     dict_path = '/home/ubuntu/data/output/sorted.csv'
-    result_path = '/home/ubuntu/data_2/dataset.h5'
+    result_path = '/home/ubuntu/data_2/input.h5'
 
     categories, sizes, images = _read_csv_info(image_dir, dict_path, top_c=6)
     enc = _encode_images(categories, images)
