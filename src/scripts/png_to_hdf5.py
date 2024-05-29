@@ -53,15 +53,14 @@ def _load_image(data: dict):
 
 
 def main():
-    parent_dir = '/home/ubuntu/data/output'
-    image_dir = os.path.join(parent_dir, 'cropped_images')
-    dict_path = os.path.join(parent_dir, 'sorted.csv')
-    dst_path = os.path.join(parent_dir, 'dataset.h5')
+    image_dir = '/home/ubuntu/data/output/cropped_images'
+    dict_path = '/home/ubuntu/data/output/sorted.csv'
+    result_path = '/home/ubuntu/data_2/dataset.h5'
 
     categories, sizes, images = _read_csv_info(image_dir, dict_path, top_c=6)
     enc = _encode_images(categories, images)
 
-    output = h5.File(dst_path, mode='w')
+    output = h5.File(result_path, mode='w')
 
     output.create_dataset('category_size', data=np.array(sizes, dtype=np.int32))
     output.create_dataset('category_name', data=np.array(categories, dtype='object'))
