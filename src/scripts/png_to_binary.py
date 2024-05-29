@@ -35,9 +35,9 @@ def _read_csv_info(image_dir: str, dict_path: str, top_c: int):
     category_sizes = np.array([category_dict[name] for name in category_names], dtype=np.int32)
     return category_names, category_sizes, images
 
-def _encode_image(categories: list[str], category: str):
+def _encode_image(categories: np.ndarray[str], category: str):
     enc = np.zeros(len(categories), dtype=np.float32)
-    enc[categories.index(category)] = 1.0
+    enc[np.argmax(categories == category)] = 1.0
     return enc
 
 def _encode_images(categories: list[str], images: list[dict]):
