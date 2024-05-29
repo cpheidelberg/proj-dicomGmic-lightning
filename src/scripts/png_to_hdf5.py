@@ -71,6 +71,7 @@ def main():
     image_ds = output.create_dataset('image_data', (len(images), *first_image.shape), dtype=first_image.dtype)
     for i in range(len(images)):
         image_ds[i] = _load_image(images[i])
+        print(f'{round(i/len(images)*100)}% \t{i}/{len(images)}')
 
     output.close()
 
