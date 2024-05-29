@@ -21,17 +21,18 @@ class ClassificationImages(Dataset):
         self.category_sizes = list(self.data['category_size'])
         self.image_encodings = list(self.data['image_encoding'])
 
+        self.category_max_size = max(self.category_sizes)
         self.category_offsets = [sum(self.category_sizes[:i]) for i in range(len(self.category_names))]
 
     def __len__(self):
-        return len(self.category_names) * self.category_sizes[0]
+        return len(self.category_names) * self.category_max_size
 
     def __getitem__(self, index: int):
         return self._nth_image(self._convert_index(index))
 
     def _convert_index(self, index: int):
-        category, scaled = divmod(index, self.category_sizes[0])
-        scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
+        category, scaled = divmod(index, self.category_max_size)
+        scaled = scaled * self.category_sizes[category] // self.category_max_size
         return self.category_offsets[category] + scaled
 
     def _nth_image(self, index: int):
