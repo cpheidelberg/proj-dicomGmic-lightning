@@ -19,7 +19,7 @@ class GMIC(lightning.LightningModule):
         self.cnn = cnn.CNN(parameters)
         self.classifier = classifier.Classifier(parameters)
 
-        self.feature_vectors = None#---feature_vectors
+        self.feature_vectors = feature_vectors
 
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
@@ -135,8 +135,8 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_end(self):
-        if self.current_epoch % 2 == 0:
-            pass#---self.feature_vectors.reset()
+        if self.feature_vectors is not None and self.current_epoch % 2 == 0:
+            self.feature_vectors.reset()
 
 
     def validation_step(self, batch, batch_idx):
@@ -206,7 +206,10 @@ class GMIC(lightning.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            ds = self.train_dataset #---if self.current_epoch % 2 == 0 else self.feature_vectors
+            if self.feature_vectors is None or self.current_epoch % 2 == 0:
+                ds = self.train_dataset
+            else:
+                ds = self.feature_vectors
             return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=6, shuffle=True)
         return None
 
