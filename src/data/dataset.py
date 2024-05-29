@@ -14,31 +14,27 @@ from src.data import loading
 
 
 class ClassificationImages(Dataset):
-    def __init__(self, dataset_path: str):
-        self.data = h5py.File(dataset_path, libver='latest', swmr=True)
-
-        self.category_names = list(self.data['category_name'])
-        self.category_sizes = list(self.data['category_size'])
-        self.image_encodings = list(self.data['image_encoding'])
-
-        self.category_max_size = max(self.category_sizes)
-        self.category_offsets = [sum(self.category_sizes[:i]) for i in range(len(self.category_names))]
+    def __init__(self, input_dir: str):
+        self.category_names = np.load(os.path.join(input_dir, 'category_names.np'))
+        self.category_sizes = np.load(os.path.join(input_dir, 'category_sizes.np'))
+        self.labels = np.load(os.path.join(input_dir, 'labels.np'))
+        self.image_dir = os.path.join(input_dir, 'images')
 
     def __len__(self):
-        return len(self.category_names) * self.category_max_size
+        return len(self.category_names) * self.category_sizes[0]
 
     def __getitem__(self, index: int):
         return self._nth_image(self._convert_index(index))
 
     def _convert_index(self, index: int):
-        category, scaled = divmod(index, self.category_max_size)
-        scaled = scaled * self.category_sizes[category] // self.category_max_size
-        return self.category_offsets[category] + scaled
+        category, scaled = divmod(index, self.category_sizes[0])
+        scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
+        return sum(self.category_sizes[:category]) + scaled
 
     def _nth_image(self, index: int):
-        image = torch.Tensor(self.data['image_data'][index])
-        enc = self.image_encodings[index]
-        return image, enc
+        image = torch.load(os.path.join(self.image_dir, f'{index}.torch'))
+        label = self.labels[index]
+        return image, label
 
     def num_classes(self):
         return len(self.category_names)
