@@ -14,25 +14,13 @@ from src.data import loading
 
 
 class ClassificationImages(Dataset):
-    def __init__(self, image_dir: str, dict_path: str, top_c: int):
-        tab = pd.read_csv(dict_path)
+    def __init__(self, dataset_path: str):
+        self.data = h5py.File(dataset_path)
 
-        self.categories = list(tab['category'].explode().unique())[:top_c]
-        self.no_finding_idx = self.categories.index('No Finding')
+        self.categories = list(self.data['category_name'])
+        self.category_counts = list(self.data['category_size'])
 
-        self.category_counts = [sum(tab['category'] == c) for c in self.categories]
         self.category_starts = [sum(self.category_counts[:i]) for i in range(len(self.categories))]
-
-        self.images = []
-        for i in range(len(tab)):
-            if tab.loc[i, 'category'] in self.categories:
-                self.images.append({
-                    'path': os.path.join(image_dir, tab.loc[i, 'image']) + '.png',
-                    'view': tab.loc[i, 'view'],
-                    'category': tab.loc[i, 'category'],
-                    'center_x': tab.loc[i, 'center_x'],
-                    'center_y': tab.loc[i, 'center_y']
-                })
 
     def __len__(self):
         return len(self.categories) * self.category_counts[0]
@@ -46,24 +34,12 @@ class ClassificationImages(Dataset):
         return self.category_starts[category] + scaled
 
     def _nth_image(self, index: int):
-        data = self.images[index]
-
-        image = self._load_image(data['path'], data['view'], (data['center_x'], data['center_y']))
-        enc = self._hot_encoding(data['category'])
+        image = torch.Tensor(self.data['image_data'][index])
+        enc = self.data['image_encoding'][index]
         return image, enc
 
-    def _load_image(self, path: str, view: str, best_center: tuple[int, int]):
-        img = loading.load_image(path, view, horizontal_flip='NO')
-        img = loading.process_image(img, view, best_center)
-        img = np.expand_dims(img, 0).copy()
-        return torch.Tensor(img)
-
-    def _hot_encoding(self, category: str):
-        index = self.categories.index(category)
-        length = len(self.categories)
-        encoding = np.zeros(length, dtype=np.float32)
-        encoding[index] = 1.0
-        return encoding
+    def num_classes(self):
+        return len(self.categories)
 
 
 class ClassificationImagesFromPickle(ClassificationImages):

@@ -37,8 +37,7 @@ def _to_array(array: bytes) -> np.ndarray:
 
 
 class Storage(torch.utils.data.Dataset):
-    def __init__(self, path: str, no_finding: int, class_num: int):
-        self._no_finding = no_finding
+    def __init__(self, path: str, class_num: int):
         self._class_num = class_num
 
         self._path = path
@@ -75,7 +74,7 @@ class Storage(torch.utils.data.Dataset):
             con.execute('DELETE FROM synthetic')
 
             for label in range(self._class_num):
-                if label != self._no_finding:
+                if label > 0:
                     self._synthesise_vectors(con.cursor(), label, n=2, k=5)
 
             con.execute('DELETE FROM original')
@@ -84,7 +83,7 @@ class Storage(torch.utils.data.Dataset):
         with sql.connect(self._path) as con:
             cur = con.cursor()
             for label, gv, hc in zip(labels, global_vec, h_crops):
-                if label != self._no_finding:
+                if label > 0:
                     cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
 
     def __len__(self):
