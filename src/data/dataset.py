@@ -17,29 +17,30 @@ class ClassificationImages(Dataset):
     def __init__(self, dataset_path: str):
         self.data = h5py.File(dataset_path)
 
-        self.categories = list(self.data['category_name'])
-        self.category_counts = list(self.data['category_size'])
+        self.category_names = list(self.data['category_name'])
+        self.category_sizes = list(self.data['category_size'])
+        self.image_encodings = list(self.data['image_encoding'])
 
-        self.category_starts = [sum(self.category_counts[:i]) for i in range(len(self.categories))]
+        self.category_offsets = [sum(self.category_sizes[:i]) for i in range(len(self.category_names))]
 
     def __len__(self):
-        return len(self.categories) * self.category_counts[0]
+        return len(self.category_names) * self.category_sizes[0]
 
     def __getitem__(self, index: int):
         return self._nth_image(self._convert_index(index))
 
     def _convert_index(self, index: int):
-        category, scaled = divmod(index, self.category_counts[0])
-        scaled = scaled * self.category_counts[category] // self.category_counts[0]
-        return self.category_starts[category] + scaled
+        category, scaled = divmod(index, self.category_sizes[0])
+        scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
+        return self.category_offsets[category] + scaled
 
     def _nth_image(self, index: int):
         image = torch.Tensor(self.data['image_data'][index])
-        enc = self.data['image_encoding'][index]
+        enc = self.image_encodings[index]
         return image, enc
 
     def num_classes(self):
-        return len(self.categories)
+        return len(self.category_names)
 
 
 class ClassificationImagesFromPickle(ClassificationImages):
