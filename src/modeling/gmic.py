@@ -128,7 +128,7 @@ class GMIC(lightning.LightningModule):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         x, y = batch
 
-        if self.current_epoch % 2 == 0:
+        if self.feature_vectors is None or self.current_epoch % 2 == 0:
             return self._train_on_image(image=x, y=y)
         else:
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
