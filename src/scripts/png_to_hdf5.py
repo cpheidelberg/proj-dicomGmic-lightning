@@ -60,7 +60,8 @@ def main():
     categories, sizes, images = _read_csv_info(image_dir, dict_path, top_c=6)
     enc = _encode_images(categories, images)
 
-    output = h5.File(result_path, mode='w')
+    output = h5.File(result_path, mode='w', libver='latest')
+    output.swmr_mode = True
 
     output.create_dataset('category_size', data=np.array(sizes, dtype=np.int32))
     output.create_dataset('category_name', data=np.array(categories, dtype='object'))

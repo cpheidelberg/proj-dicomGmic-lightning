@@ -15,7 +15,7 @@ from src.data import loading
 
 class ClassificationImages(Dataset):
     def __init__(self, dataset_path: str):
-        self.data = h5py.File(dataset_path)
+        self.data = h5py.File(dataset_path, libver='latest', swmr=True)
 
         self.category_names = list(self.data['category_name'])
         self.category_sizes = list(self.data['category_size'])
