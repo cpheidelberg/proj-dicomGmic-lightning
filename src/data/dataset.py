@@ -67,7 +67,7 @@ class ClassificationImages(Dataset):
         for i in range(length):
             image = self.nth_image(i).numpy()
             filename = os.path.basename(self.images[i]['path'])
-            loading.write_image_png(image, os.path.join(dest_dir, filename))
+            loading.write_image_png(os.path.join(dest_dir, filename), image)
 
             print(f'{i} / {length}')
 
