@@ -29,7 +29,7 @@ def _read_csv_info(image_dir: str, dict_path: str, top_c: int):
 
     category_set = {image['category'] for image in images}
     category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
-    category_names = np.array(sorted(category_set, key=lambda name: -category_dict[name])[:top_c], dtype='object')
+    category_names = np.array(sorted(category_set, key=lambda name: -category_dict[name])[:top_c])
     category_sizes = np.array([category_dict[name] for name in category_names], dtype=np.int32)
 
     images.sort(key=lambda image: -category_dict[image['category']])
@@ -64,10 +64,10 @@ def main():
     np.save('/home/ubuntu/data_2/input/category_sizes', category_sizes)
     np.save('/home/ubuntu/data_2/input/labels', labels)
 
-    for i in range(len(images)):
-        image = _load_image(images[i])
-        torch.save(image, f'/home/ubuntu/data_2/input/images/{i}.torch')
-        print(f'{round(i / len(images) * 100)}% \t{i + 1}/{len(images)}')
+    # for i in range(len(images)):
+    #     image = _load_image(images[i])
+    #     torch.save(image, f'/home/ubuntu/data_2/input/images/{i}.torch')
+    #     print(f'{round(i / len(images) * 100)}% \t{i + 1}/{len(images)}')
 
 if __name__ == '__main__':
     main()
