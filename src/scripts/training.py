@@ -63,8 +63,8 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    # data = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
-    data = dataset.ClassificationImagesHDF5(input_path)
+    data = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
+    # data = dataset.ClassificationImagesHDF5(input_path)
 
     dataset_train, dataset_valid, dataset_test = random_split(data, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, data.num_classes())

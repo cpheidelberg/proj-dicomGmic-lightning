@@ -28,12 +28,10 @@ def flip_image(image, view, horizontal_flip):
     If training mode, makes all images face right direction.
     In medical, keeps the original directions unless horizontal_flip is set.
     """
-    if horizontal_flip == 'NO':
-        if VIEWS.is_right(view):
-            image = np.fliplr(image)
-    elif horizontal_flip == 'YES':
-        if VIEWS.is_left(view):
-            image = np.fliplr(image)
+    if horizontal_flip == 'NO' and VIEWS.is_right(view):
+        return np.fliplr(image)
+    elif horizontal_flip == 'YES' and VIEWS.is_left(view):
+        return np.fliplr(image)
 
     return image
 
@@ -47,8 +45,7 @@ def standard_normalize_single_image(image):
 
 
 def read_image_png(file_name):
-    image = np.array(imageio.imread(file_name))
-    return image
+    return np.array(imageio.imread(file_name), dtype=np.float32)
 
 
 def load_image(image_path, view, horizontal_flip):
@@ -59,7 +56,6 @@ def load_image(image_path, view, horizontal_flip):
         image = read_image_png(image_path)
     else:
         raise RuntimeError()
-    image = image.astype(np.float32)
     image = flip_image(image, view, horizontal_flip)
     return image
 

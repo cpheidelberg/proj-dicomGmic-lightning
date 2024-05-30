@@ -66,7 +66,7 @@ class ClassificationImages(Dataset):
     def _nth_image(self, n: int):
         img = loading.load_image(self.images[n]['path'], self.images[n]['view'], horizontal_flip='NO')
         img = loading.process_image(img, self.images[n]['view'], self.images[n]['center'])
-        img = np.expand_dims(img, 0).copy()
+        img = np.expand_dims(img, 0)
         return torch.Tensor(img)
 
     def num_classes(self):
