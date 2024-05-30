@@ -15,9 +15,9 @@ from src.data import loading
 
 class ClassificationImages(Dataset):
     def __init__(self, input_dir: str):
-        self.category_names = np.load(os.path.join(input_dir, 'category_names.np'))
-        self.category_sizes = np.load(os.path.join(input_dir, 'category_sizes.np'))
-        self.labels = np.load(os.path.join(input_dir, 'labels.np'))
+        self.category_names = np.load(os.path.join(input_dir, 'category_names.npy'))
+        self.category_sizes = np.load(os.path.join(input_dir, 'category_sizes.npy'))
+        self.labels = np.load(os.path.join(input_dir, 'labels.npy'))
         self.image_dir = os.path.join(input_dir, 'images')
 
     def __len__(self):

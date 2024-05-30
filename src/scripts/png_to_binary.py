@@ -60,9 +60,9 @@ def main():
     labels = _encode_images(category_names, images)
 
     os.makedirs('/home/ubuntu/data_2/input/images', exist_ok=True)
-    np.save('/home/ubuntu/data_2/input/category_names.np', category_names)
-    np.save('/home/ubuntu/data_2/input/category_sizes.np', category_sizes)
-    np.save('/home/ubuntu/data_2/input/labels.np', labels)
+    np.save('/home/ubuntu/data_2/input/category_names', category_names)
+    np.save('/home/ubuntu/data_2/input/category_sizes', category_sizes)
+    np.save('/home/ubuntu/data_2/input/labels', labels)
 
     for i in range(len(images)):
         image = _load_image(images[i])
