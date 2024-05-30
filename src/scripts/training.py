@@ -63,46 +63,40 @@ if __name__ == "__main__":
     }
 
     data = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
-    data.store_processed(pp_image_dir)
-
-    print('Preprocessing done!')
-
-    data = dataset.PreprocessedClassificationImages(pp_image_dir, dict_path, top_c=parameters['num_classes'])
-
-    print('Training time!')
 
     dataset_train, dataset_valid, dataset_test = random_split(data, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, data.num_classes())
 
-    # Training
-    model = gmic.GMIC(
-        parameters=parameters,
-        #feature_vectors=feature_vectors,
-        dataset_train=dataset_train,
-        dataset_valid=dataset_valid,
-        dataset_test=dataset_test,
-        model_path=model_path
-    )
+    for fv in [feature_vectors, None]:
+        # Training
+        model = gmic.GMIC(
+            parameters=parameters,
+            feature_vectors=fv,
+            dataset_train=dataset_train,
+            dataset_valid=dataset_valid,
+            dataset_test=dataset_test,
+            model_path=model_path
+        )
 
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
-    early_stop_callback = EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
+        logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
+        early_stop_callback = EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
 
-    training = pl.Trainer(
-        fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-        # limit_val_batches=0,
-        # num_sanity_val_steps=0,
-        max_epochs=parameters["epochs"], 
-        # gradient_clip_val=1e-3,
-        accelerator=device, 
-        # devices=[parameters["gpu_number"]],
-        devices=[0],
-        logger=logger,
-        # profiler="simple",
-        # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
-        # callbacks=[ModelSummary(max_depth=2)],
-        reload_dataloaders_every_n_epochs=1
-    )
+        training = pl.Trainer(
+            fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+            # limit_val_batches=0,
+            # num_sanity_val_steps=0,
+            max_epochs=parameters["epochs"], 
+            # gradient_clip_val=1e-3,
+            accelerator=device, 
+            # devices=[parameters["gpu_number"]],
+            devices=[0],
+            logger=logger,
+            # profiler="simple",
+            # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+            # callbacks=[ModelSummary(max_depth=2)],
+            reload_dataloaders_every_n_epochs=1
+        )
 
-    training.fit(model)
-    print(f'Training finished at: {time.ctime()}')
-    training.test(model)
+        training.fit(model)
+        print(f'Training finished at: {time.ctime()}')
+        training.test(model)

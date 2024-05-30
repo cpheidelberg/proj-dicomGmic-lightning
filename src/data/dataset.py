@@ -61,26 +61,6 @@ class ClassificationImages(Dataset):
     def num_classes(self):
         return len(self.category_names)
 
-    def store_processed(self, dest_dir: str):
-        length = len(self.images)
-
-        for i in range(length):
-            image = self.nth_image(i).numpy()[0]
-            filename = os.path.basename(self.images[i]['path'])
-            loading.write_image_png(os.path.join(dest_dir, filename), image)
-
-            print(f'{i} / {length}')
-
-
-class PreprocessedClassificationImages(ClassificationImages):
-    def __init__(self, image_dir: str, dict_path: str, top_c: int):
-        super().__init__(image_dir, dict_path, top_c)
-
-    def nth_image(self, n: int):
-        img = loading.read_image_png(self.images[n]['path'])
-        img = np.expand_dims(img, 0)
-        return torch.Tensor(img)
-
 
 class H5Dataset(Dataset):
     def __init__(self, h5_filepath, relevant_labels=None):
