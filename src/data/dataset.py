@@ -13,31 +13,65 @@ sys.path.append(parent_dir)
 from src.data import loading
 
 
+def _format_image(tab: pd.DataFrame, image_dir: str, i: int):
+    path = f"{os.path.join(image_dir, tab.loc[i, 'image'])}.png"
+    view = tab.loc[i, 'view']
+    category = tab.loc[i, 'finding_categories'][0]
+    center = tab.loc[i, 'best_center'][view][0]
+    return {'path': path, 'view': view, 'category': category, 'center': center}
+
+def _format_images(tab: pd.DataFrame, image_dir: str):
+    return [_format_image(tab, image_dir, i) for i in range(len(tab)) if len(tab.loc[i, 'finding_categories']) == 1]
+
+def _read_csv_info(image_dir: str, dict_path: str, top_c: int):
+    tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
+
+    images = _format_images(tab, image_dir)
+
+    category_set = {image['category'] for image in images}
+    category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
+    category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
+    category_sizes = [category_dict[name] for name in category_names]
+
+    images = filter((lambda image: image['category'] in category_names), images)
+    images = sorted(images, key=lambda image: -category_dict[image['category']])
+
+    return category_names, category_sizes, images
+
+def _load_image(data: dict):
+    array = loading.load_image(data['path'], data['view'], horizontal_flip='NO')
+    array = loading.process_image(array, data['view'], data['center'])
+    array = np.expand_dims(array, 0).copy()
+    return torch.Tensor(array)
+
+def _encode_image(categories: list[str], category: str):
+    enc = np.zeros(len(categories), dtype=np.float32)
+    enc[categories.index(category)] = 1.0
+    return enc
+
+
 class ClassificationImages(Dataset):
-    def __init__(self, input_dir: str):
-        self.category_names = np.load(os.path.join(input_dir, 'category_names.npy'))
-        self.category_sizes = np.load(os.path.join(input_dir, 'category_sizes.npy'))
-        self.labels = np.load(os.path.join(input_dir, 'labels.npy'))
-        self.image_dir = os.path.join(input_dir, 'images')
+    def __init__(self, image_dir: str, dict_path: str, top_c: int):
+        self.categories, self.sizes, self.images = _read_csv_info(image_dir, dict_path, top_c)
 
     def __len__(self):
-        return len(self.category_names) * self.category_sizes[0]
+        return len(self.categories) * self.sizes[0]
 
     def __getitem__(self, index: int):
         return self._nth_image(self._convert_index(index))
 
     def _convert_index(self, index: int):
-        category, scaled = divmod(index, self.category_sizes[0])
-        scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
-        return sum(self.category_sizes[:category]) + scaled
+        category, scaled = divmod(index, self.sizes[0])
+        scaled = scaled * self.sizes[category] // self.sizes[0]
+        return sum(self.sizes[:category]) + scaled
 
     def _nth_image(self, index: int):
-        image = torch.load(os.path.join(self.image_dir, f'{index}.torch'))
-        label = self.labels[index]
+        image = _load_image(self.images[index])
+        label = _encode_image(self.categories, self.images['category'])
         return image, label
 
     def num_classes(self):
-        return len(self.category_names)
+        return len(self.categories)
 
 
 class ClassificationImagesFromPickle(ClassificationImages):

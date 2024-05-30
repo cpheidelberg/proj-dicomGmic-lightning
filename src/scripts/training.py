@@ -28,13 +28,13 @@ if __name__ == "__main__":
     # set path variables
     model_path = 'models/'
 
-    data_path = '/home/ubuntu/data_2'
+    data_path = '/home/ubuntu/data/output'
     feature_vectors_path = os.path.join(data_path, 'feature_vectors.sql')
-    dataset_path = os.path.join(data_path, 'input')
-    output_path = os.path.join(data_path, 'output')
+    imgdir_path = os.path.join(data_path, 'cropped_images')
+    dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'output/segmentation')
 
-    data = dataset.ClassificationImages(dataset_path)
+    data = dataset.ClassificationImages(imgdir_path, dict_path, top_c=6)
 
     # set hyperparameters
     parameters = {
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
         "segmentation_path": segmentation_path,
-        "output_path": output_path,
+        "output_path": data_path,
 
         # model related hyper-parameters
         "cam_size": (46, 30),
