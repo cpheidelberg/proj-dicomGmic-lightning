@@ -73,11 +73,7 @@ def process_image(image, view, best_center):
         view=view
     )
 
-    # For test time only, normalize a copy of the cropped image
-    # in order to avoid changing the value of original image which gets augmented multiple times
-    cropped_image = cropped_image.copy()
     standard_normalize_single_image(cropped_image)
-
     return cropped_image
 
 
