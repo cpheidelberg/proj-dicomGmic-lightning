@@ -53,8 +53,8 @@ class ClassificationImages(Dataset):
         return self._nth_image(n), self._nth_label(n)
 
     def _convert_index(self, index: int):
-        category, scaled = divmod(index, self.category_sizes[0])
-        scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
+        category, offset = divmod(index, self.category_sizes[0])
+        scaled = offset * self.category_sizes[category] // self.category_sizes[0]
         return sum(self.category_sizes[:category]) + scaled
 
     def _nth_label(self, n: int):
