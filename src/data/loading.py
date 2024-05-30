@@ -69,7 +69,6 @@ def process_image(image, view, best_center):
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
-    print(image.shape)
     cropped_image, _ = augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
@@ -82,7 +81,7 @@ def process_image(image, view, best_center):
     # in order to avoid changing the value of original image which gets augmented multiple times
     cropped_image = cropped_image.copy()
     standard_normalize_single_image(cropped_image)
-    print(cropped_image.shape)
+
     return cropped_image
 
 
