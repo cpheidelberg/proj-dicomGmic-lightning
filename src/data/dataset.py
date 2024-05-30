@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import os, ast, pickle, h5py, time, sys, random
+import os, ast, h5py, time, sys
 from tqdm import tqdm
 import multiprocessing
 
@@ -13,99 +13,96 @@ sys.path.append(parent_dir)
 from src.data import loading
 
 
-def _format_image(tab: pd.DataFrame, image_dir: str, i: int):
-    path = f"{os.path.join(image_dir, tab.loc[i, 'image'])}.png"
-    view = tab.loc[i, 'view']
-    category = tab.loc[i, 'finding_categories'][0]
-    center = tab.loc[i, 'best_center'][view][0]
-    return {'path': path, 'view': view, 'category': category, 'center': center}
+def _balanced_len(category_sizes: list[int]):
+    return len(category_sizes) * category_sizes[0]
 
-def _format_images(tab: pd.DataFrame, image_dir: str):
-    return [_format_image(tab, image_dir, i) for i in range(len(tab)) if len(tab.loc[i, 'finding_categories']) == 1]
-
-def _read_csv_info(image_dir: str, dict_path: str, top_c: int):
-    tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
-
-    images = _format_images(tab, image_dir)
-
-    category_set = {image['category'] for image in images}
-    category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
-    category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
-    category_sizes = [category_dict[name] for name in category_names]
-
-    images = filter((lambda image: image['category'] in category_names), images)
-    images = sorted(images, key=lambda image: -category_dict[image['category']])
-
-    return category_names, category_sizes, images
-
-def _load_image(data: dict):
-    array = loading.load_image(data['path'], data['view'], horizontal_flip='NO')
-    array = loading.process_image(array, data['view'], data['center'])
-    array = np.expand_dims(array, 0).copy()
-    return torch.Tensor(array)
-
-def _encode_image(categories: list[str], category: str):
-    enc = np.zeros(len(categories), dtype=np.float32)
-    enc[categories.index(category)] = 1.0
-    return enc
+def _balanced_idx(category_sizes: list[int], index: int):
+    category, scaled = divmod(index, category_sizes[0])
+    scaled = scaled * category_sizes[category] // category_sizes[0]
+    return sum(category_sizes[:category]) + scaled
 
 
 class ClassificationImages(Dataset):
     def __init__(self, image_dir: str, dict_path: str, top_c: int):
-        self.category_names, self.category_sizes, self.images = _read_csv_info(image_dir, dict_path, top_c)
+        tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
+
+        images = []
+        for i in range(len(tab)):
+            if len(tab.loc[i, 'finding_categories']) == 1:
+                images.append({
+                    'path': f"{os.path.join(image_dir, tab.loc[i, 'image'])}.png",
+                    'view': tab.loc[i, 'view'],
+                    'category': tab.loc[i, 'finding_categories'][0],
+                    'center': tab.loc[i, 'best_center'][tab.loc[i, 'view']][0]
+                })
+
+        category_set = {image['category'] for image in images}
+        category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
+
+        self.category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
+        self.category_sizes = [category_dict[name] for name in self.category_names]
+
+        self.images = [image for image in images if image['category'] in self.category_names]
+        self.images.sort(key=lambda image: -category_dict[image['category']])
 
     def __len__(self):
-        return len(self.category_names) * self.category_sizes[0]
+        return _balanced_len(self.category_sizes)
 
     def __getitem__(self, index: int):
-        return self._nth_image(self._convert_index(index))
+        n = _balanced_idx(self.category_sizes, index)
+        return self._nth_image(n), self._nth_label(n)
 
     def _convert_index(self, index: int):
         category, scaled = divmod(index, self.category_sizes[0])
         scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
         return sum(self.category_sizes[:category]) + scaled
 
-    def _nth_image(self, index: int):
-        image = _load_image(self.images[index])
-        label = _encode_image(self.category_names, self.images[index]['category'])
-        return image, label
+    def _nth_label(self, n: int):
+        category = self.category_names.index(self.images[n]['category'])
+        encoding = np.zeros(len(self.category_names), dtype=np.float32)
+        encoding[category] = 1.0
+        return encoding
+
+    def _nth_image(self, n: int):
+        img = loading.load_image(self.images[n]['path'], self.images[n]['view'], horizontal_flip='NO')
+        img = loading.process_image(img, self.images[n]['view'], self.images[n]['center'])
+        img = np.expand_dims(img, 0).copy()
+        return torch.Tensor(img)
 
     def num_classes(self):
         return len(self.category_names)
 
+    def store_as_hdf5(self, dst_path: str):
+        with h5py.File(dst_path, mode='w', libver='latest') as f:
+            f.swmr_mode = True
+            length = len(self.images)
 
-def store_as_hdf5(src: ClassificationImages, dst: str):
-    with h5py.File(dst, mode='w', libver='latest') as f:
-        f.swmr_mode = True
-        f.create_dataset('category_names', data=np.array(src.category_names))
-        f.create_dataset('category_sizes', data=np.array(src.category_sizes))
+            f.create_dataset('category_names', data=np.array(self.category_names, dtype='object'))
+            f.create_dataset('category_sizes', data=np.array(self.category_sizes))
+            f.create_dataset('labels', data=np.array([self._nth_label(i) for i in range(length)]))
 
-        image0, label0 = src[0]
-        image0 = image0.numpy()
-        images = f.create_dataset('images', dtype=image0.dtype, shape=(len(src), *image0.shape), chunks=(1, *image0.shape))
-        labels = f.create_dataset('labels', dtype=label0.dtype, shape=(len(src), *label0.shape), chunks=(1, *label0.shape))
+            image0 = self._nth_image(0).numpy()
+            images = f.create_dataset('images', dtype=image0.dtype, shape=(length, *image0.shape), chunks=(1, *image0.shape))
 
-        for i in range(len(src)):
-            image, label = src[i]
-            images[i] = image.numpy()
-            labels[i] = label
-            print(f'{i}/{len(src)}')
-        
-        print('Done!')
+            for i in range(length):
+                images[i] = self._nth_image(i).numpy()
+                print(f'{i + 1} / {length}')
+
 
 class ClassificationImagesHDF5(Dataset):
     def __init__(self, data_path: str):
         file = h5py.File(data_path, libver='latest', swmr=True)
-        self.images = file['images']
-        self.labels = list(file['labels'])
         self.category_names = list(file['category_names'])
         self.category_sizes = list(file['category_sizes'])
+        self.labels = list(file['labels'])
+        self.images = file['images']
 
     def __len__(self):
-        return len(self.labels)
+        return _balanced_len(self.category_sizes)
 
     def __getitem__(self, index: int):
-        return torch.Tensor(self.images[index]), self.labels[index]
+        n = _balanced_idx(self.category_sizes, index)
+        return torch.Tensor(self.images[n]), self.labels[n]
 
     def num_classes(self):
         return len(self.category_names)
@@ -206,10 +203,13 @@ def main():
 
     # data = ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=6)
     # data = ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
-    data = H5Dataset(h5_filepath=h5Path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    # data = H5Dataset(h5_filepath=h5Path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     # create_chunked_h5(data)
 
-    print(data[0])
+    # print(data[0])
+
+    data = ClassificationImages('/home/ubuntu/data/output/cropped_images', '/home/ubuntu/data/output/dictionary.csv', top_c=6)
+    data.store_as_hdf5('/home/ubuntu/data_2/input.hdf5')
 
 
 if __name__ == "__main__":
