@@ -48,6 +48,10 @@ def read_image_png(file_name):
     return np.array(imageio.imread(file_name), dtype=np.float32)
 
 
+def write_image_png(file_name, image):
+    imageio.imwrite(file_name, image)
+
+
 def load_image(image_path, view, horizontal_flip):
     """
     Loads a png or hdf5 image as floats and flips according to its view.
