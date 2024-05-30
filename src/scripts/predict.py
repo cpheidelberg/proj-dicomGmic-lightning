@@ -232,8 +232,8 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.PredictionClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
-    parameters["class_names"] = data.unique_categories
+    data = dataset.ClassificationImages(image_path_test, dict_path, top_c=parameters["num_classes"])
+    parameters["class_names"] = data.category_names
     # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
@@ -251,5 +251,5 @@ if __name__ == "__main__":
 
     prediction = trainer.predict(lightningModule)
     
-    print(f"Categories: {data.unique_categories}")
+    print(f"Categories: {data.category_names}")
     print("Prediction: {}".format(prediction))

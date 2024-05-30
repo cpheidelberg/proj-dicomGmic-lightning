@@ -30,11 +30,9 @@ if __name__ == "__main__":
 
     data_path = '/home/ubuntu/data/output'
     feature_vectors_path = os.path.join(data_path, 'feature_vectors.sql')
-    imgdir_path = os.path.join(data_path, 'cropped_images')
+    image_dir = os.path.join(data_path, 'cropped_images')
     dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'output/segmentation')
-
-    data = dataset.ClassificationImages(imgdir_path, dict_path, top_c=6)
 
     # set hyperparameters
     parameters = {
@@ -59,9 +57,11 @@ if __name__ == "__main__":
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": data.num_classes(), # output classes
+        "num_classes": 6, # output classes
         "use_v1_global": False,
     }
+
+    data = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
 
     dataset_train, dataset_valid, dataset_test = random_split(data, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, data.num_classes())
