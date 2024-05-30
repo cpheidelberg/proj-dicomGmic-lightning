@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     data_path = '/home/ubuntu/data_2'
     feature_vectors_path = os.path.join(data_path, 'feature_vectors.sql')
-    dataset_path = os.path.join(data_path, 'input.h5')
+    dataset_path = os.path.join(data_path, 'input')
     output_path = os.path.join(data_path, 'output')
     segmentation_path = os.path.join(data_path, 'output/segmentation')
 
