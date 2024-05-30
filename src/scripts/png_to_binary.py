@@ -64,10 +64,10 @@ def main():
     np.save('/home/ubuntu/data_2/input/category_sizes', category_sizes)
     np.save('/home/ubuntu/data_2/input/labels', labels)
 
-    # for i in range(len(images)):
-    #     image = _load_image(images[i])
-    #     torch.save(image, f'/home/ubuntu/data_2/input/images/{i}.torch')
-    #     print(f'{round(i / len(images) * 100)}% \t{i + 1}/{len(images)}')
+    for i in range(len(images)):
+        image = _load_image(images[i])
+        torch.save(image, f'/home/ubuntu/data_2/input/images/{i}.torch')
+        print(f'{round(i / len(images) * 100)}% \t{i + 1}/{len(images)}')
 
 if __name__ == '__main__':
     main()
