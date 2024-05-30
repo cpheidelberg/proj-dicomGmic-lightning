@@ -31,10 +31,9 @@ if __name__ == "__main__":
     data_path = '/home/ubuntu/data/output'
     feature_vectors_path = os.path.join(data_path, 'feature_vectors.sql')
     image_dir = os.path.join(data_path, 'cropped_images')
+    pp_image_dir = os.path.join(data_path, 'preprocessed_images')
     dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'output/segmentation')
-
-    input_path = '/home/ubuntu/data_2/input.hdf5'
 
     # set hyperparameters
     parameters = {
@@ -64,7 +63,13 @@ if __name__ == "__main__":
     }
 
     data = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
-    # data = dataset.ClassificationImagesHDF5(input_path)
+    data.store_processed(pp_image_dir)
+
+    print('Preprocessing done!')
+
+    data = dataset.PreprocessedClassificationImages(pp_image_dir, dict_path, top_c=parameters['num_classes'])
+
+    print('Training time!')
 
     dataset_train, dataset_valid, dataset_test = random_split(data, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, data.num_classes())
