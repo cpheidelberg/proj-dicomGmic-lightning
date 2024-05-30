@@ -34,7 +34,7 @@ if __name__ == "__main__":
     dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'output/segmentation')
 
-    input_path = '/home/ubuntu/data_2/input.h5'
+    input_path = '/home/ubuntu/data_2/input.hdf5'
 
     # set hyperparameters
     parameters = {
