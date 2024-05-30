@@ -67,7 +67,7 @@ class ClassificationImages(Dataset):
 
     def _nth_image(self, index: int):
         image = _load_image(self.images[index])
-        label = _encode_image(self.categories, self.images['category'])
+        label = _encode_image(self.categories, self.images[index]['category'])
         return image, label
 
     def num_classes(self):
