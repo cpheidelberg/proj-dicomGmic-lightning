@@ -20,7 +20,6 @@ class GMIC(lightning.LightningModule):
         self.classifier = classifier.Classifier(parameters)
 
         self.feature_vectors = feature_vectors
-        self.class_weights = class_weights
 
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
@@ -43,13 +42,12 @@ class GMIC(lightning.LightningModule):
         self.train_f1 = metrics.BinaryF1Score()
         self.train_auc = metrics.BinaryAUROC()
 
-        # self.class_labels = np.zeros(len(parameters["class_labels"]))
+        if class_weights:
+            weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size']).to(parameters['parameters'])
+        else:
+            weight_tensor = None
 
-    def _loss(self, y_hat, y: torch.Tensor):
-        weight = None
-        if self.class_weights:
-            weight = torch.FloatTensor([[self.class_weights[c] for c in range(6)] for _ in range(len(y))]).to(y.device)
-        return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, reduction='sum', weight=weight)
+        self.criterion = torch.nn.BCELoss(weight=weight_tensor, reduction='sum')
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
@@ -86,9 +84,9 @@ class GMIC(lightning.LightningModule):
             h_crops = h_crops.cpu().numpy(force=True)
             self.feature_vectors.add(y_index, global_vec, h_crops)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_global = self.criterion(y_global, y)
+        loss_local = self.criterion(y_local, y)
 
         loss = loss_fusion + loss_global + loss_local
 
@@ -110,8 +108,8 @@ class GMIC(lightning.LightningModule):
     def _train_on_feature_vector(self, global_vec, h_crops, y):
         y_fusion, y_local = self.classifier(global_vec, h_crops)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_local = self.criterion(y_local, y)
 
         loss = loss_fusion + loss_local
 
@@ -150,9 +148,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_global = self.criterion(y_global, y)
+        loss_local = self.criterion(y_local, y)
 
         loss = loss_fusion + loss_global + loss_local
         
@@ -167,9 +165,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_global = self.criterion(y_global, y)
+        loss_local = self.criterion(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         # Log loss for each batch
