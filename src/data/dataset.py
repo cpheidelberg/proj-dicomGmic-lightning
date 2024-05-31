@@ -32,7 +32,6 @@ class ClassificationImages(Dataset):
         self.category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
 
         self.images = [image for image in images if image['category'] in self.category_names]
-        self.images.sort(key=lambda image: -category_dict[image['category']])
 
         category_sizes = [category_dict[name] for name in self.category_names]
         self.class_weights = [len(self.images) / (len(category_sizes) * size) for size in category_sizes]
