@@ -48,10 +48,8 @@ class GMIC(lightning.LightningModule):
     def _loss(self, y_hat, y):
         weight = None
         if self.class_weights:
-            y_index = np.argmax(y_hat.cpu().numpy(force=True), axis=1).tolist()
-            weight = torch.FloatTensor([self.class_weights[i] for i in y_index])
+            weight = torch.FloatTensor([[self.class_weights[c] for c in range(6)] for _ in range(len(y))])
             print('*' * 10000)
-            print(y_index)
             print(y)
             print(y_hat)
             print(weight)
