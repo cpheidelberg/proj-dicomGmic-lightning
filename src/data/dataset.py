@@ -37,13 +37,9 @@ class ClassificationImages(Dataset):
         self.images.sort(key=lambda image: -category_dict[image['category']])
 
     def __len__(self):
-        return len(self.category_sizes) * self.category_sizes[0]
+        return len(self.images)
 
-    def __getitem__(self, index: int):
-        category, scaled = divmod(index, self.category_sizes[0])
-        scaled = scaled * self.category_sizes[category] // self.category_sizes[0]
-        n = sum(self.category_sizes[:category]) + scaled
-
+    def __getitem__(self, n: int):
         return self.nth_image(n), self.nth_label(n)
 
     def nth_label(self, n: int):
@@ -60,6 +56,9 @@ class ClassificationImages(Dataset):
 
     def num_classes(self):
         return len(self.category_names)
+
+    def class_weight(self, class_index: int):
+        return len(self.images) / (self.num_classes() * self.category_sizes[class_index])
 
 
 class H5Dataset(Dataset):

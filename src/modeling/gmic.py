@@ -32,8 +32,6 @@ class GMIC(lightning.LightningModule):
 
             print(f"Use pretrained model from {checkpoint_path}")
 
-        self.criterion = torch.nn.BCELoss(reduction="sum")
-
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
@@ -45,6 +43,11 @@ class GMIC(lightning.LightningModule):
         self.train_auc = metrics.BinaryAUROC()
 
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
+
+    def _loss(self, y_hat, y):
+        y_index = np.argmax(y_hat.cpu().numpy(force=True), axis=1).tolist()
+        y_weight = [self.train_dataset.class_weight(i) for i in y_index]
+        return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, reduction='sum', weight=y_weight)
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
@@ -81,9 +84,9 @@ class GMIC(lightning.LightningModule):
             h_crops = h_crops.cpu().numpy(force=True)
             self.feature_vectors.add(y_index, global_vec, h_crops)
 
-        loss_fusion = self.criterion(y_fusion, y)
-        loss_global = self.criterion(y_global, y)
-        loss_local = self.criterion(y_local, y)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_global = self._loss(y_global, y)
+        loss_local = self._loss(y_local, y)
 
         loss = loss_fusion + loss_global + loss_local
 
@@ -105,8 +108,8 @@ class GMIC(lightning.LightningModule):
     def _train_on_feature_vector(self, global_vec, h_crops, y):
         y_fusion, y_local = self.classifier(global_vec, h_crops)
 
-        loss_fusion = self.criterion(y_fusion, y)
-        loss_local = self.criterion(y_local, y)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_local = self._loss(y_local, y)
 
         loss = loss_fusion + loss_local
 
@@ -145,9 +148,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self.criterion(y_fusion, y)
-        loss_global = self.criterion(y_global, y)
-        loss_local = self.criterion(y_local, y)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_global = self._loss(y_global, y)
+        loss_local = self._loss(y_local, y)
 
         loss = loss_fusion + loss_global + loss_local
         
@@ -162,9 +165,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self.criterion(y_fusion, y)
-        loss_global = self.criterion(y_global, y)
-        loss_local = self.criterion(y_local, y)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_global = self._loss(y_global, y)
+        loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         # Log loss for each batch
@@ -210,21 +213,21 @@ class GMIC(lightning.LightningModule):
                 ds = self.train_dataset
             else:
                 ds = self.feature_vectors
-            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=6, shuffle=True)
+            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=16, shuffle=True)
         return None
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return torchdata.DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=6, shuffle=False)
+            return torchdata.DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return torchdata.DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=6, shuffle=False)
+            return torchdata.DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
         return None
 
     def predict_dataloader(self):
