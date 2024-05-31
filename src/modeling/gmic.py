@@ -48,7 +48,7 @@ class GMIC(lightning.LightningModule):
     def _loss(self, y_hat, y):
         weight = None
         if self.class_weights:
-            y_index = np.argmax(y_hat.cpu().numpy(force=True), axis=1).tolist()
+            y_index = np.argmax(y_hat.cpu().numpy(force=True), axis=0).tolist()
             weight = torch.FloatTensor([self.class_weights[i] for i in y_index])
         return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, reduction='sum', weight=weight)
 
@@ -82,7 +82,7 @@ class GMIC(lightning.LightningModule):
         y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
         if self.feature_vectors is not None:
-            y_index = np.argmax(y.cpu().numpy(force=True), axis=1).tolist()
+            y_index = np.argmax(y.cpu().numpy(force=True), axis=0).tolist()
             global_vec = global_vec.cpu().numpy(force=True)
             h_crops = h_crops.cpu().numpy(force=True)
             self.feature_vectors.add(y_index, global_vec, h_crops)
