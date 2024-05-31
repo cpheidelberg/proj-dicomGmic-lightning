@@ -43,7 +43,8 @@ class GMIC(lightning.LightningModule):
         self.train_auc = metrics.BinaryAUROC()
 
         if class_weights:
-            weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size']).to(parameters['device_type'])
+            weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size'])
+            weight_tensor = weight_tensor.to('cuda' if parameters['device_type'] == 'gpu' else parameters['device_type'])
         else:
             weight_tensor = None
 
