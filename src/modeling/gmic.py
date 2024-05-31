@@ -43,7 +43,7 @@ class GMIC(lightning.LightningModule):
         self.train_auc = metrics.BinaryAUROC()
 
         if class_weights:
-            weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size']).to(parameters['device'])
+            weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size']).to(parameters['device_type'])
         else:
             weight_tensor = None
 
