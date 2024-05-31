@@ -29,12 +29,13 @@ class ClassificationImages(Dataset):
 
         category_set = {image['category'] for image in images}
         category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
-
         self.category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
-        self.category_sizes = [category_dict[name] for name in self.category_names]
 
         self.images = [image for image in images if image['category'] in self.category_names]
         self.images.sort(key=lambda image: -category_dict[image['category']])
+
+        category_sizes = [category_dict[name] for name in self.category_names]
+        self.class_weights = [len(self.images) / (len(category_sizes) * size) for size in category_sizes]
 
     def __len__(self):
         return len(self.images)
@@ -56,9 +57,6 @@ class ClassificationImages(Dataset):
 
     def num_classes(self):
         return len(self.category_names)
-
-    def class_weight(self, class_index: int):
-        return len(self.images) / (self.num_classes() * self.category_sizes[class_index])
 
 
 class H5Dataset(Dataset):

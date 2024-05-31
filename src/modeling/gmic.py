@@ -12,7 +12,7 @@ from src.scripts import predict
 
 class GMIC(lightning.LightningModule):
 
-    def __init__(self, parameters, feature_vectors=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
+    def __init__(self, parameters, feature_vectors=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None, class_weights=None):
         super(GMIC, self).__init__()
         self.save_hyperparameters(parameters)
 
@@ -20,6 +20,7 @@ class GMIC(lightning.LightningModule):
         self.classifier = classifier.Classifier(parameters)
 
         self.feature_vectors = feature_vectors
+        self.class_weights = class_weights
 
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
@@ -45,9 +46,11 @@ class GMIC(lightning.LightningModule):
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
     def _loss(self, y_hat, y):
-        y_index = np.argmax(y_hat.cpu().numpy(force=True), axis=1).tolist()
-        y_weight = [self.train_dataset.class_weight(i) for i in y_index]
-        return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, reduction='sum', weight=y_weight)
+        weight = None
+        if self.class_weights:
+            y_index = np.argmax(y_hat.cpu().numpy(force=True), axis=1).tolist()
+            weight = torch.FloatTensor([self.class_weights[i] for i in y_index])
+        return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, reduction='sum', weight=weight)
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
