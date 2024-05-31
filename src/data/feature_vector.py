@@ -33,12 +33,12 @@ def _to_bytes(array: np.ndarray) -> bytes:
     return pickle.dumps(array.tolist())
 
 def _to_array(array: bytes) -> np.ndarray:
-    return np.array(pickle.loads(array), dtype='float32')
+    return np.array(pickle.loads(array), dtype=np.float32)
 
 
 class Storage(torch.utils.data.Dataset):
-    def __init__(self, path: str, class_num: int):
-        self._class_num = class_num
+    def __init__(self, path: str, category_sizes: list[int]):
+        self._category_sizes = category_sizes
 
         self._path = path
         with sql.connect(self._path) as con:
@@ -73,9 +73,9 @@ class Storage(torch.utils.data.Dataset):
         with sql.connect(self._path) as con:
             con.execute('DELETE FROM synthetic')
 
-            for label in range(self._class_num):
-                if label > 0:
-                    self._synthesise_vectors(con.cursor(), label, n=2, k=5)
+            largest = max(self._category_sizes)
+            for category, size in enumerate(self._category_sizes):
+                self._synthesise_vectors(con.cursor(), category, largest // size, k=5)
 
             con.execute('DELETE FROM original')
 
@@ -83,8 +83,7 @@ class Storage(torch.utils.data.Dataset):
         with sql.connect(self._path) as con:
             cur = con.cursor()
             for label, gv, hc in zip(labels, global_vec, h_crops):
-                if label > 0:
-                    cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
+                cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
 
     def __len__(self):
         with sql.connect(self._path) as con:
@@ -95,6 +94,6 @@ class Storage(torch.utils.data.Dataset):
             label, vector = con.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (index,)).fetchone()
 
             x = self._unmarshall(vector)
-            y = np.zeros(self._class_num, dtype='float32')
+            y = np.zeros(len(self._category_sizes), dtype='float32')
             y[label] = 1
             return x, y

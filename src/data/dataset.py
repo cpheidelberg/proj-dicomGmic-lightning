@@ -29,33 +29,32 @@ class ClassificationImages(Dataset):
 
         category_set = {image['category'] for image in images}
         category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
+
         self.category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
+        self.category_sizes = [category_dict[name] for name in self.category_names]
 
         self.images = [image for image in images if image['category'] in self.category_names]
-
-        category_sizes = [category_dict[name] for name in self.category_names]
-        self.class_weights = [len(self.images) / (len(category_sizes) * size) for size in category_sizes]
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, n: int):
-        return self.nth_image(n), self.nth_label(n)
+        return self._nth_image(n), self._nth_label(n)
 
-    def nth_label(self, n: int):
+    def _nth_label(self, n: int):
         category = self.category_names.index(self.images[n]['category'])
-        encoding = np.zeros(len(self.category_names), dtype=np.float32)
-        encoding[category] = 1.0
-        return encoding
+        enc = np.zeros(len(self.category_names), dtype=np.float32)
+        enc[category] = 1.0
+        return enc
 
-    def nth_image(self, n: int):
+    def _nth_image(self, n: int):
         img = loading.load_image(self.images[n]['path'], self.images[n]['view'], horizontal_flip='NO')
         img = loading.process_image(img, self.images[n]['view'], self.images[n]['center'])
         img = np.expand_dims(img, 0)
         return torch.Tensor(img)
 
-    def num_classes(self):
-        return len(self.category_names)
+    def class_weights(self):
+        return [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
 
 
 class H5Dataset(Dataset):
