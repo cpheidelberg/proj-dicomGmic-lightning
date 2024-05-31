@@ -45,14 +45,10 @@ class GMIC(lightning.LightningModule):
 
         # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
-    def _loss(self, y_hat, y):
+    def _loss(self, y_hat, y: torch.Tensor):
         weight = None
         if self.class_weights:
-            weight = torch.FloatTensor([[self.class_weights[c] for c in range(6)] for _ in range(len(y))])
-            print('*' * 10000)
-            print(y)
-            print(y_hat)
-            print(weight)
+            weight = torch.FloatTensor([[self.class_weights[c] for c in range(6)] for _ in range(len(y))]).to(y.device)
         return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, reduction='sum', weight=weight)
 
 
