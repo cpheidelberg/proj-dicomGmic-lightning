@@ -45,9 +45,11 @@ class GMIC(lightning.LightningModule):
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
         self.weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size']).to(device)
 
+    def _uses_image_now(self):
+        return self.feature_vectors is None or self.current_epoch % 2 == 0
 
     def _loss(self, y_hat, y):
-        weight = self.weight_tensor[:len(y)]
+        weight = self.weight_tensor[:len(y)] if self._uses_image_now() else None
         return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, weight=weight, reduction='sum')
 
 
@@ -132,7 +134,7 @@ class GMIC(lightning.LightningModule):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         x, y = batch
 
-        if self.feature_vectors is None or self.current_epoch % 2 == 0:
+        if self._uses_image_now():
             return self._train_on_image(image=x, y=y)
         else:
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
@@ -210,7 +212,7 @@ class GMIC(lightning.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            if self.feature_vectors is None or self.current_epoch % 2 == 0:
+            if self._uses_image_now():
                 ds = self.train_dataset
             else:
                 ds = self.feature_vectors
