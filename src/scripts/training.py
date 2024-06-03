@@ -61,10 +61,10 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
+    classification_images = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
 
-    dataset_train, dataset_valid, dataset_test = random_split(data, [0.8, 0.1, 0.1])
-    feature_vectors = feature_vector.Storage(feature_vectors_path, data.category_sizes)
+    dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
+    feature_vectors = feature_vector.Storage(feature_vectors_path, classification_images.category_sizes)
 
     # Training
     model = gmic.GMIC(
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         dataset_valid=dataset_valid,
         dataset_test=dataset_test,
         model_path=model_path,
-        image_class_weights=data.class_weights
+        image_class_weights=classification_images.class_weights
     )
 
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
@@ -86,8 +86,7 @@ if __name__ == "__main__":
         # num_sanity_val_steps=0,
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
-        accelerator=device, 
-        # devices=[parameters["gpu_number"]],
+        accelerator=device,
         devices=[0],
         logger=logger,
         # profiler="simple",
