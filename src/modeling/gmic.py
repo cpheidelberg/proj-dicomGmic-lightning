@@ -43,7 +43,7 @@ class GMIC(lightning.LightningModule):
         self.train_auc = metrics.BinaryAUROC()
 
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
-        self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size'], device=device)
+        self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size']).to(device)
         self.feature_weights = self.image_weights
 
     def _uses_image_now(self):
@@ -55,7 +55,7 @@ class GMIC(lightning.LightningModule):
 
             device = self.image_weights.device
             length = len(self.image_weights)
-            self.feature_weights = torch.FloatTensor([self.feature_vectors.class_weights] * length, device=device)
+            self.feature_weights = torch.FloatTensor([self.feature_vectors.class_weights] * length).to(device)
 
     def _fv_loss(self, y_hat, y):
         return torch.nn.functional.binary_cross_entropy(y_hat, y, self.feature_weights[:len(y)], reduction='sum')
