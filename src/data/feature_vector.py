@@ -79,12 +79,12 @@ class Storage(torch.utils.data.Dataset):
 
             for category, size in enumerate(self._category_sizes):
                 if size < largest:
-                    multiple = min(50, largest // size)
+                    multiple = min(7, largest // size)
                     self._synthesise_vectors(cur, category, multiple, k=5)
                     synthetic_sizes.append(multiple * size)
                 else:
                     cur.execute('INSERT INTO synthetic SELECT * FROM original WHERE label = ?', (category, ))
-                    synthetic_sizes.append(largest)
+                    synthetic_sizes.append(size)
 
             cur.execute('DELETE FROM original')
 

@@ -164,7 +164,6 @@ class GMIC(lightning.LightningModule):
         loss = loss_fusion + loss_global + loss_local
         
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
-
         return loss
 
 
@@ -179,9 +178,7 @@ class GMIC(lightning.LightningModule):
         loss_local = self._img_loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        # Log loss for each batch
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)
-
         return loss
     
     
@@ -218,10 +215,7 @@ class GMIC(lightning.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
-            if self._uses_image_now():
-                ds = self.train_dataset
-            else:
-                ds = self.feature_vectors
+            ds = self.train_dataset if self._uses_image_now() else self.feature_vectors
             return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=16, shuffle=True)
         return None
 
