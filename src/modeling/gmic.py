@@ -216,7 +216,7 @@ class GMIC(lightning.LightningModule):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
             ds = self.train_dataset if self._uses_image_now() else self.feature_vectors
-            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
         return None
 
 
