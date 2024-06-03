@@ -32,8 +32,8 @@ def flip_image(image, view, horizontal_flip):
         return np.fliplr(image)
     elif horizontal_flip == 'YES' and VIEWS.is_left(view):
         return np.fliplr(image)
-
-    return image
+    else:
+        return image
 
 
 def standard_normalize_single_image(image):
@@ -46,10 +46,6 @@ def standard_normalize_single_image(image):
 
 def read_image_png(file_name):
     return np.array(imageio.imread(file_name), dtype=np.float32)
-
-
-def write_image_png(file_name, image):
-    imageio.imwrite(file_name, image)
 
 
 def load_image(image_path, view, horizontal_flip):
@@ -83,8 +79,3 @@ def process_image(image, view, best_center):
     standard_normalize_single_image(cropped_image)
 
     return cropped_image
-
-
-
-
-

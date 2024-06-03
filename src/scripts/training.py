@@ -2,8 +2,8 @@ import os, sys, time
 
 import torch
 from torch.utils.data import random_split
-import lightning.pytorch as pl
-from lightning.pytorch.callbacks import EarlyStopping
+import lightning
+from lightning.pytorch import callbacks, loggers
 
 # import own files
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -77,10 +77,10 @@ if __name__ == "__main__":
         image_class_weights=classification_images.class_weights
     )
 
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
-    early_stop_callback = EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
+    logger = loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
+    early_stop_callback = callbacks.EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
 
-    training = pl.Trainer(
+    training = lightning.Trainer(
         fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
         # limit_val_batches=0,
         # num_sanity_val_steps=0,
