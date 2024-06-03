@@ -74,7 +74,7 @@ if __name__ == "__main__":
         dataset_valid=dataset_valid,
         dataset_test=dataset_test,
         model_path=model_path,
-        class_weights=data.class_weights
+        image_class_weights=data.class_weights
     )
 
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)

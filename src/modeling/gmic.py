@@ -12,7 +12,7 @@ from src.scripts import predict
 
 class GMIC(lightning.LightningModule):
 
-    def __init__(self, parameters, class_weights, feature_vectors=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
+    def __init__(self, parameters, image_class_weights, feature_vectors=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
         super(GMIC, self).__init__()
         self.save_hyperparameters(parameters)
 
@@ -43,14 +43,25 @@ class GMIC(lightning.LightningModule):
         self.train_auc = metrics.BinaryAUROC()
 
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
-        self.weight_tensor = torch.FloatTensor([class_weights] * parameters['batch_size']).to(device)
+        self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size'], device=device)
+        self.feature_weights = self.image_weights
 
     def _uses_image_now(self):
         return self.feature_vectors is None or self.current_epoch % 2 == 0
 
-    def _loss(self, y_hat, y):
-        weight = self.weight_tensor[:len(y)] if self._uses_image_now() else None
-        return torch.nn.functional.binary_cross_entropy(input=y_hat, target=y, weight=weight, reduction='sum')
+    def on_train_epoch_end(self):
+        if self.feature_vectors is not None and self.current_epoch % 2 == 0:
+            self.feature_vectors.reset()
+
+            device = self.image_weights.device
+            length = len(self.image_weights)
+            self.feature_weights = torch.FloatTensor([self.feature_vectors.class_weights] * length, device=device)
+
+    def _fv_loss(self, y_hat, y):
+        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.feature_weights[:len(y)], reduction='sum')
+
+    def _img_loss(self, y_hat, y):
+        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.image_weights[:len(y)], reduction='sum')
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
@@ -87,9 +98,9 @@ class GMIC(lightning.LightningModule):
             h_crops = h_crops.cpu().numpy(force=True)
             self.feature_vectors.add(y_index, global_vec, h_crops)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self._img_loss(y_fusion, y)
+        loss_global = self._img_loss(y_global, y)
+        loss_local = self._img_loss(y_local, y)
 
         loss = loss_fusion + loss_global + loss_local
 
@@ -111,8 +122,8 @@ class GMIC(lightning.LightningModule):
     def _train_on_feature_vector(self, global_vec, h_crops, y):
         y_fusion, y_local = self.classifier(global_vec, h_crops)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self._fv_loss(y_fusion, y)
+        loss_local = self._fv_loss(y_local, y)
 
         loss = loss_fusion + loss_local
 
@@ -140,20 +151,15 @@ class GMIC(lightning.LightningModule):
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
 
 
-    def on_train_epoch_end(self):
-        if self.feature_vectors is not None and self.current_epoch % 2 == 0:
-            self.feature_vectors.reset()
-
-
     def validation_step(self, batch, batch_idx):
         """Implementation of PyTorch validation loop in Lightning called for each batch"""
         img, y = batch
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self._img_loss(y_fusion, y)
+        loss_global = self._img_loss(y_global, y)
+        loss_local = self._img_loss(y_local, y)
 
         loss = loss_fusion + loss_global + loss_local
         
@@ -168,9 +174,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self._img_loss(y_fusion, y)
+        loss_global = self._img_loss(y_global, y)
+        loss_local = self._img_loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         # Log loss for each batch

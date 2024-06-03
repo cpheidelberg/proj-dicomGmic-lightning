@@ -39,6 +39,7 @@ def _to_array(array: bytes) -> np.ndarray:
 class Storage(torch.utils.data.Dataset):
     def __init__(self, path: str, category_sizes: list[int]):
         self._category_sizes = category_sizes
+        self.class_weights = [1] * len(category_sizes)
 
         self._path = path
         with sql.connect(self._path) as con:
@@ -56,9 +57,8 @@ class Storage(torch.utils.data.Dataset):
 
     def _synthesise_vectors(self, cur: sql.Cursor, label: int, n: int, k: int):
         vectors = self._get_original_vectors(cur, label)
-        if len(vectors) > k + 1:
-            for vec in SMOTE(vectors).generate(n, k):
-                cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _to_bytes(vec)))
+        for vec in SMOTE(vectors).generate(n, k):
+            cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _to_bytes(vec)))
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
         return _to_bytes(np.concatenate((global_vec.flatten(), h_crops.flatten())))
@@ -71,13 +71,25 @@ class Storage(torch.utils.data.Dataset):
 
     def reset(self):
         with sql.connect(self._path) as con:
-            con.execute('DELETE FROM synthetic')
+            cur = con.cursor()
+            cur.execute('DELETE FROM synthetic')
 
             largest = max(self._category_sizes)
-            for category, size in enumerate(self._category_sizes):
-                self._synthesise_vectors(con.cursor(), category, largest // size, k=5)
+            synthetic_sizes = []
 
-            con.execute('DELETE FROM original')
+            for category, size in enumerate(self._category_sizes):
+                if size < largest:
+                    multiple = min(50, largest // size)
+                    self._synthesise_vectors(cur, category, multiple, k=5)
+                    synthetic_sizes.append(multiple * size)
+                else:
+                    cur.execute('INSERT INTO synthetic SELECT FROM original WHERE label = ?', (category, ))
+                    synthetic_sizes.append(largest)
+
+            cur.execute('DELETE FROM original')
+
+        total_size = sum(synthetic_sizes)
+        self.class_weights = [total_size / (len(synthetic_sizes) * size) for size in synthetic_sizes]
 
     def add(self, labels, global_vec, h_crops):
         with sql.connect(self._path) as con:
