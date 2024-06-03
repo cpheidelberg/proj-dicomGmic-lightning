@@ -31,9 +31,8 @@ if __name__ == "__main__":
     data_path = '/home/ubuntu/data/output'
     feature_vectors_path = os.path.join(data_path, 'feature_vectors.sql')
     image_dir = os.path.join(data_path, 'cropped_images')
-    pp_image_dir = os.path.join(data_path, 'preprocessed_images')
     dict_path = os.path.join(data_path, 'dictionary.csv')
-    segmentation_path = os.path.join(data_path, 'output/segmentation')
+    segmentation_path = os.path.join(data_path, 'segmentation')
 
     # set hyperparameters
     parameters = {

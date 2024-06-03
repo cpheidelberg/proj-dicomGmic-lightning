@@ -43,21 +43,23 @@ class ClassificationImage:
 class ClassificationImages(Dataset):
     def __init__(self, image_dir: str, dict_path: str, top_c: int):
         tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
+
         images = [ClassificationImage.load(image_dir, line) for line in tab.iloc]
 
-        categories = {image.category for image in images}
-        sizes = {name: sum(image.category == name for image in images) for name in categories}
+        category_set = {image.category for image in images}
+        category_dict = {category: sum(image.category == category for image in images) for category in category_set}
 
-        self.categories = sorted(categories, key=lambda name: -sizes[name])[:top_c]
-        self.images = [image for image in images if image.category in self.categories]
+        self.category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
+        self.category_sizes = [category_dict[name] for name in self.category_names]
 
-        self.class_weights = [len(self.images) / (len(self.categories) * sizes[name]) for name in self.categories]
+        self.images = [image for image in images if image.category in self.category_names]
+        self.class_weights = [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, i: int):
-        return self.images[i].tensor(), self.images[i].encoding(self.categories)
+        return self.images[i].tensor(), self.images[i].encoding(self.category_names)
 
 
 class H5Dataset(Dataset):
