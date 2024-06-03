@@ -83,7 +83,7 @@ class Storage(torch.utils.data.Dataset):
                     self._synthesise_vectors(cur, category, multiple, k=5)
                     synthetic_sizes.append(multiple * size)
                 else:
-                    cur.execute('INSERT INTO synthetic SELECT FROM original WHERE label = ?', (category, ))
+                    cur.execute('INSERT INTO synthetic SELECT * FROM original WHERE label = ?', (category, ))
                     synthetic_sizes.append(largest)
 
             cur.execute('DELETE FROM original')
