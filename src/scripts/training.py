@@ -39,7 +39,7 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 15,
+        "epochs": 31,
         "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,

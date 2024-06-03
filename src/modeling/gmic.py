@@ -126,18 +126,6 @@ class GMIC(lightning.LightningModule):
         loss_local = self._fv_loss(y_local, y)
 
         loss = loss_fusion + loss_local
-
-        self.train_acc(y_fusion, y)
-        self.train_f1(y_fusion, y)
-        self.train_auc(y_fusion, y)
-
-        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
-        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
-        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
-        self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
-        self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
-        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
         return loss
 
 
