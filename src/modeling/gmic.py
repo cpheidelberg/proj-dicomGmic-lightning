@@ -3,9 +3,8 @@ import os
 
 import torch
 import lightning
-from torch.utils.data import DataLoader
-from torchmetrics.classification import Accuracy, BinaryAUROC, BinaryF1Score
-from torchmetrics.metric import Metric
+import torch.utils.data as torchdata
+import torchmetrics.classification as metrics
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
@@ -38,9 +37,10 @@ class GMIC(lightning.LightningModule):
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
 
-        self.metrics: dict[str, Metric] = {}
-        for phase in ['train', 'val', 'test']:
-            self.metrics[phase] = [('acc', Accuracy(task="binary", num_classes=self.hparams.num_classes)), ('f1', BinaryF1Score()), ('auc', BinaryAUROC())]
+        # metrics
+        self.train_acc = metrics.Accuracy(task="binary", num_classes=self.hparams.num_classes)
+        self.train_f1 = metrics.BinaryF1Score()
+        self.train_auc = metrics.BinaryAUROC()
 
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
         self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size']).to(device)
@@ -89,12 +89,6 @@ class GMIC(lightning.LightningModule):
         return y_fusion, y_global, y_local, global_vec, h_crops
 
 
-    def _record_metrics(self, phase, y_fusion, y):
-        for name, metric in self.metrics['train']:
-            metric(y_fusion, y)
-            self.log(f"{phase}_{name}", metric, on_step=False, on_epoch=True)
-
-
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
         y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
@@ -107,10 +101,16 @@ class GMIC(lightning.LightningModule):
         loss_fusion = self._img_loss(y_fusion, y)
         loss_global = self._img_loss(y_global, y)
         loss_local = self._img_loss(y_local, y)
+
         loss = loss_fusion + loss_global + loss_local
 
-        self._record_metrics('train', y_fusion, y)
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.train_auc(y_fusion, y)
 
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
+        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
@@ -124,10 +124,16 @@ class GMIC(lightning.LightningModule):
 
         loss_fusion = self._fv_loss(y_fusion, y)
         loss_local = self._fv_loss(y_local, y)
+
         loss = loss_fusion + loss_local
 
-        self._record_metrics('train', y_fusion, y)
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.train_auc(y_fusion, y)
 
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
+        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
@@ -154,10 +160,9 @@ class GMIC(lightning.LightningModule):
         loss_fusion = self._img_loss(y_fusion, y)
         loss_global = self._img_loss(y_global, y)
         loss_local = self._img_loss(y_local, y)
+
         loss = loss_fusion + loss_global + loss_local
         
-        self._record_metrics('val', y_fusion, y)
-
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
         return loss
 
@@ -172,8 +177,6 @@ class GMIC(lightning.LightningModule):
         loss_global = self._img_loss(y_global, y)
         loss_local = self._img_loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
-
-        self._record_metrics('test', y_fusion, y)
 
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)
         return loss
@@ -213,25 +216,25 @@ class GMIC(lightning.LightningModule):
         """Create DataLoader for Training out of given DataSet"""
         if self.train_dataset:
             ds = self.train_dataset if self._uses_image_now() else self.feature_vectors
-            return DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
+            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
         return None
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+            return torchdata.DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+            return torchdata.DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
         return None
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.predict_dataset:
-            return DataLoader(self.predict_dataset, batch_size=1, num_workers=6, shuffle=False)
+            return torchdata.DataLoader(self.predict_dataset, batch_size=1, num_workers=6, shuffle=False)
         return None
