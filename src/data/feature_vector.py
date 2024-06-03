@@ -51,7 +51,7 @@ class Storage(torch.utils.data.Dataset):
 
     def _get_original_vectors(self, cur: sql.Cursor, label: int):
         vectors = []
-        for vector, in cur.execute('SELECT vector FROM original WHERE label = ?', (label,)):
+        for vector, in cur.execute('SELECT vector FROM original WHERE label = ? ORDER BY RANDOM()', (label,)):
             vectors.append(_to_array(vector))
         return np.array(vectors)
 

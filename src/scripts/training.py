@@ -90,7 +90,7 @@ if __name__ == "__main__":
         # devices=[parameters["gpu_number"]],
         devices=[0],
         logger=logger,
-        profiler="simple",
+        # profiler="simple",
         # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
         reload_dataloaders_every_n_epochs=1
