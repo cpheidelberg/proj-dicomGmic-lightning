@@ -5,6 +5,7 @@ import torch
 import lightning
 from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy, BinaryAUROC, BinaryF1Score
+from torchmetrics.metric import Metric
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
@@ -37,8 +38,9 @@ class GMIC(lightning.LightningModule):
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
 
-        metrics = {'acc': Accuracy(task="binary", num_classes=self.hparams.num_classes), 'f1': BinaryF1Score(), 'auc': BinaryAUROC()}
-        self.metrics = {key: [(name, metric.clone()) for name, metric in metrics.items()] for key in ['train', 'val', 'test']}
+        self.metrics: dict[str, Metric] = {}
+        for phase in ['train', 'val', 'test']:
+            self.metrics[phase] = [('acc', Accuracy(task="binary", num_classes=self.hparams.num_classes)), ('f1', BinaryF1Score()), ('auc', BinaryAUROC())]
 
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
         self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size']).to(device)
