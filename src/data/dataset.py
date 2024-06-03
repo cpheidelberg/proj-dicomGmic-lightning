@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import os, ast, h5py, time, sys
+import os, ast, h5py, time, sys, dataclasses
 from tqdm import tqdm
 import multiprocessing
 
@@ -13,48 +13,51 @@ sys.path.append(parent_dir)
 from src.data import loading
 
 
+@dataclasses.dataclass(frozen=True)
+class ClassificationImage:
+    path: str
+    view: str
+    category: str
+    center: tuple[int, int]
+
+    @staticmethod
+    def load(image_dir: str, line: pd.Series):
+        path = f"{os.path.join(image_dir, line['image'])}.png"
+        view = line['view']
+        category = line['finding_categories'][0] if len(line['finding_categories']) == 1 else path
+        center = line['best_center'][view][0]
+        return ClassificationImage(path, view, category, center)
+
+    def tensor(self):
+        img = loading.load_image(self.path, self.view, horizontal_flip='NO')
+        img = loading.process_image(img, self.view, self.center)
+        img = np.expand_dims(img, 0)
+        return torch.Tensor(img)
+
+    def encoding(self, categories: list[str]):
+        enc = np.zeros(len(categories), dtype=np.float32)
+        enc[categories.index(self.category)] = 1.0
+        return enc
+
+
 class ClassificationImages(Dataset):
     def __init__(self, image_dir: str, dict_path: str, top_c: int):
         tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
+        images = [ClassificationImage.load(image_dir, line) for line in tab.iloc]
 
-        images = []
-        for i in range(len(tab)):
-            if len(tab.loc[i, 'finding_categories']) == 1:
-                images.append({
-                    'path': f"{os.path.join(image_dir, tab.loc[i, 'image'])}.png",
-                    'view': tab.loc[i, 'view'],
-                    'category': tab.loc[i, 'finding_categories'][0],
-                    'center': tab.loc[i, 'best_center'][tab.loc[i, 'view']][0]
-                })
+        categories = {image.category for image in images}
+        sizes = {name: sum(image.category == name for image in images) for name in categories}
 
-        category_set = {image['category'] for image in images}
-        category_dict = {category: sum(image['category'] == category for image in images) for category in category_set}
+        self.categories = sorted(categories, key=lambda name: -sizes[name])[:top_c]
+        self.images = [image for image in images if image.category in self.categories]
 
-        self.category_names = sorted(category_set, key=lambda name: -category_dict[name])[:top_c]
-        self.category_sizes = [category_dict[name] for name in self.category_names]
-
-        self.images = [image for image in images if image['category'] in self.category_names]
+        self.class_weights = [len(self.images) / (len(self.categories) * sizes[name]) for name in self.categories]
 
     def __len__(self):
         return len(self.images)
 
-    def __getitem__(self, n: int):
-        return self._nth_image(n), self._nth_label(n)
-
-    def _nth_label(self, n: int):
-        category = self.category_names.index(self.images[n]['category'])
-        enc = np.zeros(len(self.category_names), dtype=np.float32)
-        enc[category] = 1.0
-        return enc
-
-    def _nth_image(self, n: int):
-        img = loading.load_image(self.images[n]['path'], self.images[n]['view'], horizontal_flip='NO')
-        img = loading.process_image(img, self.images[n]['view'], self.images[n]['center'])
-        img = np.expand_dims(img, 0)
-        return torch.Tensor(img)
-
-    def class_weights(self):
-        return [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
+    def __getitem__(self, i: int):
+        return self.images[i].tensor(), self.images[i].encoding(self.categories)
 
 
 class H5Dataset(Dataset):
