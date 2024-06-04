@@ -24,25 +24,24 @@ class GMIC(lightning.LightningModule):
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
             if "model_idx" in parameters: # use a pretrained model
-                checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
-            elif model_path: # use a self trained model
-                checkpoint_path = os.path.join(model_path)
+                model_path = os.path.join(model_path, f"sample_model_{parameters['model_idx']}.p")
 
-            self.init_pretrained_weights(torch.load(checkpoint_path))
-
-            print(f"Use pretrained model from {checkpoint_path}")
+            self.init_pretrained_weights(torch.load(model_path))
+            print(f"Use pretrained model from {model_path}")
 
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
 
-        # metrics
-        self.train_acc = metrics.Accuracy(task='binary', num_classes=self.hparams.num_classes)
-        self.train_f1 = metrics.F1Score(task='binary', num_classes=self.hparams.num_classes)
-        self.train_auc = metrics.AUROC(task='binary', num_classes=self.hparams.num_classes)
+        self.train_acc = metrics.MulticlassAccuracy(self.hparams.num_classes)
+        self.train_f1 = metrics.MulticlassF1Score(self.hparams.num_classes)
+        self.train_auc = metrics.MulticlassAUROC(self.hparams.num_classes)
 
+        # Get name of the device to Tensor's method .to(device)
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
+
+        # Repeat the same weights for all items of the batch
         self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size']).to(device)
         self.feature_weights = self.image_weights
 
