@@ -34,9 +34,9 @@ class GMIC(lightning.LightningModule):
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
 
-        self.train_acc = metrics.MulticlassAccuracy(self.hparams.num_classes)
-        self.train_f1 = metrics.MulticlassF1Score(self.hparams.num_classes)
-        self.train_auc = metrics.MulticlassAUROC(self.hparams.num_classes)
+        self.train_acc = metrics.Accuracy(task='binary', num_classes=self.hparams.num_classes)
+        self.train_f1 = metrics.F1Score(task='binary', num_classes=self.hparams.num_classes)
+        self.train_auc = metrics.AUROC(task='binary', num_classes=self.hparams.num_classes)
 
         # Get name of the device to Tensor's method .to(device)
         device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
