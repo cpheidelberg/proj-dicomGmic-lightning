@@ -39,7 +39,7 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 31,
+        "epochs": 8,
         "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # Training
     model = gmic.GMIC(
         parameters=parameters,
-        feature_vectors=feature_vectors,
+        # feature_vectors=feature_vectors,
         dataset_train=dataset_train,
         dataset_valid=dataset_valid,
         dataset_test=dataset_test,
