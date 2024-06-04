@@ -18,8 +18,8 @@
 # ==============================================================================
 
 import torch
-import src.modeling.modules as m
-import src.utilities.tools as croptools
+from src.modeling import modules
+from src.utilities import tools
 
 
 class CNN(torch.nn.Module):
@@ -29,15 +29,15 @@ class CNN(torch.nn.Module):
         self._cam_size = parameters["cam_size"]
         self._crop_shape = parameters["crop_shape"]
 
-        self.global_network = m.GlobalNetwork(parameters)
+        self.global_network = modules.GlobalNetwork(parameters)
         self.downsampling_branch = self.global_network.downsampling_branch
         self.postprocess_module = self.global_network.postprocess_module
 
-        self.aggregation_function = m.TopTPercentAggregationFunction(parameters["percent_t"])
-        self.retrieve_roi_module = m.RetrieveROIModule(parameters)
+        self.aggregation_function = modules.TopTPercentAggregationFunction(parameters["percent_t"])
+        self.retrieve_roi_module = modules.RetrieveROIModule(parameters)
 
         # detection network
-        self.local_network = m.LocalNetwork()
+        self.local_network = modules.LocalNetwork()
         self.dn_resnet = self.local_network.dn_resnet
 
 
@@ -56,10 +56,10 @@ class CNN(torch.nn.Module):
         small_x_locations = self.retrieve_roi_module.forward(x_original, self._cam_size, self.saliency_map)
 
         # convert crop locations that is on self.cam_size to x_original
-        self.patch_locations = croptools.scale_crops(small_x_locations, self._cam_size, x_original.size()[-2:])
+        self.patch_locations = tools.scale_crops(small_x_locations, self._cam_size, x_original.size()[-2:])
 
         # patch retriever
-        crops_variable = croptools.retrieve_crops(x_original, self.patch_locations, self._crop_shape, self.retrieve_roi_module.crop_method)
+        crops_variable = tools.retrieve_crops(x_original, self.patch_locations, self._crop_shape, self.retrieve_roi_module.crop_method)
         self.patches = crops_variable.data.cpu().numpy()
 
         # detection network
