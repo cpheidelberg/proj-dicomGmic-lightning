@@ -28,17 +28,15 @@ class CNN(torch.nn.Module):
 
         self._cam_size = parameters["cam_size"]
         self._crop_shape = parameters["crop_shape"]
+        self._percent_t = parameters["percent_t"]
 
         self.global_network = modules.GlobalNetwork(parameters)
         self.downsampling_branch = self.global_network.downsampling_branch
         self.postprocess_module = self.global_network.postprocess_module
 
-        self.aggregation_function = modules.TopTPercentAggregationFunction(parameters["percent_t"])
         self.retrieve_roi_module = modules.RetrieveROIModule(parameters)
 
-        # detection network
-        self.local_network = modules.LocalNetwork()
-        self.dn_resnet = self.local_network.dn_resnet
+        self.detection_network = modules.ResNetV1(64, modules.BasicBlockV1, [2,2,2,2], 3)
 
 
     def forward(self, x_original):
@@ -50,7 +48,7 @@ class CNN(torch.nn.Module):
 
         # calculate y_global
         # note that y_global is not directly used in inference
-        self.y_global = self.aggregation_function.forward(self.saliency_map)
+        self.y_global = modules.top_t_percent(self.saliency_map, self._percent_t)
 
         # region proposal network
         small_x_locations = self.retrieve_roi_module.forward(x_original, self._cam_size, self.saliency_map)
@@ -64,8 +62,8 @@ class CNN(torch.nn.Module):
 
         # detection network
         batch_size, num_crops, I, J = crops_variable.size()
-        crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
-        h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
+        crops_var = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1).expand(-1, 3, -1 , -1)
+        h_crops = self.detection_network.forward(crops_var).mean(dim=2).mean(dim=2).view(batch_size, num_crops, -1)
 
         # use max pooling to collapse the feature map
         g1, _ = torch.max(h_g, dim=2)

@@ -286,21 +286,12 @@ class GlobalNetwork(nn.Module):
         return last_feature_map, cam
 
 
-
-class TopTPercentAggregationFunction:
-    """
-    An aggregator that uses the SM to compute the y_global.
-    Use the sum of topK value
-    """
-    def __init__(self, percent_t: float):
-        self.percent_t = percent_t
-
-    def forward(self, cam):
-        batch_size, num_class, H, W = cam.size()
-        cam_flatten = cam.view(batch_size, num_class, -1)
-        top_t = int(round(W*H*self.percent_t))
-        selected_area = cam_flatten.topk(top_t, dim=2)[0]
-        return selected_area.mean(dim=2)
+def top_t_percent(cam, percent_t: float):
+    batch_size, num_class, H, W = cam.size()
+    cam_flatten = cam.view(batch_size, num_class, -1)
+    top_t = int(round(W*H*percent_t))
+    selected_area = cam_flatten.topk(top_t, dim=2)[0]
+    return selected_area.mean(dim=2)
 
 
 class RetrieveROIModule:
@@ -352,24 +343,5 @@ class RetrieveROIModule:
             all_max_position.append(max_pos)
             mask = tools.generate_mask_uplft(current_images, crop_shape_adjusted, max_pos, self.gpu_number)
             current_images = current_images * mask
+
         return torch.cat(all_max_position, dim=1).data.cpu().numpy()
-
-
-class LocalNetwork:
-    """
-    The local network that takes a crop and computes its hidden representation
-    Use ResNet
-    """
-    def __init__(self):
-        self.dn_resnet = ResNetV1(64, BasicBlockV1, [2,2,2,2], 3)
-
-    def forward(self, x_crop):
-        """
-        Function that takes in a single crop and return the hidden representation
-        :param x_crop: (N,C,h,w)
-        :return:
-        """
-        # forward propagte using ResNet
-        res = self.dn_resnet(x_crop.expand(-1, 3, -1 , -1))
-        # global average pooling
-        return res.mean(dim=2).mean(dim=2)
