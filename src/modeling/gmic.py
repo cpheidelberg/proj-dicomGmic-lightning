@@ -87,7 +87,6 @@ class GMIC(lightning.LightningModule):
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
         y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
-
         if self.feature_vectors is not None:
             y_index = y.argmax(dim=1).cpu().numpy(force=True).tolist()
             global_vec = global_vec.cpu().numpy(force=True)
@@ -100,11 +99,10 @@ class GMIC(lightning.LightningModule):
         loss = loss_fusion + loss_global + loss_local
 
         argmax_y = y.argmax(dim=1)
-        argmax_y_fusion = y_fusion.argmax(dim=1)
 
-        self.train_acc(argmax_y_fusion, argmax_y)
-        self.train_f1(argmax_y_fusion, argmax_y)
-        self.train_auc(argmax_y_fusion, argmax_y)
+        self.train_acc(y_fusion, argmax_y)
+        self.train_f1(y_fusion, argmax_y)
+        self.train_auc(y_fusion, argmax_y)
 
         self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
         self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
