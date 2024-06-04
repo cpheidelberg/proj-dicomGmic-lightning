@@ -23,7 +23,6 @@ Defines modules for breast cancer classification models.
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 
 from src.utilities import tools
@@ -374,41 +373,3 @@ class LocalNetwork:
         res = self.dn_resnet(x_crop.expand(-1, 3, -1 , -1))
         # global average pooling
         return res.mean(dim=2).mean(dim=2)
-
-
-class AttentionModule:
-    """
-    The attention module takes multiple hidden representations and compute the attention-weighted average
-    Use Gated Attention Mechanism in https://arxiv.org/pdf/1802.04712.pdf
-    """
-    def __init__(self, num_classes: int):
-        self.mil_attn_V = nn.Linear(512, 128, bias=False)
-        self.mil_attn_U = nn.Linear(512, 128, bias=False)
-        self.mil_attn_w = nn.Linear(128, 1, bias=False)
-        # classifier
-        self.classifier_linear = nn.Linear(512, num_classes, bias=False)
-
-
-    def forward(self, h_crops):
-        """
-        Function that takes in the hidden representations of crops and use attention to generate a single hidden vector
-        :param h_small:
-        :param h_crops:
-        :return:
-        """
-        batch_size, num_crops, h_dim = h_crops.size()
-        h_crops_reshape = h_crops.view(batch_size * num_crops, h_dim)
-        # calculate the attn score
-        attn_projection = torch.sigmoid(self.mil_attn_U(h_crops_reshape)) * \
-                          torch.tanh(self.mil_attn_V(h_crops_reshape))
-        attn_score = self.mil_attn_w(attn_projection)
-        # use softmax to map score to attention
-        attn_score_reshape = attn_score.view(batch_size, num_crops)
-        attn = F.softmax(attn_score_reshape, dim=1)
-
-        # final hidden vector
-        z_weighted_avg = torch.sum(attn.unsqueeze(-1) * h_crops, 1)
-
-        # map to the final layer
-        y_crops = torch.sigmoid(self.classifier_linear(z_weighted_avg))
-        return z_weighted_avg, attn, y_crops

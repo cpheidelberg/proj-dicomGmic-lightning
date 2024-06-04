@@ -18,30 +18,51 @@
 # ==============================================================================
 
 import torch
-import src.modeling.modules as m
-
 
 class Classifier(torch.nn.Module):
+    """
+    The attention module takes multiple hidden representations and compute the attention-weighted average
+    Use Gated Attention Mechanism in https://arxiv.org/pdf/1802.04712.pdf
+    """
     def __init__(self, parameters):
         super(Classifier, self).__init__()
 
         # MIL module
-        self.attention_module = m.AttentionModule(parameters["num_classes"])
-        self.mil_attn_V = self.attention_module.mil_attn_V
-        self.mil_attn_U = self.attention_module.mil_attn_U
-        self.mil_attn_w = self.attention_module.mil_attn_w
+        self.mil_attn_V = torch.nn.Linear(512, 128, bias=False)
+        self.mil_attn_U = torch.nn.Linear(512, 128, bias=False)
+        self.mil_attn_w = torch.nn.Linear(128, 1, bias=False)
 
         # classifier
-        self.classifier_linear = self.attention_module.classifier_linear
+        self.classifier_linear = torch.nn.Linear(512, parameters["num_classes"], bias=False)
 
         # fusion branch
         self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"] + 512, parameters["num_classes"])
 
 
     def forward(self, global_vec, h_crops):
+        """
+        Function that takes in the hidden representations of crops and use attention to generate a single hidden vector
+        :param h_small:
+        :param h_crops:
+        :return:
+        """
         # MIL module
-        # y_local is not directly used during inference
-        z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
+        batch_size, num_crops, h_dim = h_crops.size()
+        h_crops_reshape = h_crops.view(batch_size * num_crops, h_dim)
+
+        # calculate the attn score
+        attn_projection = torch.sigmoid(self.mil_attn_U(h_crops_reshape)) * torch.tanh(self.mil_attn_V(h_crops_reshape))
+        attn_score = self.mil_attn_w(attn_projection)
+
+        # use softmax to map score to attention
+        attn_score_reshape = attn_score.view(batch_size, num_crops)
+        self.patch_attns = torch.nn.functional.softmax(attn_score_reshape, dim=1)
+
+        # final hidden vector
+        z = torch.sum(self.patch_attns.unsqueeze(-1) * h_crops, 1)
+
+        # map to the final layer
+        self.y_local = torch.sigmoid(self.classifier_linear(z))
 
         # fusion branch
         concat_vec = torch.cat([global_vec, z], dim=1)
