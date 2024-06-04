@@ -30,13 +30,34 @@ class CNN(torch.nn.Module):
         self._crop_shape = parameters["crop_shape"]
         self._percent_t = parameters["percent_t"]
 
-        self.global_network = modules.GlobalNetwork(parameters)
-        self.downsampling_branch = self.global_network.downsampling_branch
-        self.postprocess_module = self.global_network.postprocess_module
+        self.downsampling_branch = modules.ResNetV2(
+            input_channels=1, num_filters=16,
+            # first conv layer
+            first_layer_kernel_size=(7,7), first_layer_conv_stride=2,
+            first_layer_padding=3,
+            # first pooling layer
+            first_pool_size=3, first_pool_stride=2, first_pool_padding=0,
+            # res blocks architecture
+            blocks_per_layer_list=[2, 2, 2, 2, 2],
+            block_strides_list=[1, 2, 2, 2, 2],
+            block_fn=modules.BasicBlockV2,
+            growth_factor=2)
 
-        self.retrieve_roi_module = modules.RetrieveROIModule(parameters)
+        self.postprocess_module = torch.nn.Conv2d(
+            in_channels=parameters["post_processing_dim"],
+            out_channels=parameters["num_classes"],
+            kernel_size=(1, 1),
+            bias=False)
 
-        self.detection_network = modules.ResNetV1(64, modules.BasicBlockV1, [2,2,2,2], 3)
+        self.retrieve_roi_module = modules.RetrieveROIModule(
+            num_crops_per_class = parameters["K"],
+            crop_shape = parameters["crop_shape"],
+            gpu_number = None if parameters["device_type"] != "gpu" else parameters["gpu_number"])
+
+        self.detection_network = modules.ResNetV1(
+            initial_filters=64,
+            block=modules.BasicBlockV1,
+            layers=[2,2,2,2], input_channels=3)
 
 
     def forward(self, x_original):
@@ -44,7 +65,8 @@ class CNN(torch.nn.Module):
         :param x_original: N x H x W x C array
         """
         # global network: x_small -> class activation map
-        h_g, self.saliency_map = self.global_network.forward(x_original)
+        h_g = self.downsampling_branch.forward(x_original)
+        self.saliency_map = torch.sigmoid(self.postprocess_module.forward(h_g))
 
         # calculate y_global
         # note that y_global is not directly used in inference

@@ -29,6 +29,14 @@ from src.utilities import tools
 from torchvision.models.resnet import conv3x3
 
 
+def top_t_percent(cam, percent_t: float):
+    batch_size, num_class, H, W = cam.size()
+    cam_flatten = cam.view(batch_size, num_class, -1)
+    top_t = int(round(W*H*percent_t))
+    selected_area = cam_flatten.topk(top_t, dim=2)[0]
+    return selected_area.mean(dim=2)
+
+
 class BasicBlockV2(nn.Module):
     """
     Basic Residual Block of ResNet V2
@@ -235,75 +243,16 @@ class ResNetV1(nn.Module):
         return x
 
 
-class PostProcessingStandard(nn.Module):
-    """
-    Unit in Global Network that takes in x_out and produce saliency maps
-    """
-    def __init__(self, parameters):
-        super(PostProcessingStandard, self).__init__()
-        # map all filters to output classes
-        self.gn_conv_last = nn.Conv2d(parameters["post_processing_dim"],
-                                      parameters["num_classes"],
-                                      (1, 1), bias=False)
-
-    def forward(self, x_out):
-        return torch.sigmoid(self.gn_conv_last(x_out))
-
-
-class GlobalNetwork(nn.Module):
-    """
-    Implementation of Global Network using ResNet-22
-    """
-    def __init__(self, parameters):
-        super(GlobalNetwork, self).__init__()
-
-        if parameters.get("use_v1_global", False):
-            # First conv is 7*7, stride 2, padding 3, cut 1/2 resolution
-            self.downsampling_branch = ResNetV1(
-                initial_filters=64, block=BasicBlockV1,
-                layers=[2, 2, 2, 2], input_channels=3)
-        else:
-            self.downsampling_branch = ResNetV2(
-                input_channels=1, num_filters=16,
-                # first conv layer
-                first_layer_kernel_size=(7,7), first_layer_conv_stride=2,
-                first_layer_padding=3,
-                # first pooling layer
-                first_pool_size=3, first_pool_stride=2, first_pool_padding=0,
-                # res blocks architecture
-                blocks_per_layer_list=[2, 2, 2, 2, 2],
-                block_strides_list=[1, 2, 2, 2, 2],
-                block_fn=BasicBlockV2,
-                growth_factor=2)
-
-        self.postprocess_module = PostProcessingStandard(parameters)
-
-    def forward(self, x):
-        # retrieve results from downsampling network at all 4 levels
-        last_feature_map = self.downsampling_branch.forward(x)
-        # feed into postprocessing network
-        cam = self.postprocess_module.forward(last_feature_map)
-        return last_feature_map, cam
-
-
-def top_t_percent(cam, percent_t: float):
-    batch_size, num_class, H, W = cam.size()
-    cam_flatten = cam.view(batch_size, num_class, -1)
-    top_t = int(round(W*H*percent_t))
-    selected_area = cam_flatten.topk(top_t, dim=2)[0]
-    return selected_area.mean(dim=2)
-
-
 class RetrieveROIModule:
     """
     A Regional Proposal Network instance that computes the locations of the crops
     Greedy select crops with largest sums
     """
-    def __init__(self, parameters):
+    def __init__(self, num_crops_per_class, crop_shape, gpu_number):
         self.crop_method = "upper_left"
-        self.num_crops_per_class = parameters["K"]
-        self.crop_shape = parameters["crop_shape"]
-        self.gpu_number = None if parameters["device_type"] != "gpu" else parameters["gpu_number"]
+        self.num_crops_per_class = num_crops_per_class
+        self.crop_shape = crop_shape
+        self.gpu_number = gpu_number
 
     def forward(self, x_original, cam_size, h_small):
         """
