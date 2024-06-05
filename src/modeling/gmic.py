@@ -28,10 +28,10 @@ class GMIC(lightning.LightningModule):
             print(f"Use pretrained model from {model_path}")
 
         self.feature_vectors = feature_vectors
-        self.train_dataset = dataset_train
-        self.valid_dataset = dataset_valid
-        self.test_dataset = dataset_test
-        self.predict_dataset = dataset_predict
+        self.dataset_train = feature_vectors if self._using_feature_vectors() else dataset_train
+        self.dataset_valid = dataset_valid
+        self.dataset_test = dataset_test
+        self.dataset_predict = dataset_predict
 
         self.train_acc = metrics.Accuracy(task='binary', num_classes=self.hparams.num_classes)
         self.train_f1 = metrics.F1Score(task='binary', num_classes=self.hparams.num_classes)
@@ -52,7 +52,7 @@ class GMIC(lightning.LightningModule):
 
 
     def _using_feature_vectors(self):
-        return bool(self.hparams.get('training_on_feature_vectors'))
+        return bool(self.hparams.get('training_on_feature_vectors')) and self.feature_vectors is not None
 
     def _is_last_epoch(self) -> bool:
         return self.current_epoch == self.hparams.epochs - 1
@@ -151,10 +151,10 @@ class GMIC(lightning.LightningModule):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         x, y = batch
 
-        if self._uses_image_now():
-            return self._train_on_image(image=x, y=y)
-        else:
+        if self._using_feature_vectors():
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
+        else:
+            return self._train_on_image(image=x, y=y)
 
 
     def validation_step(self, batch, batch_idx):
@@ -219,24 +219,23 @@ class GMIC(lightning.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.train_dataset:
-            ds = self.train_dataset if self._uses_image_now() else self.feature_vectors
-            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
+        if self.dataset_train:
+            return torchdata.DataLoader(self.dataset_train, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.valid_dataset:
-            return torchdata.DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+        if self.dataset_valid:
+            return torchdata.DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
 
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
-        if self.test_dataset:
-            return torchdata.DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+        if self.dataset_test:
+            return torchdata.DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
 
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
-        if self.predict_dataset:
-            return torchdata.DataLoader(self.predict_dataset, batch_size=1, num_workers=6, shuffle=False)
+        if self.dataset_predict:
+            return torchdata.DataLoader(self.dataset_predict, batch_size=1, num_workers=6, shuffle=False)
