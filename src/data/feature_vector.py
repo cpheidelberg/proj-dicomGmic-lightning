@@ -53,7 +53,7 @@ class Storage(torch.utils.data.Dataset):
         vectors = []
         for vector, in cur.execute('SELECT vector FROM original WHERE label = ? ORDER BY RANDOM()', (label,)):
             vectors.append(_np_loads(vector))
-        return np.array(vectors)
+        return np.array(vectors, dtype=np.float32)
 
 
     def _insert_synthetic(self, cur: sql.Cursor, label: int, synthetic):
@@ -69,11 +69,11 @@ class Storage(torch.utils.data.Dataset):
 
 
     def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
-        return _np_dumps(np.concatenate((global_vec.flatten(), h_crops.flatten())))
+        return _np_dumps(np.concatenate((global_vec.flatten(), h_crops.flatten()), dtype=np.float32))
 
 
     def _unmarshall(self, vector: bytes):
-        vector = _np_loads(vector)
+        vector = _np_loads(vector).astype(np.float32, copy=False)
         global_vec = vector[:256].reshape((256,))
         h_crops = vector[256:].reshape((self._num_classes, 512))
         return global_vec, h_crops
@@ -120,6 +120,6 @@ class Storage(torch.utils.data.Dataset):
             label, vector = con.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (i,)).fetchone()
 
             x = self._unmarshall(vector)
-            y = np.zeros(self._num_classes, dtype='float32')
+            y = np.zeros(self._num_classes, dtype=np.float32)
             y[label] = 1
             return x, y
