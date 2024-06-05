@@ -69,7 +69,3 @@ class Classifier(torch.nn.Module):
         self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
         return self.y_fusion, self.y_local
-
-    def loss(self, y_hat, y, weight):
-        weight = weight if weight is None or len(weight) == len(y) else weight[:len(y)]
-        return torch.nn.functional.binary_cross_entropy(y_hat, y, weight=weight, reduction='sum')

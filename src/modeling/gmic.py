@@ -19,16 +19,15 @@ class GMIC(lightning.LightningModule):
         self.cnn = cnn.CNN(parameters)
         self.classifier = classifier.Classifier(parameters)
 
-        self.feature_vectors = feature_vectors
-
         # load pretrained model layers suitable for new model config
-        if parameters["pretrained"]:
+        if self.hparams.pretrained:
             if "model_idx" in parameters: # use a pretrained model
-                model_path = os.path.join(model_path, f"sample_model_{parameters['model_idx']}.p")
+                model_path = os.path.join(model_path, f"sample_model_{self.hparams.model_idx}.p")
 
             self.init_pretrained_weights(torch.load(model_path))
             print(f"Use pretrained model from {model_path}")
 
+        self.feature_vectors = feature_vectors
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
@@ -39,43 +38,57 @@ class GMIC(lightning.LightningModule):
         self.train_auc = metrics.AUROC(task='binary', num_classes=self.hparams.num_classes)
 
         # Get name of the device to Tensor's method .to(device)
-        device = 'cuda' if parameters['device_type'] == 'gpu' else parameters['device_type']
+        device = 'cuda' if self.hparams.device_type == 'gpu' else self.hparams.device_type
+
+        # Use proper class weights
+        weights = self.feature_vectors.class_weights() if self._using_feature_vectors() else image_class_weights
 
         # Repeat the same weights for all items of the batch
-        self.image_weights = torch.FloatTensor([image_class_weights] * parameters['batch_size']).to(device)
-        self.feature_weights = self.image_weights
+        self.class_weights = torch.FloatTensor([weights] * self.hparams.batch_size).to(device)
 
 
-    def _uses_image_now(self):
-        return self.feature_vectors is None or self.current_epoch % 2 == 0
+    def _loss(self, y_hat, y):
+        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights[:len(y)], reduction='sum')
+
+
+    def _using_feature_vectors(self):
+        return bool(self.hparams.get('training_on_feature_vectors'))
+
+    def _is_last_epoch(self) -> bool:
+        return self.current_epoch == self.hparams.epochs - 1
+
+    def _saving_feature_vectors(self):
+        return self.feature_vectors is not None and not self._using_feature_vectors() and self._is_last_epoch()
+
+
+    def on_train_epoch_start(self) -> None:
+        if self._saving_feature_vectors():
+            self.feature_vectors.clear()
 
 
     def on_train_epoch_end(self):
-        if self.feature_vectors is not None and self.current_epoch % 2 == 0:
-            self.feature_vectors.reset()
-
-            device = self.image_weights.device
-            length = len(self.image_weights)
-            self.feature_weights = torch.FloatTensor([self.feature_vectors.class_weights] * length).to(device)
+        if self._saving_feature_vectors():
+            print('Synthesising feature vectors...')
+            self.feature_vectors.synthesise()
+            print('Synthesised!')
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
         """Load state_dict for layers independent of variable class number and freeze for transfer learning"""
-        remove_keywords = ("fusion_dnn", "classifier_linear", "postprocess_module")
+        removed = ("fusion_dnn", "classifier_linear", "postprocess_module")
+        fine_tuning = self.hparams.get("fine-tuning", False)
+        using_fv = self._using_feature_vectors()
 
-        remove_keys = [key for key in state if key.startswith(remove_keywords)]
-        for key in remove_keys:
-            del state[key]
-
+        state = {key: val for key, val in state.items() if not key.startswith(removed)}
         self.cnn.load_state_dict(state, strict=False)
         self.classifier.load_state_dict(state, strict=False)
 
         # Freeze layers except for fine-tuning
         for name, param in self.cnn.named_parameters():
-            param.requires_grad = name.startswith(remove_keywords) or self.hparams.get("fine-tuning", False)
+            param.requires_grad = not using_fv and (fine_tuning or name.startswith(removed))
 
         for name, param in self.classifier.named_parameters():
-            param.requires_grad = name.startswith(remove_keywords) or self.hparams.get("fine-tuning", False)
+            param.requires_grad = using_fv or fine_tuning or name.startswith(removed)
 
 
     def forward(self, image):
@@ -87,22 +100,20 @@ class GMIC(lightning.LightningModule):
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
         y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
-        if self.feature_vectors is not None:
-            y_index = y.argmax(dim=1).cpu().numpy(force=True).tolist()
-            global_vec = global_vec.cpu().numpy(force=True)
-            h_crops = h_crops.cpu().numpy(force=True)
+        if self._saving_feature_vectors():
+            y_index = y.argmax(dim=1).tolist()
+            global_vec = global_vec.cpu().numpy()
+            h_crops = h_crops.cpu().numpy()
             self.feature_vectors.add(y_index, global_vec, h_crops)
 
-        loss_fusion = self.classifier.loss(y_fusion, y, self.image_weights)
-        loss_global = self.classifier.loss(y_global, y, self.image_weights)
-        loss_local = self.classifier.loss(y_local, y, self.image_weights)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_global = self._loss(y_global, y)
+        loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        argmax_y = y.argmax(dim=1)
-
-        self.train_acc(y_fusion, argmax_y)
-        self.train_f1(y_fusion, argmax_y)
-        self.train_auc(y_fusion, argmax_y)
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.train_auc(y_fusion, y)
 
         self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
         self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
@@ -118,10 +129,21 @@ class GMIC(lightning.LightningModule):
     def _train_on_feature_vector(self, global_vec, h_crops, y):
         y_fusion, y_local = self.classifier(global_vec, h_crops)
 
-        loss_fusion = self.classifier.loss(y_fusion, y, self.feature_weights)
-        loss_local = self.classifier.loss(y_local, y, self.feature_weights)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_local
 
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.train_auc(y_fusion, y)
+
+        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
+        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
+        self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
+        self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
         return loss
 
 
@@ -141,9 +163,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self.classifier.loss(y_fusion, y, self.image_weights)
-        loss_global = self.classifier.loss(y_global, y, self.image_weights)
-        loss_local = self.classifier.loss(y_local, y, self.image_weights)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_global = self._loss(y_global, y)
+        loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
         
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
@@ -156,9 +178,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self.classifier.loss(y_fusion, y, self.image_weights)
-        loss_global = self.classifier.loss(y_global, y, self.image_weights)
-        loss_local = self.classifier.loss(y_local, y, self.image_weights)
+        loss_fusion = self._loss(y_fusion, y)
+        loss_global = self._loss(y_global, y)
+        loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)

@@ -45,6 +45,7 @@ if __name__ == "__main__":
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
+        "training_on_feature_vectors": False,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -64,7 +65,7 @@ if __name__ == "__main__":
     classification_images = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
-    feature_vectors = feature_vector.Storage(feature_vectors_path, classification_images.category_sizes)
+    feature_vectors = feature_vector.Storage(feature_vectors_path, parameters['num_classes'])
 
     # Training
     model = gmic.GMIC(
