@@ -211,20 +211,24 @@ class GMIC(lightning.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        ds = self.feature_vectors if self._using_feature_vectors() else self.dataset_train
-        return DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
+        if self.dataset_train:
+            ds = self.feature_vectors if self._using_feature_vectors() else self.dataset_train
+            return DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        return DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+        if self.dataset_valid:
+            return DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
 
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
-        return DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+        if self.dataset_test:
+            return DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
 
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
-        return DataLoader(self.dataset_predict, batch_size=1, num_workers=6, shuffle=False)
+        if self.dataset_predict:
+            return DataLoader(self.dataset_predict, batch_size=1, num_workers=6, shuffle=False)
