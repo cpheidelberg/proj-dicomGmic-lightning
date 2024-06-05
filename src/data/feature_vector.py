@@ -82,9 +82,8 @@ class Storage(torch.utils.data.Dataset):
     def synthesise(self):
         with sql.connect(self._path) as con:
             cur = con.cursor()
-            cur.execute('DELETE FROM synthetic')
 
-            sizes = [size for size, in con.execute('SELECT COUNT(*) FROM synthetic GROUP BY label ORDER BY label')]
+            sizes = [size for size, in con.execute('SELECT COUNT(*) FROM original GROUP BY label ORDER BY label')]
             largest = max(sizes)
 
             for label, size in enumerate(sizes):
