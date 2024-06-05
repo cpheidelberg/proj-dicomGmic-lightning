@@ -15,6 +15,16 @@ class GMIC(lightning.LightningModule):
         super(GMIC, self).__init__()
         self.save_hyperparameters(parameters)
 
+        self.feature_vectors = feature_vectors
+        self.dataset_train = dataset_train
+        self.dataset_valid = dataset_valid
+        self.dataset_test = dataset_test
+        self.dataset_predict = dataset_predict
+
+        self.train_acc = BinaryAccuracy()
+        self.train_f1  = BinaryF1Score()
+        self.train_auc = BinaryAUROC()
+
         self.cnn = cnn.CNN(parameters)
         self.classifier = classifier.Classifier(parameters)
 
@@ -26,16 +36,6 @@ class GMIC(lightning.LightningModule):
             self.init_pretrained_weights(torch.load(model_path))
             print(f"Use pretrained model from {model_path}")
 
-        self.feature_vectors = feature_vectors
-        self.dataset_train = dataset_train
-        self.dataset_valid = dataset_valid
-        self.dataset_test = dataset_test
-        self.dataset_predict = dataset_predict
-
-        self.train_acc = BinaryAccuracy()
-        self.train_f1  = BinaryF1Score()
-        self.train_auc = BinaryAUROC()
-
         # Get name of the device to Tensor's method .to(device)
         device = 'cuda' if self.hparams.device_type == 'gpu' else self.hparams.device_type
 
@@ -46,9 +46,6 @@ class GMIC(lightning.LightningModule):
         self.class_weights = torch.FloatTensor([weights] * self.hparams.batch_size).to(device)
 
 
-    def _loss(self, y_hat, y):
-        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights[:len(y)], reduction='sum')
-
     def _using_feature_vectors(self):
         return bool(self.hparams.get('training_on_feature_vectors')) and self.feature_vectors is not None
 
@@ -57,7 +54,6 @@ class GMIC(lightning.LightningModule):
 
     def _saving_feature_vectors(self):
         return self.feature_vectors is not None and not self._using_feature_vectors() and self._is_last_epoch()
-
 
     def on_train_epoch_start(self):
         if self._saving_feature_vectors():
@@ -90,6 +86,10 @@ class GMIC(lightning.LightningModule):
         y_global, global_vec, h_crops = self.cnn(image)
         y_fusion, y_local = self.classifier(global_vec, h_crops)
         return y_fusion, y_global, y_local, global_vec, h_crops
+
+
+    def _loss(self, y_hat, y):
+        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights[:len(y)], reduction='sum')
 
 
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
