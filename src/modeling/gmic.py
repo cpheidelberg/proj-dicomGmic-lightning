@@ -1,4 +1,3 @@
-import numpy as np
 import os
 
 import torch
@@ -50,7 +49,6 @@ class GMIC(lightning.LightningModule):
     def _loss(self, y_hat, y):
         return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights[:len(y)], reduction='sum')
 
-
     def _using_feature_vectors(self):
         return bool(self.hparams.get('training_on_feature_vectors')) and self.feature_vectors is not None
 
@@ -62,7 +60,6 @@ class GMIC(lightning.LightningModule):
 
 
     def on_train_epoch_start(self):
-        print(self.feature_vectors, self._using_feature_vectors(), self._is_last_epoch(), self.current_epoch, self.hparams.epochs - 1)
         if self._saving_feature_vectors():
             self.feature_vectors.clear()
 
