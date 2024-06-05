@@ -45,7 +45,7 @@ if __name__ == "__main__":
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
-        "training_on_feature_vectors": True,
+        "training_on_feature_vectors": False,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -58,11 +58,12 @@ if __name__ == "__main__":
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 6, # output classes
+        "num_classes": 2,#6, # output classes
         "use_v1_global": False,
     }
 
     classification_images = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
+    classification_images.undersample()
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, parameters['num_classes'])

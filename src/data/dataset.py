@@ -60,7 +60,9 @@ class ClassificationImages(Dataset):
         images = []
         for category in self.category_names:
             images += random.sample([image for image in self.images if image.category == category], smallest)
+
         self.images = images
+        self.class_weights = [1.0] * len(self.class_weights)
 
     def __len__(self):
         return len(self.images)
