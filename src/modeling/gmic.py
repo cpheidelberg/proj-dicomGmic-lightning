@@ -28,7 +28,7 @@ class GMIC(lightning.LightningModule):
             print(f"Use pretrained model from {model_path}")
 
         self.feature_vectors = feature_vectors
-        self.dataset_train = feature_vectors if self._using_feature_vectors() else dataset_train
+        self.dataset_train = dataset_train
         self.dataset_valid = dataset_valid
         self.dataset_test = dataset_test
         self.dataset_predict = dataset_predict
@@ -61,7 +61,8 @@ class GMIC(lightning.LightningModule):
         return self.feature_vectors is not None and not self._using_feature_vectors() and self._is_last_epoch()
 
 
-    def on_train_epoch_start(self) -> None:
+    def on_train_epoch_start(self):
+        print(self.feature_vectors, self._using_feature_vectors(), self._is_last_epoch(), self.current_epoch, self.hparams.epochs - 1)
         if self._saving_feature_vectors():
             self.feature_vectors.clear()
 
@@ -220,7 +221,8 @@ class GMIC(lightning.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.dataset_train:
-            return torchdata.DataLoader(self.dataset_train, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
+            ds = self.feature_vectors if self._using_feature_vectors() else self.dataset_train
+            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
 
 
     def val_dataloader(self):
