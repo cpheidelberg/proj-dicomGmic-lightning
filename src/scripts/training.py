@@ -39,13 +39,13 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 2,
+        "epochs": 8,
         "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
-        "training_on_feature_vectors": False,
+        "training_on_feature_vectors": True,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
