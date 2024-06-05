@@ -101,7 +101,7 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        for name, metric in self.metrics:
+        for name, metric in self.metrics.items():
             metric(y_fusion, y)
             self.log(f'train_{name}', metric, on_step=False, on_epoch=True)
 
