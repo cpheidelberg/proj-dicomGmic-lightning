@@ -2,8 +2,8 @@ import os
 
 import torch
 import lightning
-import torch.utils.data as torchdata
-import torchmetrics.classification as metrics
+from torch.utils.data import DataLoader
+from torchmetrics.classification import BinaryAccuracy, BinaryF1Score, BinaryAUROC
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
@@ -32,9 +32,7 @@ class GMIC(lightning.LightningModule):
         self.dataset_test = dataset_test
         self.dataset_predict = dataset_predict
 
-        self.train_acc = metrics.Accuracy(task='binary', num_classes=self.hparams.num_classes)
-        self.train_f1 = metrics.F1Score(task='binary', num_classes=self.hparams.num_classes)
-        self.train_auc = metrics.AUROC(task='binary', num_classes=self.hparams.num_classes)
+        self.metrics = {'acc': BinaryAccuracy(), 'f1': BinaryF1Score(), 'auc': BinaryAUROC()}
 
         # Get name of the device to Tensor's method .to(device)
         device = 'cuda' if self.hparams.device_type == 'gpu' else self.hparams.device_type
@@ -63,12 +61,9 @@ class GMIC(lightning.LightningModule):
         if self._saving_feature_vectors():
             self.feature_vectors.clear()
 
-
     def on_train_epoch_end(self):
         if self._saving_feature_vectors():
-            print('Synthesising feature vectors...')
             self.feature_vectors.synthesise()
-            print('Synthesised!')
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
@@ -99,23 +94,17 @@ class GMIC(lightning.LightningModule):
         y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
         if self._saving_feature_vectors():
-            y_index = y.argmax(dim=1).tolist()
-            global_vec = global_vec.cpu().numpy()
-            h_crops = h_crops.cpu().numpy()
-            self.feature_vectors.add(y_index, global_vec, h_crops)
+            self.feature_vectors.add(y.argmax(dim=1).tolist(), global_vec.cpu().numpy(), h_crops.cpu().numpy())
 
         loss_fusion = self._loss(y_fusion, y)
         loss_global = self._loss(y_global, y)
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        self.train_acc(y_fusion, y)
-        self.train_f1(y_fusion, y)
-        self.train_auc(y_fusion, y)
+        for name, metric in self.metrics:
+            metric(y_fusion, y)
+            self.log(f'train_{name}', metric, on_step=False, on_epoch=True)
 
-        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
-        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
-        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
@@ -217,24 +206,20 @@ class GMIC(lightning.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.dataset_train:
-            ds = self.feature_vectors if self._using_feature_vectors() else self.dataset_train
-            return torchdata.DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
+        ds = self.feature_vectors if self._using_feature_vectors() else self.dataset_train
+        return DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True) # 8 gives better performance than 16
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.dataset_valid:
-            return torchdata.DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+        return DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
 
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
-        if self.dataset_test:
-            return torchdata.DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
+        return DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=16, shuffle=False)
 
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
-        if self.dataset_predict:
-            return torchdata.DataLoader(self.dataset_predict, batch_size=1, num_workers=6, shuffle=False)
+        return DataLoader(self.dataset_predict, batch_size=1, num_workers=6, shuffle=False)

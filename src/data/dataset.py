@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import os, ast, h5py, time, sys, dataclasses
+import os, ast, h5py, time, sys, random, dataclasses
 from tqdm import tqdm
 import multiprocessing
 
@@ -54,6 +54,13 @@ class ClassificationImages(Dataset):
 
         self.images = [image for image in images if image.category in self.category_names]
         self.class_weights = [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
+
+    def undersample(self):
+        smallest = min(self.category_sizes)
+        images = []
+        for category in self.category_names:
+            images += random.sample([image for image in self.images if image.category == category], smallest)
+        self.images = images
 
     def __len__(self):
         return len(self.images)

@@ -83,8 +83,6 @@ if __name__ == "__main__":
 
     training = lightning.Trainer(
         fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-        # limit_val_batches=0,
-        # num_sanity_val_steps=0,
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device,
