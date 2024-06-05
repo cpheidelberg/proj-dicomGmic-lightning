@@ -32,7 +32,9 @@ class GMIC(lightning.LightningModule):
         self.dataset_test = dataset_test
         self.dataset_predict = dataset_predict
 
-        self.metrics = {'acc': BinaryAccuracy(), 'f1': BinaryF1Score(), 'auc': BinaryAUROC()}
+        self.train_acc = BinaryAccuracy()
+        self.train_f1  = BinaryF1Score()
+        self.train_auc = BinaryAUROC()
 
         # Get name of the device to Tensor's method .to(device)
         device = 'cuda' if self.hparams.device_type == 'gpu' else self.hparams.device_type
@@ -101,15 +103,18 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        for name, metric in self.metrics.items():
-            metric(y_fusion, y)
-            self.log(f'train_{name}', metric, on_step=False, on_epoch=True)
+        self.train_acc(y_fusion, y)
+        self.train_f1(y_fusion, y)
+        self.train_auc(y_fusion, y)
 
-        self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
-        self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
-        self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
-        self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
+        self.log('train_acc', self.train_acc, on_step=False, on_epoch=True)
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True)
+        self.log('train_auc', self.train_auc, on_step=False, on_epoch=True)
+        self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
+        self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
+        self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
         return loss
 
 
