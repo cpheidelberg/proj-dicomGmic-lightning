@@ -40,7 +40,7 @@ if __name__ == "__main__":
         "device_type": device,
         "gpu_number": 0,
         "epochs": 8,
-        "batch_size": 48,
+        "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,
         "fine-tuning": False,
@@ -86,7 +86,7 @@ if __name__ == "__main__":
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device,
-        devices=[0],
+        devices=[0,1,2],
         logger=logger,
         # profiler="simple",
         # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
