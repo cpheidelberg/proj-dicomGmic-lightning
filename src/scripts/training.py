@@ -86,7 +86,7 @@ if __name__ == "__main__":
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device,
-        devices=[0,1,2],
+        devices=[0],
         logger=logger,
         # profiler="simple",
         # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
