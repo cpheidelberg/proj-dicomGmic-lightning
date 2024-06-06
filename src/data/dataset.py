@@ -74,7 +74,7 @@ class ClassificationImages(Dataset):
         return len(self.images)
 
     def __getitem__(self, i: int):
-        x = self.transform(image=self.images[i].image()).unsqueeze(0)
+        x = self.transform(image=self.images[i].image())['image'].unsqueeze(0)
         y = self.images[i].encoding(self.category_names)
         return x, y
 
