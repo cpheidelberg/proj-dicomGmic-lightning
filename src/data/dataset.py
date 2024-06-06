@@ -54,10 +54,10 @@ class ClassificationImages(Dataset):
         self.images = [image for image in images if image.category in self.category_names]
         self.class_weights = [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
 
+        
         self.transform = albumentations.Compose([
-            albumentations.RandomScale(p=0.25),
-            albumentations.RandomCrop(2944, 1920, p=0.25),
-            albumentations.RandomBrightnessContrast(p=0.25),
+            albumentations.RandomResizedCrop(size=(2944, 1920), p=0.3),
+            albumentations.RandomBrightnessContrast(p=0.3),
             albumentations.pytorch.ToTensorV2()
         ])
 
