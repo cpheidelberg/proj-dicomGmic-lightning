@@ -40,7 +40,7 @@ if __name__ == "__main__":
         "device_type": device,
         "gpu_number": 0,
         "epochs": 8,
-        "batch_size": 64,
+        "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,
         "fine-tuning": False,
