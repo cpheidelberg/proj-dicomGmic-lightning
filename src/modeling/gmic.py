@@ -36,14 +36,11 @@ class GMIC(lightning.LightningModule):
             self.init_pretrained_weights(torch.load(model_path))
             print(f"Use pretrained model from {model_path}")
 
-        # Get name of the device to Tensor's method .to(device)
-        device = 'cuda' if self.hparams.device_type == 'gpu' else self.hparams.device_type
-
         # Use proper class weights
         weights = self.feature_vectors.class_weights() if self._using_feature_vectors() else image_class_weights
 
         # Repeat the same weights for all items of the batch
-        self.class_weights = torch.FloatTensor([weights] * self.hparams.batch_size).to(device)
+        self.class_weights = torch.FloatTensor([weights] * self.hparams.batch_size).to(self.device)
 
 
     def _using_feature_vectors(self):
