@@ -26,10 +26,10 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    model_path = 'models/'
+    model_path = './models/'
+    feature_vectors_path = './feature_vectors.sql'
 
-    data_path = '/home/ubuntu/data/output'
-    feature_vectors_path = os.path.join(data_path, 'feature_vectors.sql')
+    data_path = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     image_dir = os.path.join(data_path, 'cropped_images')
     dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'segmentation')
