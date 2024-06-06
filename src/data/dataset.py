@@ -32,7 +32,7 @@ class ClassificationImage:
     def tensor(self, transform):
         img = loading.load_image(self.path, self.view, horizontal_flip='NO')
         img = loading.process_image(img, self.view, self.center)
-        img = transform(img)
+        img = transform(image=img)
         img = np.expand_dims(img, 0)
         return torch.Tensor(img)
 
