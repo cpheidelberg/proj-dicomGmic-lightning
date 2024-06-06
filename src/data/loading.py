@@ -60,6 +60,8 @@ def load_image(image_path, view, horizontal_flip):
     return image
 
 
+_random_number_generator = np.random.default_rng()
+
 def process_image(image, view, best_center):
     """
     Applies augmentation window with random noise in location and size
@@ -68,7 +70,7 @@ def process_image(image, view, best_center):
     cropped_image, _ = augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
-        random_number_generator=np.random.RandomState(0),
+        random_number_generator=_random_number_generator,
         best_center=best_center,
         view=view
     )
