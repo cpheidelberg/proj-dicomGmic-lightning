@@ -58,10 +58,9 @@ class ClassificationImages(Dataset):
         self.class_weights = [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
 
         self.transform = albumentations.Compose([
-            albumentations.RandomScale(p=0.2),
-            albumentations.RandomCrop(2944, 1920, p=0.2),
-            albumentations.RandomBrightnessContrast(p=0.2),
-            albumentations.RandomToneCurve(p=0.2)
+            albumentations.RandomScale(p=0.25),
+            albumentations.RandomCrop(2944, 1920, p=0.25),
+            albumentations.RandomBrightnessContrast(p=0.25)
         ])
 
     def undersample(self):
