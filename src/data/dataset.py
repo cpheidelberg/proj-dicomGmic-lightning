@@ -3,6 +3,7 @@ import pandas as pd
 import os, ast, h5py, time, sys, random, dataclasses
 from tqdm import tqdm
 import multiprocessing
+import albumentations
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -28,9 +29,10 @@ class ClassificationImage:
         center = line['best_center'][view][0]
         return ClassificationImage(path, view, category, center)
 
-    def tensor(self):
+    def tensor(self, transform):
         img = loading.load_image(self.path, self.view, horizontal_flip='NO')
         img = loading.process_image(img, self.view, self.center)
+        img = transform(img)
         img = np.expand_dims(img, 0)
         return torch.Tensor(img)
 
@@ -55,6 +57,11 @@ class ClassificationImages(Dataset):
         self.images = [image for image in images if image.category in self.category_names]
         self.class_weights = [len(self.images) / (len(self.category_sizes) * size) for size in self.category_sizes]
 
+        self.transform = albumentations.Compose([
+            albumentations.RandomBrightnessContrast(p=0.3),
+            albumentations.RandomToneCurve(p=0.3),
+        ])
+
     def undersample(self):
         smallest = min(self.category_sizes)
         images = []
@@ -68,7 +75,7 @@ class ClassificationImages(Dataset):
         return len(self.images)
 
     def __getitem__(self, i: int):
-        return self.images[i].tensor(), self.images[i].encoding(self.category_names)
+        return self.images[i].tensor(self.transform), self.images[i].encoding(self.category_names)
 
 
 class H5Dataset(Dataset):
