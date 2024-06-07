@@ -70,7 +70,7 @@ if __name__ == "__main__":
     # Training
     model = gmic.GMIC(
         parameters=parameters,
-        # feature_vectors=feature_vectors,
+        feature_vectors=feature_vectors,
         dataset_train=dataset_train,
         dataset_valid=dataset_valid,
         dataset_test=dataset_test,
