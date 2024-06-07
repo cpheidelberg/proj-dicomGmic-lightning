@@ -45,7 +45,7 @@ if __name__ == "__main__":
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
-        "training_on_feature_vectors": False,
+        "training_on_feature_vectors": True,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
