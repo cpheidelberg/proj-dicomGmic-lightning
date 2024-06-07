@@ -213,19 +213,19 @@ class GMIC(lightning.LightningModule):
         """Create DataLoader for Training out of given DataSet"""
         if self.dataset_train:
             ds = self.feature_vectors if self._using_feature_vectors() else self.dataset_train
-            return DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=8, shuffle=True)
+            return DataLoader(ds, batch_size=self.hparams.batch_size, num_workers=10, shuffle=True)
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.dataset_valid:
-            return DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=8, shuffle=False)
+            return DataLoader(self.dataset_valid, batch_size=self.hparams.batch_size, num_workers=10, shuffle=False)
 
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.dataset_test:
-            return DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=8, shuffle=False)
+            return DataLoader(self.dataset_test, batch_size=self.hparams.batch_size, num_workers=10, shuffle=False)
 
 
     def predict_dataloader(self):
