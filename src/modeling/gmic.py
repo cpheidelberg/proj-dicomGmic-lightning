@@ -3,7 +3,7 @@ import os
 import torch
 import lightning
 from torch.utils.data import DataLoader
-from torchmetrics.classification import BinaryAccuracy, BinaryF1Score, BinaryAUROC
+import torchmetrics.functional.classification as metrics
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
@@ -20,10 +20,6 @@ class GMIC(lightning.LightningModule):
         self.dataset_valid = dataset_valid
         self.dataset_test = dataset_test
         self.dataset_predict = dataset_predict
-
-        self.train_acc = BinaryAccuracy()
-        self.train_f1  = BinaryF1Score()
-        self.train_auc = BinaryAUROC()
 
         self.cnn = cnn.CNN(parameters)
         self.classifier = classifier.Classifier(parameters)
@@ -103,13 +99,9 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        self.train_acc(y_fusion, y)
-        self.train_f1(y_fusion, y)
-        self.train_auc(y_fusion, y)
-
-        self.log('train_acc', self.train_acc, on_step=False, on_epoch=True)
-        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True)
-        self.log('train_auc', self.train_auc, on_step=False, on_epoch=True)
+        self.log("train_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("train_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("train_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
         self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
         self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
         self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
@@ -125,13 +117,9 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_local
 
-        self.train_acc(y_fusion, y)
-        self.train_f1(y_fusion, y)
-        self.train_auc(y_fusion, y)
-
-        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
-        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
-        self.log("train_auc", self.train_auc, on_step=False, on_epoch=True)
+        self.log("train_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("train_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("train_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
@@ -159,7 +147,13 @@ class GMIC(lightning.LightningModule):
         loss_global = self._loss(y_global, y)
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
-        
+
+        self.log("val_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("val_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("val_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
+        self.log('val_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
+        self.log('val_loss_global', loss_global, on_epoch=True, sync_dist=True)
+        self.log('val_loss_local', loss_local, on_epoch=True, sync_dist=True)
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
         return loss
 
@@ -175,10 +169,16 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
+        self.log("test_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("test_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
+        self.log("test_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
+        self.log('test_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
+        self.log('test_loss_global', loss_global, on_epoch=True, sync_dist=True)
+        self.log('test_loss_local', loss_local, on_epoch=True, sync_dist=True)
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)
         return loss
-    
-    
+
+
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
         img, y, data = batch
