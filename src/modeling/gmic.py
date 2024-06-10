@@ -32,9 +32,10 @@ class GMIC(lightning.LightningModule):
             self.init_pretrained_weights(torch.load(model_path))
             print(f"Use pretrained model from {model_path}")
 
-        # Use proper class weights for calculating loss
-        weights = self.feature_vectors.class_weights() if self._using_feature_vectors() else image_class_weights
-        self.loss = torch.nn.BCELoss(weight=torch.FloatTensor([weights]), reduction='sum')
+        if self._using_feature_vectors():
+            self.loss = torch.nn.BCELoss(torch.FloatTensor([self.feature_vectors.class_weights()]), reduction='sum')
+        else:
+            self.loss = torch.nn.BCELoss(torch.FloatTensor([image_class_weights]), reduction='sum')
 
 
     def _using_feature_vectors(self):
