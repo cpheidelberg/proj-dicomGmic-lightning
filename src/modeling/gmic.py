@@ -34,7 +34,7 @@ class GMIC(lightning.LightningModule):
 
         # Use proper class weights for calculating loss
         weights = self.feature_vectors.class_weights() if self._using_feature_vectors() else image_class_weights
-        self._loss = torch.nn.BCELoss(weight=torch.FloatTensor([weights]), reduction='sum')
+        self.loss = torch.nn.BCELoss(weight=torch.FloatTensor([weights]), reduction='sum')
 
 
     def _using_feature_vectors(self):
@@ -92,9 +92,9 @@ class GMIC(lightning.LightningModule):
         if self._saving_feature_vectors():
             self.feature_vectors.add(y.argmax(dim=1).tolist(), global_vec.cpu().numpy(), h_crops.cpu().numpy())
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.loss(y_fusion, y)
+        loss_global = self.loss(y_global, y)
+        loss_local = self.loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         self._metrics('train', y_fusion, y)
@@ -109,8 +109,8 @@ class GMIC(lightning.LightningModule):
     def _train_on_feature_vector(self, global_vec, h_crops, y):
         y_fusion, y_local = self.classifier(global_vec, h_crops)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.loss(y_fusion, y)
+        loss_local = self.loss(y_local, y)
         loss = loss_fusion + loss_local
 
         self._metrics('train', y_fusion, y)
@@ -137,9 +137,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.loss(y_fusion, y)
+        loss_global = self.loss(y_global, y)
+        loss_local = self.loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         self._metrics('val', y_fusion, y)
@@ -156,9 +156,9 @@ class GMIC(lightning.LightningModule):
 
         y_fusion, y_global, y_local, _, _ = self(img)
 
-        loss_fusion = self._loss(y_fusion, y)
-        loss_global = self._loss(y_global, y)
-        loss_local = self._loss(y_local, y)
+        loss_fusion = self.loss(y_fusion, y)
+        loss_global = self.loss(y_global, y)
+        loss_local = self.loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
         self._metrics('test', y_fusion, y)
