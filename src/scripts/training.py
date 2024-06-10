@@ -14,7 +14,7 @@ from src.modeling import gmic
 from src.data import dataset, feature_vector
 
 
-if __name__ == "__main__":
+def main(top_c, undersample, train_on_f_v, epochs):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -39,13 +39,13 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 8,
+        "epochs": epochs,
         "batch_size": 16,
         "learning_rate": 1e-3,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
-        "training_on_feature_vectors": True,
+        "training_on_feature_vectors": train_on_f_v,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -58,11 +58,13 @@ if __name__ == "__main__":
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 6, # output classes
+        "num_classes": top_c, # output classes
         "use_v1_global": False,
     }
 
     classification_images = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
+    if undersample:
+        classification_images.undersample()
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, parameters['num_classes'])
@@ -79,11 +81,10 @@ if __name__ == "__main__":
     )
 
     logger = loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
-    early_stop_callback = callbacks.EarlyStopping(monitor='val_loss', patience=5, strict=False, verbose=False, mode='min')
 
     training = lightning.Trainer(
         fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-        max_epochs=parameters["epochs"], 
+        max_epochs=parameters["epochs"],
         # gradient_clip_val=1e-3,
         accelerator=device,
         devices=[0],
@@ -96,3 +97,9 @@ if __name__ == "__main__":
     training.fit(model)
     print(f'Training finished at: {time.ctime()}')
     training.test(model)
+
+
+if __name__ == "__main__":
+    main(top_c=2, undersample=True,  train_on_f_v=False, epochs=64)
+    main(top_c=6, undersample=False, train_on_f_v=False, epochs=8)
+    main(top_c=6, undersample=False, train_on_f_v=True,  epochs=8)
