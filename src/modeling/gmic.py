@@ -32,14 +32,9 @@ class GMIC(lightning.LightningModule):
             self.init_pretrained_weights(torch.load(model_path))
             print(f"Use pretrained model from {model_path}")
 
-        # Get name of the device to Tensor's method .to(device)
-        device = 'cuda' if self.hparams.device_type == 'gpu' else self.hparams.device_type
-
-        # Use proper class weights
+        # Use proper class weights for calculating loss
         weights = self.feature_vectors.class_weights() if self._using_feature_vectors() else image_class_weights
-
-        # Repeat the same weights for all items of the batch
-        self.class_weights = torch.FloatTensor([weights]).to(device)
+        self._loss = torch.nn.BCELoss(weight=torch.FloatTensor([weights]), reduction='sum')
 
 
     def _using_feature_vectors(self):
@@ -82,10 +77,6 @@ class GMIC(lightning.LightningModule):
         y_global, global_vec, h_crops = self.cnn(image)
         y_fusion, y_local = self.classifier(global_vec, h_crops)
         return y_fusion, y_global, y_local, global_vec, h_crops
-
-
-    def _loss(self, y_hat, y):
-        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights, reduction='sum')
 
 
     def _metrics(self, prefix: str, y_hat: torch.Tensor, y: torch.Tensor):
