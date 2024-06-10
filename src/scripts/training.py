@@ -3,7 +3,7 @@ import os, sys, time
 import torch
 from torch.utils.data import random_split
 import lightning
-from lightning.pytorch import callbacks, loggers
+from lightning.pytorch import loggers
 
 # import own files
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,7 +14,7 @@ from src.modeling import gmic
 from src.data import dataset, feature_vector
 
 
-def main(top_c, undersample, train_on_f_v, epochs):
+def main(top_c: int, undersample: bool, using_feature_vectors_since: int, epochs: int):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -45,7 +45,7 @@ def main(top_c, undersample, train_on_f_v, epochs):
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
-        "training_on_feature_vectors": train_on_f_v,
+        "using_feature_vectors_since": using_feature_vectors_since,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -100,6 +100,7 @@ def main(top_c, undersample, train_on_f_v, epochs):
 
 
 if __name__ == "__main__":
-    main(top_c=2, undersample=True,  train_on_f_v=False, epochs=64)
-    main(top_c=6, undersample=False, train_on_f_v=False, epochs=8)
-    main(top_c=6, undersample=False, train_on_f_v=True,  epochs=8)
+    for i in range(3):
+        main(top_c=2, undersample=True, using_feature_vectors_since=999, epochs=64)
+        main(top_c=6, undersample=False, using_feature_vectors_since=999, epochs=16)
+        main(top_c=6, undersample=False, using_feature_vectors_since=8, epochs=16)
