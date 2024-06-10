@@ -39,7 +39,7 @@ class GMIC(lightning.LightningModule):
         weights = self.feature_vectors.class_weights() if self._using_feature_vectors() else image_class_weights
 
         # Repeat the same weights for all items of the batch
-        self.class_weights = torch.FloatTensor([weights] * self.hparams.batch_size).to(device)
+        self.class_weights = torch.FloatTensor([weights]).to(device)
 
 
     def _using_feature_vectors(self):
@@ -85,7 +85,14 @@ class GMIC(lightning.LightningModule):
 
 
     def _loss(self, y_hat, y):
-        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights[:len(y)], reduction='sum')
+        return torch.nn.functional.binary_cross_entropy(y_hat, y, self.class_weights, reduction='sum')
+
+
+    def _metrics(self, prefix: str, y_hat: torch.Tensor, y: torch.Tensor):
+        y = y.type(torch.int)
+        self.log(f"{prefix}_acc", metrics.binary_accuracy(y_hat, y), on_step=False, on_epoch=True)
+        self.log(f"{prefix}_f1",  metrics.binary_f1_score(y_hat, y), on_step=False, on_epoch=True)
+        self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True)
 
 
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
@@ -99,9 +106,7 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        self.log("train_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("train_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("train_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
+        self._metrics('train', y_fusion, y)
         self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
         self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
         self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
@@ -117,9 +122,7 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_local
 
-        self.log("train_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("train_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("train_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
+        self._metrics('train', y_fusion, y)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
@@ -148,9 +151,7 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        self.log("val_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("val_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("val_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
+        self._metrics('val', y_fusion, y)
         self.log('val_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
         self.log('val_loss_global', loss_global, on_epoch=True, sync_dist=True)
         self.log('val_loss_local', loss_local, on_epoch=True, sync_dist=True)
@@ -169,9 +170,7 @@ class GMIC(lightning.LightningModule):
         loss_local = self._loss(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        self.log("test_acc", metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("test_f1",  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True)
-        self.log("test_auc", metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True)
+        self._metrics('test', y_fusion, y)
         self.log('test_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
         self.log('test_loss_global', loss_global, on_epoch=True, sync_dist=True)
         self.log('test_loss_local', loss_local, on_epoch=True, sync_dist=True)
