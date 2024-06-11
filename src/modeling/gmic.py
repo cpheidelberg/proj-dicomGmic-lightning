@@ -50,7 +50,7 @@ class GMIC(lightning.LightningModule):
     def on_train_epoch_end(self):
         if self._training_on_FV_next():
             self.feature_vectors.synthesise()
-            self.loss = torch.nn.BCELoss(torch.FloatTensor([self.feature_vectors.class_weights()]), reduction='sum')
+            self.loss = torch.nn.BCELoss(torch.FloatTensor([self.feature_vectors.class_weights()]).to(self.loss.weight.device), reduction='sum')
 
             for _, param in self.cnn.named_parameters():
                 param.requires_grad = False
