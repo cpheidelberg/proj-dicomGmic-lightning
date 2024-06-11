@@ -89,6 +89,7 @@ def main(top_c: int, undersample: bool, using_feature_vectors_since: int, epochs
         accelerator=device,
         devices=[0],
         logger=logger,
+        reload_dataloaders_every_n_epochs=1,
         # profiler="simple",
         # strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
