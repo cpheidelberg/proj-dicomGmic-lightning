@@ -85,9 +85,6 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
     dict_path = os.path.join(parent_path, 'dictionary.csv')
     top_c = 6
 
-    dest_path = '/home/student/gmic/vindr-mammo'
-    labels_path = os.path.join(dest_path, 'labels.txt')
-
     tab = pd.read_csv(dict_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
     
     # Delete images which don't have exactly one category
@@ -97,9 +94,10 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
         else:
             tab.loc[i, 'finding_categories'] = tab.loc[i, 'finding_categories'][0]
 
-    tab = tab.reset_index()
+    tab.reset_index(inplace=True)
     categories = list(tab['finding_categories'].value_counts()[:top_c].keys())
 
+    dest_path = '/home/student/gmic/vindr-mammo'
     for index, category in enumerate(categories):
         os.makedirs(os.path.join(dest_path, str(index)), exist_ok=True)
 
@@ -119,7 +117,7 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
                 image=image
             )
 
-    with open(labels_path, 'w') as labels_file:
+    with open(os.path.join(dest_path, 'labels.txt'), 'w') as labels_file:
         labels_file.write('\n'.join(categories))
 
 
