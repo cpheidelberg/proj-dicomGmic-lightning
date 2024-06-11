@@ -50,17 +50,12 @@ def read_image_png(file_name):
 
 def load_image(image_path, view, horizontal_flip):
     """
-    Loads a png or hdf5 image as floats and flips according to its view.
+    Loads a png image as floats and flips according to its view.
     """
-    if image_path.endswith("png"):
-        image = read_image_png(image_path)
-    else:
-        raise RuntimeError()
-    image = flip_image(image, view, horizontal_flip)
-    return image
 
+    image = read_image_png(image_path)
+    return flip_image(image, view, horizontal_flip)
 
-_random_number_generator = np.random.default_rng()
 
 def process_image(image, view, best_center):
     """
@@ -70,7 +65,7 @@ def process_image(image, view, best_center):
     cropped_image, _ = augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
-        random_number_generator=_random_number_generator,
+        random_number_generator=np.random.RandomState(0),
         best_center=best_center,
         view=view
     )
