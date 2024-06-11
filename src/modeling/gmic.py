@@ -60,7 +60,6 @@ class GMIC(lightning.LightningModule):
         """Load state_dict for layers independent of variable class number and freeze for transfer learning"""
         removed = ("fusion_dnn", "classifier_linear", "postprocess_module")
         fine_tuning = self.hparams.get("fine-tuning", False)
-        using_fv = self._training_on_FV_now()
 
         state = {key: val for key, val in state.items() if not key.startswith(removed)}
         self.cnn.load_state_dict(state, strict=False)
@@ -68,10 +67,10 @@ class GMIC(lightning.LightningModule):
 
         # Freeze layers except for fine-tuning
         for name, param in self.cnn.named_parameters():
-            param.requires_grad = not using_fv and (fine_tuning or name.startswith(removed))
+            param.requires_grad = fine_tuning or name.startswith(removed)
 
         for name, param in self.classifier.named_parameters():
-            param.requires_grad = using_fv or fine_tuning or name.startswith(removed)
+            param.requires_grad = fine_tuning or name.startswith(removed)
 
 
     def forward(self, image):
