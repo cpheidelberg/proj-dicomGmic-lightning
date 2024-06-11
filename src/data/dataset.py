@@ -97,7 +97,7 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
     tab.reset_index(inplace=True)
     categories = list(tab['finding_categories'].value_counts()[:top_c].keys())
 
-    dest_path = '/home/student/gmic/vindr-mammo'
+    dest_path = '/home/student/gmic/vindrmammo_data'
     for index, category in enumerate(categories):
         os.makedirs(os.path.join(dest_path, str(index)), exist_ok=True)
 
