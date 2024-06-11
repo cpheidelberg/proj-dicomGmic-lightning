@@ -33,8 +33,12 @@ def flip_image(image, view, horizontal_flip) -> np.ndarray:
     return np.fliplr(image) if flip else image
 
 
-def read_image(file_name, dtype=np.float32) -> np.ndarray:
-    return np.array(imageio.imread(file_name), dtype=dtype)
+def read_image(path, dtype=np.float32) -> np.ndarray:
+    return np.array(imageio.imread(path), dtype=dtype)
+
+
+def write_image(path, image):
+    imageio.imwrite(path, image)
 
 
 def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
