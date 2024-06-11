@@ -18,61 +18,46 @@
 # ==============================================================================
 
 import numpy as np
+import imageio.v3 as imageio
 from src.constants import VIEWS
-import imageio
-import src.data.augmentations as augmentations
+from src.data import augmentations
 
 
-def flip_image(image, view, horizontal_flip):
+def flip_image(image, view, horizontal_flip) -> np.ndarray:
     """
     If training mode, makes all images face right direction.
     In medical, keeps the original directions unless horizontal_flip is set.
     """
-    if horizontal_flip == 'NO' and VIEWS.is_right(view):
-        return np.fliplr(image)
-    elif horizontal_flip == 'YES' and VIEWS.is_left(view):
-        return np.fliplr(image)
-    else:
-        return image
+    flip  = horizontal_flip == 'NO' and VIEWS.is_right(view)
+    flip |= horizontal_flip == 'YES' and VIEWS.is_left(view)
+    return np.fliplr(image) if flip else image
 
 
-def standard_normalize_single_image(image):
-    """
-    Standardizes an image in-place 
-    """
-    image -= np.mean(image)
-    image /= np.maximum(np.std(image), 10**(-5))
+def read_image(file_name, dtype=np.float32) -> np.ndarray:
+    return np.array(imageio.imread(file_name), dtype=dtype)
 
 
-def read_image_png(file_name):
-    return np.array(imageio.imread(file_name), dtype=np.float32)
-
-
-def load_image(image_path, view, horizontal_flip):
-    """
-    Loads a png image as floats and flips according to its view.
-    """
-
-    image = read_image_png(image_path)
-    return flip_image(image, view, horizontal_flip)
-
-
-def process_image(image, view, best_center):
-    """
-    Applies augmentation window with random noise in location and size
-    and return normalized cropped image.
-    """
-    cropped_image, _ = augmentations.random_augmentation_best_center(
+def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
+    image = flip_image(image, view, horizontal_flip)
+    image, _ = augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
         random_number_generator=np.random.RandomState(0),
         best_center=best_center,
         view=view
     )
+    return image.copy()
 
-    # For test time only, normalize a copy of the cropped image
-    # in order to avoid changing the value of original image which gets augmented multiple times
-    cropped_image = cropped_image.copy()
-    standard_normalize_single_image(cropped_image)
 
-    return cropped_image
+def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
+    """
+    Applies augmentation window with random noise in location and size
+    and return normalized cropped image.
+    """
+    image = flip_and_crop(image, view, horizontal_flip, best_center)
+
+    # Standardizes an image in-place 
+    image -= np.mean(image)
+    image /= np.maximum(np.std(image), 10**(-5))
+
+    return image

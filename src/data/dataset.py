@@ -30,8 +30,8 @@ class ClassificationImage:
         return ClassificationImage(path, view, category, center)
 
     def image(self):
-        img = loading.load_image(self.path, self.view, horizontal_flip='NO')
-        return loading.process_image(img, self.view, self.center)
+        img = loading.read_image(self.path)
+        return loading.process_image(img, self.view, 'NO', self.center)
 
     def encoding(self, categories: list[str]):
         enc = np.zeros(len(categories), dtype=np.float32)
