@@ -53,15 +53,23 @@ def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
     return image.copy()
 
 
+def _standardize(image):
+    # Standardizes an image in-place 
+    image -= np.mean(image)
+    image /= np.maximum(np.std(image), 10**(-5))
+
+
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
     image = flip_and_crop(image, view, horizontal_flip, best_center)
+    _standardize(image)
+    return image
 
-    # Standardizes an image in-place 
-    image -= np.mean(image)
-    image /= np.maximum(np.std(image), 10**(-5))
 
+def read_image_standardized(path) -> np.ndarray:
+    image = read_image(path)
+    _standardize(image)
     return image
