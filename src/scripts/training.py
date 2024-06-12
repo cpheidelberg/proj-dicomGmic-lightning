@@ -30,7 +30,6 @@ def main(using_feature_vectors_since: int, epochs: int):
 
     data_path = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     data_dir = '/home/student/gmic/vindrmammo_data'
-    dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'segmentation')
 
     # set hyperparameters
