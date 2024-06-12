@@ -101,4 +101,4 @@ def main(using_feature_vectors_since: int, epochs: int):
 if __name__ == "__main__":
     # main(top_c=2, undersample=True, using_feature_vectors_since=999, epochs=64)      # ~/gmic/tb_logs/awsTest/version_0
     # main(top_c=6, undersample=False, using_feature_vectors_since=999, epochs=16)     # ~/gmic/tb_logs/awsTest/version_1
-    main(using_feature_vectors_since=8, epochs=16)
+    main(using_feature_vectors_since=1, epochs=16)

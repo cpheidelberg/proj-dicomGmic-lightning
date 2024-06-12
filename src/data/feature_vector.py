@@ -1,5 +1,3 @@
-import io
-import sqlite3 as sql
 import torch.utils.data
 import numpy as np
 import scipy.spatial
@@ -29,97 +27,54 @@ class SMOTE:
                 yield self._random_linear_combination(point, neighbour)
 
 
-def _np_dumps(array: np.ndarray) -> bytes:
-    with io.BytesIO() as buffer:
-        np.save(buffer, array)
-        return buffer.getvalue()
+def _to_vector(global_vec: np.ndarray, h_crops: np.ndarray):
+    return np.concatenate((global_vec.flatten(), h_crops.flatten()), dtype=np.float32)
 
 
-def _np_loads(array: bytes) -> np.ndarray:
-    return np.load(io.BytesIO(array))
+def _from_vector(vector: np.ndarray):
+    global_vec = vector[:256].reshape((256,))
+    h_crops = vector[256:].reshape((-1, 512))
+    return global_vec, h_crops
 
 
 class Storage(torch.utils.data.Dataset):
-    def __init__(self, path: str, num_classes: int):
+    def __init__(self, num_classes: int):
         self._num_classes = num_classes
-        self._path = path
-
-        with sql.connect(self._path) as con:
-            con.execute('CREATE TABLE IF NOT EXISTS original  (label, vector)')
-            con.execute('CREATE TABLE IF NOT EXISTS synthetic (label, vector)')
-
-
-    def _select_original(self, cur: sql.Cursor, label: int):
-        vectors = []
-        for vector, in cur.execute('SELECT vector FROM original WHERE label = ? ORDER BY RANDOM()', (label,)):
-            vectors.append(_np_loads(vector))
-        return np.array(vectors, dtype=np.float32)
-
-
-    def _insert_synthetic(self, cur: sql.Cursor, label: int, synthetic):
-        for vector in synthetic:
-            cur.execute('INSERT INTO synthetic VALUES (?, ?)', (label, _np_dumps(vector)))
-
-
-    def _synthesise_vectors(self, cur: sql.Cursor, label: int, n: int, k: int):
-        if n == 1:
-            cur.execute('INSERT INTO synthetic SELECT * FROM original WHERE label = ?', (label, ))
-        else:
-            self._insert_synthetic(cur, label, SMOTE(self._select_original(cur, label)).generate(n, k))
-
-
-    def _marshall(self, global_vec: np.ndarray, h_crops: np.ndarray):
-        return _np_dumps(np.concatenate((global_vec.flatten(), h_crops.flatten()), dtype=np.float32))
-
-
-    def _unmarshall(self, vector: bytes):
-        vector = _np_loads(vector).astype(np.float32, copy=False)
-        global_vec = vector[:256].reshape((256,))
-        h_crops = vector[256:].reshape((self._num_classes, 512))
-        return global_vec, h_crops
+        self._original = [[] for _ in range(num_classes)]
+        self._synthetic = [[] for _ in range(num_classes)]
 
 
     def synthesise(self):
-        with sql.connect(self._path) as con:
-            cur = con.cursor()
+        self._synthetic.clear()
+        self._synthetic[0] = self._original[0]
 
-            sizes = [size for size, in con.execute('SELECT COUNT(*) FROM original GROUP BY label ORDER BY label')]
-            largest = max(sizes)
-
-            for label, size in enumerate(sizes):
-                self._synthesise_vectors(cur, label, n=min(20, largest // size), k=5)
-
-
-    def clear(self):
-        with sql.connect(self._path) as con:
-            con.execute('DELETE FROM original')
-            con.execute('DELETE FROM synthetic')
+        for label in range(1, self._num_classes):
+            ratio = len(self._original[0]) // len(self._original[label])
+            self._synthetic[label] = list(SMOTE(self._original[label]).generate(n=min(20, ratio), k=5))
 
 
     def class_weights(self):
-        with sql.connect(self._path) as con:
-            sizes = [size for size, in con.execute('SELECT COUNT(*) FROM synthetic GROUP BY label ORDER BY label')]
-            avg = sum(sizes) / len(sizes)
-            return [avg / size for size in sizes]
+        sizes = [len(vectors) for vectors in self._synthetic]
+        avg = sum(sizes) / len(sizes)
+        return [avg / size for size in sizes]
 
 
     def add(self, labels, global_vec, h_crops):
-        with sql.connect(self._path) as con:
-            cur = con.cursor()
-            for label, gv, hc in zip(labels, global_vec, h_crops):
-                cur.execute('INSERT INTO original (label, vector) VALUES (?, ?)', (label, self._marshall(gv, hc)))
+        for label, gv, hc in zip(labels, global_vec, h_crops):
+            self._original[label].append(_to_vector(gv, hc))
 
 
     def __len__(self):
-        with sql.connect(self._path) as con:
-            return con.execute('SELECT COUNT(*) FROM synthetic').fetchone()[0]
+        return sum(len(vectors) for vectors in self._synthetic)
 
 
     def __getitem__(self, i: int):
-        with sql.connect(self._path) as con:
-            label, vector = con.execute('SELECT label, vector FROM synthetic ORDER BY rowid LIMIT 1 OFFSET ?', (i,)).fetchone()
+        label = 0
+        while i >= len(self._synthetic[label]):
+            i -= len(self._synthetic[label])
+            label += 1
 
-            x = self._unmarshall(vector)
-            y = np.zeros(self._num_classes, dtype=np.float32)
-            y[label] = 1
-            return x, y
+        x = _from_vector(self._synthetic[label][i])
+        y = np.zeros(self._num_classes, dtype=np.float32)
+        y[label] = 1
+        return x, y
