@@ -45,6 +45,7 @@ class Storage(torch.utils.data.Dataset):
 
 
     def synthesise(self):
+        self._original = np.array(self._original, dtype=np.float32, copy=False)
         self._synthetic[0] = self._original[0]
 
         for label in range(1, self._num_classes):
