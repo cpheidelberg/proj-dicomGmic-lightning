@@ -27,7 +27,6 @@ def main(using_feature_vectors_since: int, epochs: int):
 
     # set path variables
     model_path = './models/'
-    feature_vectors_path = './feature_vectors.sql'
 
     data_path = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     data_dir = '/home/student/gmic/vindrmammo_data'
@@ -65,7 +64,7 @@ def main(using_feature_vectors_since: int, epochs: int):
     classification_images = dataset.ClassificationImages(data_dir)
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
-    feature_vectors = feature_vector.Storage(feature_vectors_path, parameters['num_classes'])
+    feature_vectors = feature_vector.Storage(parameters['num_classes'])
 
     # Training
     model = gmic.GMIC(
