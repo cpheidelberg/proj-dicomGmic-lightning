@@ -64,7 +64,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "use_v1_global": False,
     }
 
-    classification_images = dataset.ClassificationImages(data_dir)
+    classification_images = dataset.ClassificationImages(data_dir, parameters['undersampling_rate'], parameters['augmentation_rate'])
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
 
