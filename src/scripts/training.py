@@ -14,7 +14,7 @@ from src.modeling import gmic
 from src.data import dataset, feature_vector
 
 
-def main(top_c: int, undersample: bool, using_feature_vectors_since: int, epochs: int):
+def main(using_feature_vectors_since: int, epochs: int):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -30,7 +30,7 @@ def main(top_c: int, undersample: bool, using_feature_vectors_since: int, epochs
     feature_vectors_path = './feature_vectors.sql'
 
     data_path = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    image_dir = os.path.join(data_path, 'cropped_images')
+    data_dir = '/home/student/gmic/vindrmammo_data'
     dict_path = os.path.join(data_path, 'dictionary.csv')
     segmentation_path = os.path.join(data_path, 'segmentation')
 
@@ -58,13 +58,11 @@ def main(top_c: int, undersample: bool, using_feature_vectors_since: int, epochs
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": top_c, # output classes
+        "num_classes": 6, # output classes
         "use_v1_global": False,
     }
 
-    classification_images = dataset.ClassificationImages(image_dir, dict_path, top_c=parameters['num_classes'])
-    if undersample:
-        classification_images.undersample()
+    classification_images = dataset.ClassificationImages(data_dir)
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
     feature_vectors = feature_vector.Storage(feature_vectors_path, parameters['num_classes'])
@@ -103,4 +101,4 @@ def main(top_c: int, undersample: bool, using_feature_vectors_since: int, epochs
 if __name__ == "__main__":
     # main(top_c=2, undersample=True, using_feature_vectors_since=999, epochs=64)      # ~/gmic/tb_logs/awsTest/version_0
     # main(top_c=6, undersample=False, using_feature_vectors_since=999, epochs=16)     # ~/gmic/tb_logs/awsTest/version_1
-    main(top_c=6, undersample=False, using_feature_vectors_since=8, epochs=16)
+    main(using_feature_vectors_since=8, epochs=16)
