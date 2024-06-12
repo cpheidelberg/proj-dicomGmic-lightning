@@ -11,10 +11,10 @@ parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
 from src.modeling import gmic
-from src.data import dataset, feature_vector
+from src.data import dataset
 
 
-def main(using_feature_vectors_since: int, epochs: int):
+def run_training(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -43,7 +43,11 @@ def main(using_feature_vectors_since: int, epochs: int):
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
-        "using_feature_vectors_since": using_feature_vectors_since,
+
+        "undersampling_rate": undersampling_rate,
+        "augmentation_rate": augmentation_rate,
+        "smote_rate": smote_rate,
+        "epoch_smote": epoch_smote,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -63,17 +67,15 @@ def main(using_feature_vectors_since: int, epochs: int):
     classification_images = dataset.ClassificationImages(data_dir)
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
-    feature_vectors = feature_vector.Storage(parameters['num_classes'])
 
     # Training
     model = gmic.GMIC(
         parameters=parameters,
-        feature_vectors=feature_vectors,
         dataset_train=dataset_train,
         dataset_valid=dataset_valid,
         dataset_test=dataset_test,
         model_path=model_path,
-        image_class_weights=classification_images.class_weights
+        image_class_weights=classification_images.class_weights()
     )
 
     logger = loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
@@ -97,6 +99,4 @@ def main(using_feature_vectors_since: int, epochs: int):
 
 
 if __name__ == "__main__":
-    # main(top_c=2, undersample=True, using_feature_vectors_since=999, epochs=64)      # ~/gmic/tb_logs/awsTest/version_0
-    # main(top_c=6, undersample=False, using_feature_vectors_since=999, epochs=16)     # ~/gmic/tb_logs/awsTest/version_1
-    main(using_feature_vectors_since=1, epochs=16)
+    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.5, smote_rate=0.9)

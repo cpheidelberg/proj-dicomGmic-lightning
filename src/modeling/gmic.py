@@ -7,21 +7,20 @@ import torchmetrics.functional.classification as metrics
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
+from src.data import dataset
 
 
 class GMIC(lightning.LightningModule):
 
-    def __init__(self, parameters, image_class_weights, feature_vectors=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
+    def __init__(self, parameters, image_class_weights, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path=None):
         super(GMIC, self).__init__()
         self.save_hyperparameters(parameters)
 
-        self.feature_vectors = feature_vectors
+        self.feature_vectors = dataset.FeatureVectors(self.hparams.smote_rate)
         self.dataset_train = dataset_train
         self.dataset_valid = dataset_valid
         self.dataset_test = dataset_test
         self.dataset_predict = dataset_predict
-
-        self.using_feature_vectors_since = int(parameters.get('using_feature_vectors_since', 1 << 32))
 
         self.cnn = cnn.CNN(parameters)
         self.classifier = classifier.Classifier(parameters)
@@ -38,10 +37,10 @@ class GMIC(lightning.LightningModule):
 
 
     def _training_on_FV_now(self):
-        return self.current_epoch >= self.using_feature_vectors_since
+        return self.current_epoch >= self.hparams.epoch_smote
 
     def _training_on_FV_next(self):
-        return self.current_epoch + 1 == self.using_feature_vectors_since
+        return self.current_epoch + 1 == self.hparams.epoch_smote < self.hparams.epochs
 
     def on_train_epoch_start(self):
         if self._training_on_FV_now():
@@ -199,7 +198,7 @@ class GMIC(lightning.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self._training_on_FV_now() and self.feature_vectors:
+        if self._training_on_FV_now():
             return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=10, shuffle=True)
         else:
             return DataLoader(self.dataset_train, batch_size=self.hparams.batch_size, num_workers=10, shuffle=True)
