@@ -11,13 +11,13 @@ def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: s
     dst_name = f'{category_index}/{src_name}'
     dcm_name = '/'.join(line['dicom'].split('/')[-2:])
 
-    # view = line['view']
-    # horizontal_flip = line['horizontal_flip']
-    # best_center = line['best_center'][view][0]
+    view = line['view']
+    horizontal_flip = line['horizontal_flip']
+    best_center = line['best_center'][view][0]
 
-    # image = loading.read_image(os.path.join(src_dir, src_name), dtype=None)
-    # image = loading.flip_and_crop(image, view, horizontal_flip, best_center)
-    # loading.write_image(os.path.join(dst_dir, dst_name), image)
+    image = loading.read_image(os.path.join(src_dir, src_name), dtype=None)
+    image = loading.flip_and_crop(image, view, horizontal_flip, best_center)
+    loading.write_image(os.path.join(dst_dir, dst_name), image)
     return dst_name, dcm_name, category_name
 
 
