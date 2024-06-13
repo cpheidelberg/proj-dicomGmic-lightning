@@ -108,11 +108,11 @@ class FeatureVectors(Dataset):
         return [avg / size for size in sizes]
 
 
-    def _to_vector(global_vec: np.ndarray, h_crops: np.ndarray):
+    def _to_vector(self, global_vec: np.ndarray, h_crops: np.ndarray):
         return np.concatenate((global_vec.flatten(), h_crops.flatten()), dtype=np.float32)
 
 
-    def _from_vector(vector: np.ndarray):
+    def _from_vector(self, vector: np.ndarray):
         global_vec = vector[:256].reshape((256,))
         h_crops = vector[256:].reshape((-1, 512))
         return global_vec, h_crops
