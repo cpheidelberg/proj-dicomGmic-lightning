@@ -19,7 +19,7 @@ _aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBright
 
 class ClassificationImages(Dataset):
     def __init__(self, data_dir: str, undersampling_rate: float, augmentation_rate: float):
-        self.label_num = len(entry for entry in os.scandir(data_dir) if entry.is_dir())
+        self.label_num = sum(1 for entry in os.scandir(data_dir) if entry.is_dir())
 
         self.images = [[entry.path for entry in os.scandir(os.path.join(data_dir, f'{i}'))] for i in range(self.label_num)]
 
