@@ -19,16 +19,15 @@ _aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBright
 
 class ClassificationImages(Dataset):
     def __init__(self, data_dir: str, undersampling_rate: float, augmentation_rate: float):
-        with open(os.path.join(data_dir, 'labels.txt')) as labels_file:
-            self.labels = [label.strip() for label in labels_file]
+        self.label_num = len(entry for entry in os.scandir(data_dir) if entry.is_dir())
 
-        self.images = [[entry.path for entry in os.scandir(os.path.join(data_dir, f'{i}'))] for i in range(len(self.labels))]
+        self.images = [[entry.path for entry in os.scandir(os.path.join(data_dir, f'{i}'))] for i in range(self.label_num)]
 
         c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
         self.images[0] = random.sample(self.images[0], c_max)
 
         self.sizes = [_geometric_mean(c_max, len(images), augmentation_rate) for images in self.images]
-        self.offsets = [sum(self.sizes[:i]) for i in range(len(self.labels) + 1)]
+        self.offsets = [sum(self.sizes[:i]) for i in range(self.label_num + 1)]
 
 
     def class_weights(self):
@@ -41,7 +40,7 @@ class ClassificationImages(Dataset):
 
 
     def __getitem__(self, index: int):
-        label = next(i for i in range(len(self.labels)) if self.offsets[i] <= index < self.offsets[i + 1])
+        label = next(i for i in range(self.label_num) if self.offsets[i] <= index < self.offsets[i + 1])
         position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
         x = loading.read_image_standardized(self.images[label][position])
