@@ -113,8 +113,8 @@ class FeatureVectors(Dataset):
 
 
     def _from_vector(self, vector: np.ndarray):
-        global_vec = vector[:256].reshape((256,))
-        h_crops = vector[256:].reshape((-1, 512))
+        global_vec = vector[:256].reshape((256,)).astype(np.float32, copy=False)
+        h_crops = vector[256:].reshape((-1, 512)).astype(np.float32, copy=False)
         return global_vec, h_crops
 
 
