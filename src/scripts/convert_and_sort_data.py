@@ -9,7 +9,7 @@ from src.data import loading
 def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: str, category_index: int):
     src_name = line['image'] + '.png'
     dst_name = f'{category_index}/{src_name}'
-    dcm_name = line['dicom'].split('/')[-2:]
+    dcm_name = '/'.join(line['dicom'].split('/')[-2:])
 
     # view = line['view']
     # horizontal_flip = line['horizontal_flip']
