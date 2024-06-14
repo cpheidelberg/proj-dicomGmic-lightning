@@ -1,7 +1,7 @@
 # Adapted version of the forked GMIC project classifying DICOM files and creating DICOM SR description files with ROIs
 
 ## Introduction
-This is an implementation of the Globally-Aware Multiple Instance Classifier (GMIC) model as described in [our paper](https://arxiv.org/abs/2002.07613).  
+This is a forked implementation of the Globally-Aware Multiple Instance Classifier (GMIC) model as described in [our paper](https://arxiv.org/abs/2002.07613). The original source code is available in a [GitHub repository](https://github.com/nyukat/GMIC).
 The implementation allows users to obtain breast cancer predictions and visualization of saliency maps by applying one of our pretrained models. We provide weights for 5 GMIC-ResNet-18 models. The model is implemented in PyTorch. 
 
 Code functionality:
