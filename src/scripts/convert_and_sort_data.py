@@ -6,9 +6,9 @@ sys.path.append(parent_dir)
 from src.data import loading
 
 
-def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: str, category_index: int):
+def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: str, category_index: int, index: int):
     src_name = line['image'] + '.png'
-    dst_name = f'{category_index}/{src_name}'
+    dst_name = f'{category_index}/{index}.png'
     dcm_name = '/'.join(line['dicom'].split('/')[-2:])
 
     view = line['view']
@@ -43,8 +43,8 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
     for category_index, category_name in enumerate(categories):
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
-        for line in dctn[dctn['finding_categories'] == category_name].iloc:
-            mapp.loc[len(mapp), :] = _process_image(src_dir, dst_dir, line, category_name, category_index)
+        for i, line in enumerate(dctn[dctn['finding_categories'] == category_name].iloc):
+            mapp.loc[len(mapp), :] = _process_image(src_dir, dst_dir, line, category_name, category_index, i)
 
     mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
 
