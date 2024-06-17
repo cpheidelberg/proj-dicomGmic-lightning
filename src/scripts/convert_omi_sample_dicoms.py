@@ -31,7 +31,7 @@ def get_best_center(image: np.ndarray, view: str, horizontal_flip: str):
 
 
 def get_category(file: dcm.FileDataset, data: dict):
-    screening = data['SCREENING'][file.ImageLaterality]
+    screening = data.get('SCREENING', {}).get(file.ImageLaterality, {})
     if screening.get('Mass'):
         return 'Mass'
     elif screening.get('Microcalcification') or screening.get('MicrocalcWithMass'):
