@@ -15,9 +15,14 @@ class _dicom:
     @staticmethod
     def get_category(file: pydicom.FileDataset, data: dict):
         screening = data.get('SCREENING', {}).get(file.ImageLaterality, {})
+        lesions = data.get('LESION', {}).get(file.ImageLaterality, {})
+        lesion = ','.join(l.get('LesionDescription', '') for l in lesions.values()).lower()
+
+        print(lesion)
+
         if screening.get('Mass'):
             return 'Mass'
-        elif screening.get('Microcalcification') or screening.get('MicrocalcWithMass'):
+        elif 'calcification' in lesion or screening.get('Microcalcification') or screening.get('MicrocalcWithMass'):
             return 'Suspicious Calcification'
         else:
             return 'No Finding'
@@ -50,8 +55,7 @@ def _process_dicom(path: str, data: dict) -> list[_dicom]:
     try:
         return [_dicom(path, data)]
     except RuntimeError:
-        with pydicom.read_file(path) as file:
-            print('Error: ', path, _dicom.get_category(file, data), data)
+        print('Error!')
         return []
 
 
