@@ -56,7 +56,7 @@ def convert_file(path: str, data: dict):
 
 def convert_patient(root: str, patient: str):
     with open(os.path.join(root, 'DATA', patient, f'NBSS_{patient}.json')) as file:
-        episodes = list(json.load(file).values())
+        episodes = [value for value in json.load(file).values() if isinstance(value, dict)]
 
     studies = [(study, data) for data in episodes for study in data['StudyList'].split(',') if study]
     paths = [(e.path, data) for study, data in studies for e in os.scandir(os.path.join(root, 'IMAGES', patient, study))]
