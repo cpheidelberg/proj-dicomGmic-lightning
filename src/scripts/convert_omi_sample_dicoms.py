@@ -12,7 +12,8 @@ import src.data.loading as loading
 
 
 class _dicom:
-    def get_category(self, file: pydicom.FileDataset, data: dict):
+    @staticmethod
+    def get_category(file: pydicom.FileDataset, data: dict):
         screening = data.get('SCREENING', {}).get(file.ImageLaterality, {})
         if screening.get('Mass'):
             return 'Mass'
@@ -41,7 +42,7 @@ class _dicom:
             self.image = file.pixel_array
             self.view = f'{file.ImageLaterality}-{file.ViewPosition}'
             self.horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
-            self.category = self.get_category(file, data)
+            self.category = _dicom.get_category(file, data)
             self.center = self.get_center()
 
 
@@ -49,6 +50,8 @@ def _process_dicom(path: str, data: dict) -> list[_dicom]:
     try:
         return [_dicom(path, data)]
     except RuntimeError:
+        with pydicom.read_file(path) as file:
+            print('Error: ', path, _dicom.get_category(file, data), data)
         return []
 
 
@@ -92,18 +95,18 @@ def _save_image(dcm: _dicom, category_index: int, category_name: str, dst_dir: s
 
 def main(src_dir: str, dst_dir: str):
     dicoms = _process_patients(src_dir)
-    categories = _sorted_categories(dicoms)
-    dicoms = _divide_dicoms(dicoms, categories)
+    # categories = _sorted_categories(dicoms)
+    # dicoms = _divide_dicoms(dicoms, categories)
 
-    mapp = pd.DataFrame({'png': [], 'dicom': [], 'label': []}, dtype=str)
+    # mapp = pd.DataFrame({'png': [], 'dicom': [], 'label': []}, dtype=str)
 
-    for category_index, category_name in enumerate(categories):
-        os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
+    # for category_index, category_name in enumerate(categories):
+    #     os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
-        for i, dcm in enumerate(dicoms[category_index]):
-            mapp.loc[len(mapp), :] = _save_image(dcm, category_index, category_name, dst_dir, i)
+    #     for i, dcm in enumerate(dicoms[category_index]):
+    #         mapp.loc[len(mapp), :] = _save_image(dcm, category_index, category_name, dst_dir, i)
 
-    mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
+    # mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
 
 
 if __name__ == '__main__':
