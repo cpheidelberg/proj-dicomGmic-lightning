@@ -61,7 +61,13 @@ def convert_patient(root: str, patient: str):
     studies = [(study, data) for data in episodes for study in data['StudyList'].split(',') if study]
     paths = [(e.path, data) for study, data in studies for e in os.scandir(os.path.join(root, 'IMAGES', patient, study))]
 
-    return [convert_file(path, data) for path, data in paths]
+    result = []
+    for path, data in paths:
+        try:
+            result.append(convert_file(path, data))
+        except RuntimeError:
+            pass
+    return result
 
 
 def convert_all(root: str) -> list:
