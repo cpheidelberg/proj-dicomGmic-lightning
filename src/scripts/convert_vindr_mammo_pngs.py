@@ -22,8 +22,8 @@ def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: s
 
 
 def convert_vindr_mammo_dataset_to_our_storage_format():
-    src_dir = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images'
-    dictionary_path = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv'
+    src_dir = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images'
+    dictionary_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv'
     top_c = 6
 
     dctn = pd.read_csv(dictionary_path, converters={'best_center': ast.literal_eval, 'finding_categories': ast.literal_eval})
@@ -39,7 +39,7 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
     dctn.reset_index(inplace=True)
     categories = list(dctn['finding_categories'].value_counts()[:top_c].keys())
 
-    dst_dir = '/home/student/gmic/vindrmammo_data'
+    dst_dir = '/home/ubuntu/gmic/vindrmammo_data'
     for category_index, category_name in enumerate(categories):
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
