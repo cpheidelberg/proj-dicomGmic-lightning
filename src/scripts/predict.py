@@ -193,7 +193,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    model_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
+    checkpoint_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
     dicom_file = '1-1.dcm'
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
     image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
     image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
-    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionaryTop6.csv')
+    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
     output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
     h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         "device_type": device,
         "gpu_number": 0,
         "batch_size": 1,
-        "pretrained": True,
+        "pretrained": False,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -240,16 +240,19 @@ if __name__ == "__main__":
     # Training
     lightningModule = trainer.GMICTrainer(
                         parameters=parameters,
-                        dataset_predict=dataTrain,
-                        model_path=model_path
+                        dataset_predict=dataTrain
                     )
-
-    trainer = pl.Trainer(fast_dev_run=True,
-                        accelerator=device, 
-                        devices=[parameters["gpu_number"]],
-                    )
-
-    prediction = trainer.predict(lightningModule)
+    if device == "gpu":
+        trainer = pl.Trainer(fast_dev_run=True,
+                            accelerator=device, 
+                            devices=[parameters["gpu_number"]],
+                        )
+    else:
+        trainer = pl.Trainer(fast_dev_run=True,
+                            accelerator=device, 
+                        )
+        
+    prediction = trainer.predict(lightningModule, ckpt_path=checkpoint_path)
     
     print(f"Categories: {data.unique_categories}")
     print("Prediction: {}".format(prediction))
