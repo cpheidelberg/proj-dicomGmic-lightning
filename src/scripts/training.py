@@ -28,8 +28,8 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     # set path variables
     model_path = './models/'
 
-    data_path = '/home/student/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    data_dir = '/home/student/gmic/vindrmammo_data'
+    data_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
+    data_dir = '/home/ubuntu/gmic/vindrmammo_data'
     segmentation_path = os.path.join(data_path, 'segmentation')
 
     # set hyperparameters
