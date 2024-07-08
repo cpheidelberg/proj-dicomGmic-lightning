@@ -99,14 +99,17 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
-    print('version_1: run_training(epochs=16, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.5, smote_rate=0.9)')
-    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.5, smote_rate=0.9)
+    print('version_1: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0)')
+    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0)
 
-    print('version_2: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.5, augmentation_rate=0.5, smote_rate=0.9)')
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.5, augmentation_rate=0.5, smote_rate=0.9)
+    print('version_2: run_training(epochs=16, epoch_smote=16, undersampling_rate=1.0, augmentation_rate=0.0, smote_rate=0.0)')
+    run_training(epochs=16, epoch_smote=16, undersampling_rate=1.0, augmentation_rate=0.0, smote_rate=0.0)
 
-    print('version_3: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=1.0, smote_rate=0.9)')
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=1.0, smote_rate=0.9)
+    print('version_3: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=1.0, smote_rate=0.0)')
+    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=1.0, smote_rate=0.0)
 
-    print('version_4: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.9)')
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.9)
+    print('version_4: run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=1.0)')
+    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=1.0)
+
+    print('version_5: run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.4, smote_rate=0.5)')
+    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.4, smote_rate=0.5)
