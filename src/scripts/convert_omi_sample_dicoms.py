@@ -13,16 +13,18 @@ import src.data.loading as loading
 
 class _dicom:
     @staticmethod
-    def get_category(file: pydicom.FileDataset, data: dict):
-        lesions = data.get('LESION', {}).get(file.ImageLaterality, {})
-        lesion = ';'.join(l.get('LesionDescription', '') for l in lesions.values()).lower()
+    def get_category(data: list[dict]):
+        for lesion in data:
+            if lesion.get('Mass') == 1:
+                return 'Mass'
+            if lesion.get('SuspiciousCalcifications') is not None:
+                return 'Suspicious Calcification'
+            if lesion.get('FocalAsymmetry') is not None:
+                return 'Focal Asymmetry'
+            if lesion.get('ArchitecturalDistortion') is not None:
+                return 'Architectural Distortion'
 
-        if 'mass' in lesion:
-            return 'Mass'
-        elif 'calcification' in lesion:
-            return 'Suspicious Calcification'
-        else:
-            return 'No Finding'
+        return 'No Finding'
 
     def get_center(self):
         mode = 'right' if self.view.startswith('R') else 'left'
@@ -38,13 +40,13 @@ class _dicom:
         }
         return centers.extract_center(datum, self.image)
 
-    def __init__(self, path: str, data: dict):
+    def __init__(self, path: str, data: list[dict]):
         with pydicom.read_file(path) as file:
             self.path = path
             self.image = file.pixel_array
             self.view = f'{file.ImageLaterality}-{file.ViewPosition}'
             self.horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
-            self.category = _dicom.get_category(file, data)
+            self.category = _dicom.get_category(data)
             self.center = self.get_center()
 
 
@@ -56,11 +58,17 @@ def _process_dicom(path: str, data: dict) -> list[_dicom]:
 
 
 def _process_patient(root: str, patient: str):
-    with open(os.path.join(root, 'DATA', patient, f'NBSS_{patient}.json')) as file:
-        episodes = [value for value in json.load(file).values() if isinstance(value, dict)]
+    scans = []
+    with open(os.path.join(root, 'DATA', patient, f'IMAGEDB_{patient}.json')) as file:
+        loaded = json.load(file)['STUDIES']
+        folders = [(folder, val) for folder, it in loaded.items() for val in it.values()]
+        dicts = [(folder, val) for folder, val in folders if isinstance(val, dict)]
+        scans = [(f'{folder}/{key}.dcm', val) for folder, dic in dicts for key, val in dic.items()]
+        findings = {scan: (list(lesions.values()) if lesions else []) for scan, lesions in scans}
 
-    studies = [(study, data) for data in episodes for study in data['StudyList'].split(',') if study]
-    paths = [(e.path, data) for study, data in studies for e in os.scandir(os.path.join(root, 'IMAGES', patient, study))]
+    studies = [studies.path for studies in os.scandir(os.path.join(root, 'IMAGES', patient))]
+    images = ['/'.join(scan.path.split('/')[-2:]) for study in studies for scan in os.scandir(study)]
+    paths = [(os.path.join(root, 'IMAGES', patient, img), findings[img]) for img in images]
 
     return [dcm for path, data in paths for dcm in _process_dicom(path, data)]
 
