@@ -2,6 +2,8 @@ import pydicom
 import pandas as pd
 import os, json, sys
 
+import pydicom.errors
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
@@ -41,7 +43,6 @@ class _dicom:
         return centers.extract_center(datum, self.image)
 
     def __init__(self, path: str, data: list[dict]):
-        print(path)
         with pydicom.read_file(path) as file:
             self.path = path
             self.image = file.pixel_array
@@ -54,7 +55,7 @@ class _dicom:
 def _process_dicom(path: str, data: dict) -> list[_dicom]:
     try:
         return [_dicom(path, data)]
-    except RuntimeError:
+    except RuntimeError | pydicom.errors.InvalidDicomError:
         return []
 
 
@@ -64,7 +65,7 @@ def _process_patient(root: str, patient: str):
         try:
             loaded = json.loads(file.read())['STUDIES']
         except:
-            print('Could not load for patient:', patient)
+            print('Could not load JSON for patient:', patient)
             return []
 
     folders = [(folder, val) for folder, it in loaded.items() for val in it.values()]
