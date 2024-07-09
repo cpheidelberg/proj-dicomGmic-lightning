@@ -71,8 +71,8 @@ def _process_patient(root: str, patient: str):
     scans = [(f'{folder}/{key}.dcm', val) for folder, dic in dicts for key, val in dic.items()]
     findings = {scan: (list(lesions.values()) if lesions else []) for scan, lesions in scans}
 
-    studies = [studies.path for studies in os.scandir(os.path.join(root, 'IMAGES', patient))]
-    images = ['/'.join(scan.path.split('/')[-2:]) for study in studies for scan in os.scandir(study)]
+    studies = os.listdir(os.path.join(root, 'IMAGES', patient))
+    images = [f'{study}/{img}' for study in studies for img in os.listdir(os.path.join(root, 'IMAGES', patient, study))]
     paths = [(os.path.join(root, 'IMAGES', patient, img), findings[img]) for img in images]
 
     return [dcm for path, data in paths for dcm in _process_dicom(path, data)]
