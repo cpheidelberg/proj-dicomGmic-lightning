@@ -60,7 +60,11 @@ def _process_dicom(path: str, data: dict) -> list[_dicom]:
 def _process_patient(root: str, patient: str):
     scans = []
     with open(os.path.join(root, 'DATA', patient, f'IMAGEDB_{patient}.json')) as file:
-        loaded = json.loads(file.read())['STUDIES']
+        try:
+            loaded = json.loads(file.read())['STUDIES']
+        except:
+            print('Could not load for patient:', patient)
+            return []
 
     folders = [(folder, val) for folder, it in loaded.items() for val in it.values()]
     dicts = [(folder, val) for folder, val in folders if isinstance(val, dict)]
