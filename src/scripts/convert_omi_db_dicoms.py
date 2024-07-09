@@ -60,11 +60,12 @@ def _process_dicom(path: str, data: dict) -> list[_dicom]:
 def _process_patient(root: str, patient: str):
     scans = []
     with open(os.path.join(root, 'DATA', patient, f'IMAGEDB_{patient}.json')) as file:
-        loaded = json.load(file)['STUDIES']
-        folders = [(folder, val) for folder, it in loaded.items() for val in it.values()]
-        dicts = [(folder, val) for folder, val in folders if isinstance(val, dict)]
-        scans = [(f'{folder}/{key}.dcm', val) for folder, dic in dicts for key, val in dic.items()]
-        findings = {scan: (list(lesions.values()) if lesions else []) for scan, lesions in scans}
+        loaded = json.loads(file.read())['STUDIES']
+
+    folders = [(folder, val) for folder, it in loaded.items() for val in it.values()]
+    dicts = [(folder, val) for folder, val in folders if isinstance(val, dict)]
+    scans = [(f'{folder}/{key}.dcm', val) for folder, dic in dicts for key, val in dic.items()]
+    findings = {scan: (list(lesions.values()) if lesions else []) for scan, lesions in scans}
 
     studies = [studies.path for studies in os.scandir(os.path.join(root, 'IMAGES', patient))]
     images = ['/'.join(scan.path.split('/')[-2:]) for study in studies for scan in os.scandir(study)]
