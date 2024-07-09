@@ -55,7 +55,9 @@ class _dicom:
 def _process_dicom(path: str, data: dict) -> list[_dicom]:
     try:
         return [_dicom(path, data)]
-    except RuntimeError | pydicom.errors.InvalidDicomError:
+    except RuntimeError:
+        return []
+    except pydicom.errors.InvalidDicomError:
         return []
 
 
