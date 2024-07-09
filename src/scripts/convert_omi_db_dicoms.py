@@ -41,6 +41,7 @@ class _dicom:
         return centers.extract_center(datum, self.image)
 
     def __init__(self, path: str, data: list[dict]):
+        print(path)
         with pydicom.read_file(path) as file:
             self.path = path
             self.image = file.pixel_array
