@@ -43,6 +43,14 @@ class _dicom:
             self.center = self.get_center()
 
 
+def _process_dicom(path: str) -> list[_dicom]:
+    try:
+        return [_dicom(path)]
+    except BaseException as err:
+        print('Error: ', path, err)
+        return []
+
+
 def _get_paths(root: str) -> list[str]:
     paths = []
     for dirpath, _, filenames in os.walk(root):
@@ -77,7 +85,7 @@ def _save_image(dcm: _dicom, category_index: int, category_name: str, dst_dir: s
 
 
 def main(src_dir: str, dst_dir: str):
-    dicoms = [_dicom(path) for path in _get_paths(src_dir)]
+    dicoms = [dcm for path in _get_paths(src_dir) for dcm in _process_dicom(path)]
 
     categories = _sorted_categories(dicoms)
     dicoms = _divide_dicoms(dicoms, categories)
