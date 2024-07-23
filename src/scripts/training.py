@@ -29,7 +29,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     model_path = './models/'
 
     data_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    data_dir = '/home/ubuntu/gmic/vindrmammo_data'
+    data_dirs = ['/home/ubuntu/gmic/vindrmammo_data', '/home/ubuntu/gmic/omidb_data']
     segmentation_path = os.path.join(data_path, 'segmentation')
 
     # set hyperparameters
@@ -64,7 +64,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "use_v1_global": False,
     }
 
-    classification_images = dataset.ClassificationImages(data_dir, parameters['undersampling_rate'], parameters['augmentation_rate'])
+    classification_images = dataset.ClassificationImages(data_dirs, parameters['undersampling_rate'], parameters['augmentation_rate'])
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
 
