@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import os, sys, random
 import albumentations as alb, albumentations.pytorch as alp
 from torch.utils.data import Dataset
@@ -18,16 +19,26 @@ _aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBright
 
 
 class ClassificationImages(Dataset):
-    def __init__(self, data_dir: str, undersampling_rate: float, augmentation_rate: float):
-        self.label_num = sum(1 for entry in os.scandir(data_dir) if entry.is_dir())
+    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float):
+        tables = []
+        for data_dir in data_dirs:
+            data_dir = data_dir.removesuffix('/')
 
-        self.images = [[entry.path for entry in os.scandir(os.path.join(data_dir, f'{i}'))] for i in range(self.label_num)]
+            mapping = pd.read_csv(f'{data_dir}/mapping.csv')
+            mapping['png'] = f'{data_dir}/' + mapping['png']
+            tables.append(mapping)
+
+        table = pd.concat(tables)
+
+        labels = list(table['label'].value_counts().keys())
+
+        self.images = [list(table[table['label'] == label]['png']) for label in labels]
 
         c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
         self.images[0] = random.sample(self.images[0], c_max)
 
         self.sizes = [_geometric_mean(c_max, len(images), augmentation_rate) for images in self.images]
-        self.offsets = [sum(self.sizes[:i]) for i in range(self.label_num + 1)]
+        self.offsets = [sum(self.sizes[:i]) for i in range(len(self.images) + 1)]
 
 
     def class_weights(self):
@@ -40,7 +51,7 @@ class ClassificationImages(Dataset):
 
 
     def __getitem__(self, index: int):
-        label = next(i for i in range(self.label_num) if self.offsets[i] <= index < self.offsets[i + 1])
+        label = next(i for i in range(len(self.images)) if self.offsets[i] <= index < self.offsets[i + 1])
         position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
         x = loading.read_image_standardized(self.images[label][position])
