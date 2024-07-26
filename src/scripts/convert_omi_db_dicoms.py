@@ -128,4 +128,4 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main('/home/ubuntu/sdsHD/sd21c015/DataBaseMammography/OMI_SAMPLE', '/home/ubuntu/gmic/omidb_data')
+    main('/home/student/sdsHD/sd21c015/DataBaseMammography/OMI_SAMPLE', '/home/student/gmic/omidb_data')
