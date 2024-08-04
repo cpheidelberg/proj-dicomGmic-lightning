@@ -14,7 +14,7 @@ from src.modeling import gmic
 from src.data import dataset
 
 
-def run_training(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int):
+def run_training(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int, binary: bool):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -60,11 +60,11 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 6, # output classes
+        "num_classes": 2 if binary else 6, # output classes
         "use_v1_global": False,
     }
 
-    classification_images = dataset.ClassificationImages(data_dirs, parameters['undersampling_rate'], parameters['augmentation_rate'])
+    classification_images = dataset.ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary)
 
     dataset_train, dataset_valid, dataset_test = random_split(classification_images, [0.8, 0.1, 0.1])
 
@@ -99,21 +99,5 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
-    # Same as versions 1-6, but now with two datasets at once
-    print('version_7: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0)')
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0)
-
-    print('version_8: run_training(epochs=16, epoch_smote=16, undersampling_rate=1.0, augmentation_rate=0.0, smote_rate=0.0)')
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=1.0, augmentation_rate=0.0, smote_rate=0.0)
-
-    print('version_9: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=1.0, smote_rate=0.0)')
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=1.0, smote_rate=0.0)
-
-    print('version_10: run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=1.0)')
-    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=1.0)
-
-    print('version_11: run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5)')
-    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5)
-
-    print('version_12: run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.4, smote_rate=0.5)')
-    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.4, smote_rate=0.5)
+    print('version_13: run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True)')
+    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True)

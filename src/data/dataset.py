@@ -19,7 +19,7 @@ _aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBright
 
 
 class ClassificationImages(Dataset):
-    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float):
+    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float, binary: bool):
         tables = []
         for data_dir in data_dirs:
             data_dir = data_dir.removesuffix('/')
@@ -29,10 +29,12 @@ class ClassificationImages(Dataset):
             tables.append(mapping)
 
         table = pd.concat(tables)
-
         labels = list(table['label'].value_counts().keys())
 
-        self.images = [list(table[table['label'] == label]['png']) for label in labels]
+        if binary:
+            self.images = [list(table[table['label'] == 'No Finding']['png']), list(table[table['label'] != 'No Finding']['png'])]
+        else:
+            self.images = [list(table[table['label'] == label]['png']) for label in labels]
 
         c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
         self.images[0] = random.sample(self.images[0], c_max)
