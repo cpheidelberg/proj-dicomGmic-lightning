@@ -19,7 +19,7 @@ _aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBright
 
 
 class ClassificationImages(Dataset):
-    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float, binary: bool):
+    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float, binary: bool, augment: bool):
         tables = []
         for data_dir in data_dirs:
             data_dir = data_dir.removesuffix('/')
@@ -42,6 +42,8 @@ class ClassificationImages(Dataset):
         self.sizes = [_geometric_mean(c_max, len(images), augmentation_rate) for images in self.images]
         self.offsets = [sum(self.sizes[:i]) for i in range(len(self.images) + 1)]
 
+        self.augment = augment
+
 
     def class_weights(self):
         avg = self.offsets[-1] / len(self.sizes)
@@ -57,7 +59,8 @@ class ClassificationImages(Dataset):
         position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
         x = loading.read_image_standardized(self.images[label][position])
-        x = _aug(image=x)['image']
+        if self.augment:
+            x = _aug(image=x)['image']
 
         y = np.zeros(len(self.images), dtype=np.float32)
         y[label] = 1.0
