@@ -168,7 +168,8 @@ class GMIC(lightning.LightningModule):
 
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
-        img, y, data = batch
+        img, y = batch
+        print(img.shape, y.shape)
 
         true_segs = [None for _ in range(len(y[0]))]
 
@@ -183,12 +184,12 @@ class GMIC(lightning.LightningModule):
             patch_locations = self.gmic.patch_locations
             patch_imgs = self.gmic.patches
             patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
-            save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
-            predict.visualize_example(img_numpy, saliency_maps, true_segs, patch_locations,
-                                      patch_imgs, patch_attentions, save_dir, self.hparams)
+            #save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
+            #predict.visualize_example(img_numpy, saliency_maps, true_segs, patch_locations,
+            #                          patch_imgs, patch_attentions, save_dir, self.hparams)
 
         # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
+        # predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
         return y_fusion
 
 
