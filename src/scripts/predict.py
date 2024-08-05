@@ -221,7 +221,7 @@ if __name__ == "__main__":
     ds_train, ds_valid, ds_test = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
-    gmic_module = gmic.GMIC(parameters=parameters, dataset_predict=ds_train, model_path=model_path)
+    gmic_module = gmic.GMIC(parameters, data.class_weights(), dataset_predict=ds_train, model_path=model_path)
 
     trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
     prediction = trainer.predict(gmic_module)
