@@ -1,28 +1,20 @@
-import argparse, os, cv2, sys
+import os, cv2, sys
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from tqdm import tqdm
-import time
-import multiprocessing
 
 import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
-import pydicom as dcm
 
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.utilities import pickling, tools
+from src.utilities import tools
 from src.modeling import gmic
-from src.data import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
+from src.data import dataset
 
 
 def visualize_example(input_img, saliency_maps, seg_masks,
@@ -181,7 +173,6 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
 
 
 if __name__ == "__main__":
-
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -193,19 +184,11 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    model_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
-    # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
-    dicom_file = '1-1.dcm'
+    model_path = 'models/sample_model_1.p'
 
-    sds_path = '../sdsHD/'
-    
-    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
-    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
-    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
-    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionaryTop6.csv')
-    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
-    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
-    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+    data_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
+    image_dir = '/home/ubuntu/gmic/vindrmammo_data'
+    segmentation_path = os.path.join(data_path, 'segmentation')
 
     # set hyperparameters
     parameters = {
@@ -217,9 +200,9 @@ if __name__ == "__main__":
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path_train,
-        "segmentation_path": seg_path,
-        "output_path": output_path,
+        "image_path": image_dir,
+        "segmentation_path": segmentation_path,
+        "output_path": data_path,
         "turn_on_visualization": True,
 
         # model related hyper-parameters
@@ -232,24 +215,16 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages(image_path_test, dict_path, top_c=parameters["num_classes"])
-    parameters["class_names"] = data.category_names
-    # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
-    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
+    data = dataset.ClassificationImages([image_dir], undersampling_rate=0.0, augmentation_rate=0.0, binary=True, augment=False)
+    parameters["class_names"] = data.labels
+
+    ds_train, ds_valid, ds_test = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
-    lightningModule = gmic.GMIC(
-                        parameters=parameters,
-                        dataset_predict=dataTrain,
-                        model_path=model_path
-                    )
+    gmic_module = gmic.GMIC(parameters=parameters, dataset_predict=ds_train, model_path=model_path)
 
-    trainer = pl.Trainer(fast_dev_run=True,
-                        accelerator=device, 
-                        devices=[parameters["gpu_number"]],
-                    )
+    trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
+    prediction = trainer.predict(gmic_module)
 
-    prediction = trainer.predict(lightningModule)
-    
-    print(f"Categories: {data.category_names}")
-    print("Prediction: {}".format(prediction))
+    print(f"Categories: {data.labels}")
+    print(f"Prediction: {prediction}")

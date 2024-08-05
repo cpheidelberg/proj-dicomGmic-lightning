@@ -33,8 +33,10 @@ class ClassificationImages(Dataset):
 
         if binary:
             self.images = [list(table[table['label'] == 'No Finding']['png']), list(table[table['label'] != 'No Finding']['png'])]
+            self.labels = ['No Finding', 'Suspicious']
         else:
             self.images = [list(table[table['label'] == label]['png']) for label in labels]
+            self.labels = labels
 
         c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
         self.images[0] = random.sample(self.images[0], c_max)
