@@ -61,6 +61,8 @@ class ClassificationImages(Dataset):
         x = loading.read_image_standardized(self.images[label][position])
         if self.augment:
             x = _aug(image=x)['image']
+        else:
+            x = np.expand_dims(x, 0)
 
         y = np.zeros(len(self.images), dtype=np.float32)
         y[label] = 1.0
