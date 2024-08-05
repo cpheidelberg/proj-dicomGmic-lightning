@@ -81,7 +81,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     logger = loggers.TensorBoardLogger("tb_logs", name="awsTest", log_graph=True)
 
     training = lightning.Trainer(
-        fast_dev_run=7, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+        fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
         max_epochs=parameters["epochs"],
         # gradient_clip_val=1e-3,
         accelerator=device,
