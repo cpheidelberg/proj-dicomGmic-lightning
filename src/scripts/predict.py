@@ -198,6 +198,8 @@ if __name__ == "__main__":
         "batch_size": 1,
         "pretrained": True,
 
+        "smote_rate": 0.0,
+
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
         "image_path": image_dir,
