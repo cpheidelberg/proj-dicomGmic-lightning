@@ -189,6 +189,7 @@ if __name__ == "__main__":
     data_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     image_dir = '/home/ubuntu/gmic/vindrmammo_data'
     segmentation_path = os.path.join(data_path, 'segmentation')
+    output_path = '/home/ubuntu/gmic/predict_output'
 
     # set hyperparameters
     parameters = {
@@ -204,7 +205,7 @@ if __name__ == "__main__":
         "max_crop_size_noise": 100,
         "image_path": image_dir,
         "segmentation_path": segmentation_path,
-        "output_path": data_path,
+        "output_path": output_path,
         "turn_on_visualization": True,
 
         # model related hyper-parameters
