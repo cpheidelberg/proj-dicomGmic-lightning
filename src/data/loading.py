@@ -18,7 +18,7 @@
 # ==============================================================================
 
 import numpy as np
-import imageio.v3 as imageio
+import PIL.Image as pillow
 from src.constants import VIEWS
 from src.data import augmentations
 
@@ -33,12 +33,12 @@ def flip_image(image, view, horizontal_flip) -> np.ndarray:
     return np.fliplr(image) if flip else image
 
 
-def read_image(path, dtype=np.float32) -> np.ndarray:
-    return np.array(imageio.imread(path), dtype=dtype)
+def read_image(path, dtype) -> np.ndarray:
+    return np.array(pillow.open(path), dtype=dtype)
 
 
 def write_image(path, image):
-    imageio.imwrite(path, image)
+    pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
 def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
