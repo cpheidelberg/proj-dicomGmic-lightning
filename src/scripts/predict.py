@@ -213,7 +213,7 @@ if __name__ == "__main__":
         "crop_shape": (512, 512), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 3, # output classes
+        "num_classes": 2, # output classes
         "use_v1_global": False,
     }
 
