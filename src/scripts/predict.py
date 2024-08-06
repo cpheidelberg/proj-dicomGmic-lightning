@@ -24,7 +24,6 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     Function that visualizes the saliency maps for an example
     """
     # colormap lists
-    _, _, h, w = saliency_maps.shape
     _, _, H, W = input_img.shape
 
     # set up colormaps for benign and malignant
@@ -43,7 +42,7 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     # input image
     subfigure = figure.add_subplot(1, total_num_subplots, 1)
     subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-    
+
     for idx, seg_mask in enumerate(seg_masks):
         if seg_mask is not None:
             if idx == 0:
@@ -85,13 +84,11 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     # crops
     for crop_idx in range(parameters["K"]):
         subfigure = figure.add_subplot(1, total_num_subplots, 3 + parameters["num_classes"] + crop_idx)
-        subfigure.imshow(patch_img[0, crop_idx, :, :], cmap='gray', alpha=.8, interpolation='nearest',
-                         aspect='equal')
+        subfigure.imshow(patch_img[0, crop_idx, :, :], cmap='gray', alpha=.8, interpolation='nearest', aspect='equal')
         subfigure.axis('off')
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
-    
-    print(save_dir)
+
     plt.savefig(save_dir, bbox_inches='tight', format="png", dpi=500)
     plt.close()
 
