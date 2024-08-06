@@ -175,11 +175,11 @@ class GMIC(lightning.LightningModule):
 
         # forward propagation
         y_fusion, y_global, y_local, _, _ = self(img)  # Add an extra dimension for batch
-        img_numpy = np.squeeze(img.cpu().numpy())
+        img_numpy = img.cpu().numpy()
         pred_numpy = y_fusion.cpu().numpy()
 
         # save visualization
-        saliency_maps = self.gmic.saliency_map.cpu().numpy()
+        saliency_maps = self.cnn.saliency_map.cpu().numpy()
         if self.hparams.turn_on_visualization:
             patch_locations = self.cnn.patch_locations
             patch_imgs = self.cnn.patches
