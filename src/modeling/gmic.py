@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import torch
 import lightning
 from torch.utils.data import DataLoader
@@ -169,21 +170,20 @@ class GMIC(lightning.LightningModule):
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
         img, y = batch
-        print(img.shape, y.shape)
 
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
         y_fusion, y_global, y_local, _, _ = self(img)  # Add an extra dimension for batch
-        img_numpy = img.data.cpu().numpy()
-        pred_numpy = y_fusion.data.cpu().numpy()
+        img_numpy = np.squeeze(img.numpy())
+        pred_numpy = y_fusion.numpy()
 
         # save visualization
-        saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
+        saliency_maps = self.gmic.saliency_map.cpu().numpy()
         if self.hparams.turn_on_visualization:
-            patch_locations = self.gmic.patch_locations
-            patch_imgs = self.gmic.patches
-            patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            patch_locations = self.cnn.patch_locations
+            patch_imgs = self.cnn.patches
+            patch_attentions = self.classifier.patch_attns[0, :].numpy()
             #save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
             #predict.visualize_example(img_numpy, saliency_maps, true_segs, patch_locations,
             #                          patch_imgs, patch_attentions, save_dir, self.hparams)
