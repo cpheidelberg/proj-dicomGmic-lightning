@@ -183,7 +183,7 @@ if __name__ == "__main__":
     model_path = 'models/sample_model_1.p'
 
     data_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
-    image_dir = '/home/ubuntu/gmic/vindrmammo_data'
+    image_dir = '/home/ubuntu/gmic/omidb_data'
     segmentation_path = os.path.join(data_path, 'segmentation')
     output_path = '/home/ubuntu/gmic/predict_output'
 
