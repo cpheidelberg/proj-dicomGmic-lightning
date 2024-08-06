@@ -70,6 +70,6 @@ def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
 
 
 def read_image_standardized(path) -> np.ndarray:
-    image = read_image(path)
+    image = read_image(path, dtype=np.float32)
     _standardize(image)
     return image
