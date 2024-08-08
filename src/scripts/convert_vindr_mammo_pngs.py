@@ -48,7 +48,7 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
             mapp.loc[len(mapp), :] = _process_image(src_dir, dst_dir, line, category_name, category_index, i)
 
             counter += 1
-            print(f'{counter} - {100*counter//len(dctn)}')
+            print(f'#{counter} - {100*counter//len(dctn)} %')
 
     mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
 
