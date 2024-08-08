@@ -40,11 +40,15 @@ def convert_vindr_mammo_dataset_to_our_storage_format():
     categories = list(dctn['finding_categories'].value_counts()[:top_c].keys())
 
     dst_dir = '/home/student/gmic/vindrmammo_data'
+    counter = 0
     for category_index, category_name in enumerate(categories):
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
         for i, line in enumerate(dctn[dctn['finding_categories'] == category_name].iloc):
             mapp.loc[len(mapp), :] = _process_image(src_dir, dst_dir, line, category_name, category_index, i)
+
+            counter += 1
+            print(f'{counter} - {100*counter//len(dctn)}')
 
     mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
 
