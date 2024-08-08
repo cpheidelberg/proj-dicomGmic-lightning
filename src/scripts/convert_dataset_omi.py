@@ -1,6 +1,6 @@
 import pydicom
-import pandas as pd
-import os, json, sys
+import pandas as pd, numpy as np
+import os, json, sys, dataclasses
 
 import pydicom.errors
 
@@ -13,51 +13,55 @@ import src.optimal_centers.get_optimal_centers as centers
 import src.data.loading as loading
 
 
-class _dicom:
-    @staticmethod
-    def get_category(data: list[dict]):
-        for lesion in data:
-            if lesion.get('Mass') == 1:
-                return 'Mass'
-            if lesion.get('SuspiciousCalcifications') is not None:
-                return 'Suspicious Calcification'
-            if lesion.get('FocalAsymmetry') is not None:
-                return 'Focal Asymmetry'
-            if lesion.get('ArchitecturalDistortion') is not None:
-                return 'Architectural Distortion'
-
-        return 'No Finding'
-
-    def get_center(self):
-        mode = 'right' if self.view.startswith('R') else 'left'
-        crop = cropping.crop_img_from_largest_connected(self.image, mode)
-        datum = {
-            'window_location': crop[0],
-            'rightmost_points': crop[1],
-            'bottommost_points': crop[2],
-            'distance_from_starting_side': crop[3],
-            'full_view': self.view,
-            'view': self.view[2:],
-            'horizontal_flip': self.horizontal_flip
-        }
-        return centers.extract_center(datum, self.image)
-
-    def __init__(self, path: str, data: list[dict]):
-        with pydicom.read_file(path) as file:
-            self.path = path
-            self.image = file.pixel_array
-            self.view = f'{file.ImageLaterality}-{file.ViewPosition}'
-            self.horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
-            self.category = _dicom.get_category(data)
-            self.center = self.get_center()
+@dataclasses.dataclass(frozen=True)
+class DICOM:
+    path: str
+    image: np.ndarray
+    view: str
+    horizontal_flip: str
+    category: str
+    center: tuple[int, int]
 
 
-def _process_dicom(path: str, data: dict) -> list[_dicom]:
+def _get_category(data: list[dict]):
+    for lesion in data:
+        if lesion.get('Mass') == 1:
+            return 'Mass'
+        if lesion.get('SuspiciousCalcifications') is not None:
+            return 'Suspicious Calcification'
+        if lesion.get('FocalAsymmetry') is not None:
+            return 'Focal Asymmetry'
+        if lesion.get('ArchitecturalDistortion') is not None:
+            return 'Architectural Distortion'
+    return 'No Finding'
+
+
+def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
+    mode = 'right' if view.startswith('R') else 'left'
+    crop = cropping.crop_img_from_largest_connected(image, mode)
+    datum = {
+        'window_location': crop[0],
+        'rightmost_points': crop[1],
+        'bottommost_points': crop[2],
+        'distance_from_starting_side': crop[3],
+        'full_view': view,
+        'view': view[2:],
+        'horizontal_flip': horizontal_flip
+    }
+    return centers.extract_center(datum, image)
+
+
+def _process_dicom(path: str, data: dict) -> list[DICOM]:
     try:
-        return [_dicom(path, data)]
-    except RuntimeError:
-        return []
-    except pydicom.errors.InvalidDicomError:
+        with pydicom.read_file(path) as file:
+            path = path
+            image = file.pixel_array
+            view = f'{file.ImageLaterality}-{file.ViewPosition}'
+            horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
+            category = _get_category(data)
+            center = _get_center(image, view, horizontal_flip)
+        return [DICOM(path, image, view, horizontal_flip, category, center)]
+    except:
         return []
 
 
@@ -86,21 +90,21 @@ def _process_patients(root: str):
     return [dcm for patient in os.listdir(os.path.join(root, 'IMAGES')) for dcm in _process_patient(root, patient)]
 
 
-def _sorted_categories(dicoms: list[_dicom]):
+def _sorted_categories(dicoms: list[DICOM]):
     sizes = {}
     for dcm in dicoms:
         sizes[dcm.category] = sizes.get(dcm.category, 0) + 1
     return sorted(sizes.keys(), key=lambda category: -sizes[category])
 
 
-def _divide_dicoms(dicoms: list[_dicom], categories: list[str]) -> list[list[_dicom]]:
+def _divide_dicoms(dicoms: list[DICOM], categories: list[str]) -> list[list[DICOM]]:
     split = [[] for _ in categories]
     for dcm in dicoms:
         split[categories.index(dcm.category)].append(dcm)
     return split
 
 
-def _save_image(dcm: _dicom, category_index: int, category_name: str, dst_dir: str, index: int):
+def _save_image(dcm: DICOM, category_index: int, category_name: str, dst_dir: str, index: int):
     dst_name = f'{category_index}/{index}.png'
     dcm_name = '/'.join(dcm.path.split('/')[-3:])
 
