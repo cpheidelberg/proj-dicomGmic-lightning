@@ -59,7 +59,7 @@ def _standardize(image):
     image /= np.maximum(np.std(image), 10**(-5))
 
 
-def recalibrate_brightness(image: np.ndarray) -> np.ndarray:
+def adjust_brightness(image: np.ndarray) -> np.ndarray:
     image = image * (2 ** 16 - 1) // image.max()
     if image.mean() >= 2 ** 15:
         return (2 ** 16 - 1) - image

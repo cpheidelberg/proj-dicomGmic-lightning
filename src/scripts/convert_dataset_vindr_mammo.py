@@ -16,7 +16,7 @@ def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: s
     best_center = line['best_center'][view][0]
 
     image = loading.read_image(os.path.join(src_dir, src_name), dtype='int32')
-    image = loading.recalibrate_brightness(image)
+    image = loading.adjust_brightness(image)
     image = loading.flip_and_crop(image, view, horizontal_flip, best_center)
     loading.write_image(os.path.join(dst_dir, dst_name), image)
     return [dst_name, dcm_name, category_name]
