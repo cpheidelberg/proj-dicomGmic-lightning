@@ -151,7 +151,7 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             p[0] -= window_location[2]
             p[1] -= window_location[0]
 
-        with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
+        with open(os.path.join(save_dir, f"{file_path}_polyline_{label}_{i}.txt"), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
                 f.write(f"{point[0]}, {point[1]}\n")
@@ -161,8 +161,8 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
             # plt.imshow(input_img, cmap='gray', aspect='equal')
             plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-            print("Polyline saved to: {}".format(os.path.join(save_dir, "{}_seg_{}_{}.png".format(file_path, label, i))))
-            plt.savefig(os.path.join(save_dir, "{0}_seg_{1}_{2}.png".format(file_path, label, i)))
+            print("Polyline saved to: ", os.path.join(save_dir, f"{file_path}_seg_{label}_{i}.png"))
+            plt.savefig(os.path.join(save_dir, f"{file_path}_seg_{label}_{i}.png"))
 
     if not contours:
         print(file_path, "\n\tNo contours found in the saliency map.")
