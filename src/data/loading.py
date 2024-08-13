@@ -61,7 +61,7 @@ def _standardize(image):
 
 def adjust_brightness(image: np.ndarray) -> np.ndarray:
     image = image * (2 ** 16 - 1) // image.max()
-    if image.mean() >= 2 ** 15:
+    if np.argmax(np.bincount(image.flatten())) > 10000:
         return (2 ** 16 - 1) - image
     return image
 
