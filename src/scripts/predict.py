@@ -151,6 +151,9 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             p[0] -= window_location[2]
             p[1] -= window_location[0]
 
+        print(save_dir)
+        print(f"{file_path}_polyline_{label}_{i}.txt")
+
         with open(os.path.join(save_dir, f"{file_path}_polyline_{label}_{i}.txt"), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
