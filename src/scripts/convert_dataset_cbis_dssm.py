@@ -57,7 +57,7 @@ def _process_dicom(path: str, prefix: str) -> list[DICOM]:
             folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
             view, horizontal_flip, category = _parse_folder_name(folder)
             center = _get_center(image, view, horizontal_flip)
-            return DICOM(path, image, view, horizontal_flip, category, center)
+            return [DICOM(path, image, view, horizontal_flip, category, center)]
     except BaseException as err:
         print('Error: ', path, err)
         return []
