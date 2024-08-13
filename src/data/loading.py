@@ -60,7 +60,10 @@ def _standardize(image):
 
 
 def recalibrate_brightness(image: np.ndarray) -> np.ndarray:
-    return image * (2 ** 16 - 1) // image.max()
+    image = image * (2 ** 16 - 1) // image.max()
+    if image.mean() >= 2 ** 15:
+        return (2 ** 16 - 1) - image
+    return image
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
