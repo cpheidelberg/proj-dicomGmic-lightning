@@ -59,6 +59,10 @@ def _standardize(image):
     image /= np.maximum(np.std(image), 10**(-5))
 
 
+def recalibrate_brightness(image: np.ndarray) -> np.ndarray:
+    return image * (2 ** 16 - 1) // image.max()
+
+
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
