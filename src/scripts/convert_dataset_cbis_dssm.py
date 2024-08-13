@@ -1,6 +1,6 @@
 import pydicom
-import pandas as pd
-import os, sys
+import pandas as pd, numpy as np
+import os, sys, dataclasses
 
 import pydicom.errors
 
@@ -13,39 +13,51 @@ import src.optimal_centers.get_optimal_centers as centers
 import src.data.loading as loading
 
 
-class _dicom:
-    def get_center(self):
-        mode = 'right' if self.view.startswith('R') else 'left'
-        crop = cropping.crop_img_from_largest_connected(self.image, mode)
-        datum = {
-            'window_location': crop[0],
-            'rightmost_points': crop[1],
-            'bottommost_points': crop[2],
-            'distance_from_starting_side': crop[3],
-            'full_view': self.view,
-            'view': self.view[2:],
-            'horizontal_flip': self.horizontal_flip
-        }
-        return centers.extract_center(datum, self.image)
+@dataclasses.dataclass(frozen=True)
+class DICOM:
+    path: str
+    image: np.ndarray
+    view: str
+    horizontal_flip: str
+    category: str
+    center: tuple[int, int]
 
 
-    def __init__(self, path: str):
-        with pydicom.read_file(path) as file:
-            self.path = path
-            self.image = file.pixel_array
+def _parse_folder_name(folder: str):
+    label, rest = folder.split('-', maxsplit=1)
+    parts = rest.split('_')
+    image_laterality = 'R' if parts[3] == 'RIGHT' else 'L'
+    view_position = 'MLO' if parts[4].startswith('MLO') else 'CC'
 
-            image_laterality = 'R' if 'RIGHT' in path else 'L'
-            view_position = 'MLO' if 'MLO' in path else 'CC'
-            self.view = f'{image_laterality}-{view_position}'
-
-            self.horizontal_flip = 'NO'
-            self.category = 'Suspicious Calcification' if 'Calc' in path else 'Mass'
-            self.center = self.get_center()
+    view = f'{image_laterality}-{view_position}'
+    horizontal_flip = 'NO'
+    category = 'Suspicious Calcification' if label == 'Calc' else 'Mass'
+    return view, horizontal_flip, category
 
 
-def _process_dicom(path: str) -> list[_dicom]:
+def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
+    mode = 'right' if view.startswith('R') else 'left'
+    crop = cropping.crop_img_from_largest_connected(image, mode)
+    datum = {
+        'window_location': crop[0],
+        'rightmost_points': crop[1],
+        'bottommost_points': crop[2],
+        'distance_from_starting_side': crop[3],
+        'full_view': view,
+        'view': view[2:],
+        'horizontal_flip': horizontal_flip
+    }
+    return centers.extract_center(datum, image)
+
+
+def _process_dicom(path: str, prefix: str) -> list[DICOM]:
     try:
-        return [_dicom(path)]
+        with pydicom.read_file(path) as file:
+            image = file.pixel_array
+            folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
+            view, horizontal_flip, category = _parse_folder_name(folder)
+            center = _get_center(image, view, horizontal_flip)
+            return DICOM(path, image, view, horizontal_flip, category, center)
     except BaseException as err:
         print('Error: ', path, err)
         return []
@@ -60,21 +72,21 @@ def _get_paths(root: str) -> list[str]:
     return paths
 
 
-def _sorted_categories(dicoms: list[_dicom]):
+def _sorted_categories(dicoms: list[DICOM]):
     sizes = {}
     for dcm in dicoms:
         sizes[dcm.category] = sizes.get(dcm.category, 0) + 1
     return sorted(sizes.keys(), key=lambda category: -sizes[category])
 
 
-def _divide_dicoms(dicoms: list[_dicom], categories: list[str]) -> list[list[_dicom]]:
+def _divide_dicoms(dicoms: list[DICOM], categories: list[str]) -> list[list[DICOM]]:
     split = [[] for _ in categories]
     for dcm in dicoms:
         split[categories.index(dcm.category)].append(dcm)
     return split
 
 
-def _save_image(dcm: _dicom, category_index: int, category_name: str, dst_dir: str, index: int):
+def _save_image(dcm: DICOM, category_index: int, category_name: str, dst_dir: str, index: int):
     dst_name = f'{category_index}/{index}.png'
     dcm_name = '/'.join(dcm.path.split('/')[-3:])
 
@@ -85,7 +97,7 @@ def _save_image(dcm: _dicom, category_index: int, category_name: str, dst_dir: s
 
 
 def main(src_dir: str, dst_dir: str):
-    dicoms = [dcm for path in _get_paths(src_dir) for dcm in _process_dicom(path)]
+    dicoms = [dcm for path in _get_paths(src_dir) for dcm in _process_dicom(path, src_dir)]
 
     categories = _sorted_categories(dicoms)
     dicoms = _divide_dicoms(dicoms, categories)
