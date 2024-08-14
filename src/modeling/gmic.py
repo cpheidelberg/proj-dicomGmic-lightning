@@ -171,8 +171,6 @@ class GMIC(lightning.LightningModule):
         """Predict the output for a single image."""
         img, y = batch
 
-        true_segs = [None for _ in range(len(y[0]))]
-
         # forward propagation
         y_fusion, y_global, y_local, _, _ = self(img)  # Add an extra dimension for batch
         img_numpy = img.cpu().numpy()
@@ -185,7 +183,7 @@ class GMIC(lightning.LightningModule):
             patch_imgs = self.cnn.patches
             patch_attentions = self.classifier.patch_attns[0, :].cpu().numpy()
             save_dir = os.path.join(self.hparams.output_path, f"visualization/{batch_idx}.png")
-            predict.visualize_example(img_numpy, saliency_maps, true_segs, patch_locations, patch_imgs, patch_attentions, save_dir, self.hparams)
+            predict.visualize_example(img_numpy, saliency_maps, patch_locations, patch_imgs, patch_attentions, save_dir, self.hparams)
 
         # save predicted regions of interest as polyline
         predict.save_saliency_maps(img_numpy, saliency_maps, self.hparams.segmentation_path, f"{batch_idx}.png", self.hparams)

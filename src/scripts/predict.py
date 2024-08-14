@@ -17,12 +17,12 @@ from src.modeling import gmic
 from src.data import dataset
 
 
-def visualize_example(input_img, saliency_maps, seg_masks, patches, patch_img, patch_attentions, save_dir, parameters):
+def visualize_example(img, saliency_maps, patches, patch_img, patch_attentions, save_dir, parameters):
     """
     Function that visualizes the saliency maps for an example
     """
     # colormap lists
-    _, _, H, W = input_img.shape
+    _, _, H, W = img.shape
 
     # set up colormaps for benign and malignant
     alphas = np.abs(np.linspace(0, 0.95, 259))
@@ -39,14 +39,7 @@ def visualize_example(input_img, saliency_maps, seg_masks, patches, patch_img, p
 
     # input image
     subfigure = figure.add_subplot(1, total_num_subplots, 1)
-    subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-
-    for idx, seg_mask in enumerate(seg_masks):
-        if seg_mask is not None:
-            if idx == 0:
-                subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_green, clim=[0.9, 1])
-            else:
-                subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_red, clim=[0.9, 1])
+    subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
 
     subfigure.set_title("input image")
     subfigure.axis('off')
@@ -54,28 +47,23 @@ def visualize_example(input_img, saliency_maps, seg_masks, patches, patch_img, p
     # patch map
     print(patches)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
-    subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
+    subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
     subfigure.imshow(
         tools.get_crop_mask(patches[0, np.arange(parameters["K"]), :], parameters["crop_shape"], (H, W), "upper_left"),
         alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1],
     )
 
-    for seg_mask in seg_masks:
-        if seg_mask is not None:
-            subfigure.imshow(seg_mask, alpha=0.85, cmap="Reds", clim=[0.9, 1])
-
     subfigure.set_title("patch map")
     subfigure.axis('off')
 
     # class activation maps
-    for idx, class_name in enumerate(parameters["class_names"]):
-        subfigure = figure.add_subplot(1, total_num_subplots, 3 + idx)
-        subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-        resized_cam = cv2.resize(saliency_maps[0, idx, :, :], (W, H))
-        if idx == 0: # "No Finding"
-            subfigure.imshow(resized_cam, cmap=alpha_green, clim=[0.0, 1.0])
-        else:
-            subfigure.imshow(resized_cam, cmap=alpha_red, clim=[0.0, 1.0])
+    for i, class_name in enumerate(parameters["class_names"]):
+        subfigure = figure.add_subplot(1, total_num_subplots, 3 + i)
+        subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
+        resized_cam = cv2.resize(saliency_maps[0,i,:,:], (W, H))
+
+        subfigure.imshow(resized_cam, cmap=alpha_green if i == 0 else alpha_red, clim=[0.0, 1.0])
+
         subfigure.set_title("SM: " + class_name)
         subfigure.axis('off')
 
