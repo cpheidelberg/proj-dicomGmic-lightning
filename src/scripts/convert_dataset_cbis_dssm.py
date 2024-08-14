@@ -25,9 +25,8 @@ def _parse_folder_name(folder: str):
     view_position = 'MLO' if parts[4].startswith('MLO') else 'CC'
 
     view = f'{image_laterality}-{view_position}'
-    horizontal_flip = 'NO'
     category = 'Suspicious Calcification' if label == 'Calc' else 'Mass'
-    return view, horizontal_flip, category
+    return view, category
 
 
 def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
@@ -45,31 +44,29 @@ def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
     return centers.extract_center(datum, image)
 
 
-def _read_dicom(path: str, prefix: str) -> DICOM:
+def _read_dicom(view: str, category: str, path: str) -> DICOM:
     with pydicom.read_file(path) as file:
         image = file.pixel_array.astype('int32')
-        folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
-        view, horizontal_flip, category = _parse_folder_name(folder)
-        center = _get_center(image, view, horizontal_flip)
-
-        image = loading.flip_and_crop(image, view, horizontal_flip, center)
+        center = _get_center(image, view, horizontal_flip='NO')
+        image = loading.flip_and_crop(image, view, 'NO', center)
         return DICOM(path, image, category)
 
 
-def _process_dicom(path: str, prefix: str) -> list[DICOM]:
-    try:
-        return [_read_dicom(path, prefix)]
-    except:
-        return []
+def _subdirs(root: str):
+    return (e for e in os.scandir(root) if e.is_dir())
 
 
-def _get_paths(root: str) -> list[str]:
-    paths = []
-    for dirpath, _, filenames in os.walk(root):
-        for filename in filenames:
-            if filename.endswith('.dcm'):
-                paths.append(os.path.join(dirpath, filename))
-    return paths
+def _subfiles(root: str):
+    return (e for e in os.scandir(root) if e.is_file())
+
+
+def _get_paths(root: str):
+    for folder in _subdirs(root):
+        view, category = _parse_folder_name(folder.name)
+        for sub1 in _subdirs(folder.path):
+            for sub2 in _subdirs(sub1.path):
+                for file in _subfiles(sub2.path):
+                    yield view, category, file.path
 
 
 def _sorted_categories(dicoms: list[DICOM]):
@@ -95,12 +92,14 @@ def _save_image(dcm: DICOM, category_index: int, category_name: str, dst_dir: st
 
 
 def main(src_dir: str, dst_dir: str):
-    paths = _get_paths(src_dir)
+    paths = list(_get_paths(src_dir))
     dicoms = []
-    for i, path in enumerate(paths):
-        for dcm in _process_dicom(path, src_dir):
-            dicoms.append(dcm)
-        print(f'Reading DICOMs: {100*(i+1)//len(paths)} %')
+    for i, (view, category, path) in enumerate(paths):
+        try:
+            dicoms.append(_read_dicom(view, category, path))
+            print(f'Reading DICOMs: {100*(i+1)//len(paths)} %')
+        except:
+            pass
 
     categories = _sorted_categories(dicoms)
     buckets = _divide_dicoms(dicoms, categories)
