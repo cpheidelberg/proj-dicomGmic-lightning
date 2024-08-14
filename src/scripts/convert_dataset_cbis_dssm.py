@@ -50,7 +50,7 @@ def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
 def _read_dicom(path: str, prefix: str) -> list[DICOM]:
     try:
         with pydicom.read_file(path) as file:
-            image = file.pixel_array
+            image = file.pixel_array.astype('int32')
             folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
             view, horizontal_flip, category = _parse_folder_name(folder)
             center = _get_center(image, view, horizontal_flip)
