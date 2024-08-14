@@ -2,7 +2,7 @@ import pydicom
 import pandas as pd, numpy as np
 import os, sys, dataclasses
 
-import pydicom.errors
+import traceback
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
@@ -17,10 +17,7 @@ import src.data.loading as loading
 class DICOM:
     path: str
     image: np.ndarray
-    view: str
-    horizontal_flip: str
     category: str
-    center: tuple[int, int]
 
 
 def _parse_folder_name(folder: str):
@@ -50,16 +47,20 @@ def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
     return centers.extract_center(datum, image)
 
 
-def _process_dicom(path: str, prefix: str) -> list[DICOM]:
+def _read_dicom(path: str, prefix: str) -> list[DICOM]:
     try:
         with pydicom.read_file(path) as file:
             image = file.pixel_array
             folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
             view, horizontal_flip, category = _parse_folder_name(folder)
             center = _get_center(image, view, horizontal_flip)
-            return [DICOM(path, image, view, horizontal_flip, category, center)]
+
+        image = loading.flip_and_crop(image, view, horizontal_flip, center)
+        return [DICOM(path, image, category)]
+
     except BaseException as err:
-        print('Error: ', path, err)
+        print('Error at', path.removeprefix(prefix), ', message:', err)
+        traceback.print_exception(err)
         return []
 
 
@@ -90,14 +91,12 @@ def _save_image(dcm: DICOM, category_index: int, category_name: str, dst_dir: st
     dst_name = f'{category_index}/{index}.png'
     dcm_name = '/'.join(dcm.path.split('/')[-3:])
 
-    image = loading.flip_and_crop(dcm.image, dcm.view, dcm.horizontal_flip, dcm.center)
-    loading.write_image(os.path.join(dst_dir, dst_name), image)
-
+    loading.write_image(os.path.join(dst_dir, dst_name), dcm.image)
     return [dst_name, dcm_name, category_name]
 
 
 def main(src_dir: str, dst_dir: str):
-    dicoms = [dcm for path in _get_paths(src_dir) for dcm in _process_dicom(path, src_dir)]
+    dicoms = [dcm for path in _get_paths(src_dir) for dcm in _read_dicom(path, src_dir)]
 
     categories = _sorted_categories(dicoms)
     dicoms = _divide_dicoms(dicoms, categories)
