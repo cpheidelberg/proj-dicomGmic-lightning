@@ -2,8 +2,6 @@ import pydicom
 import pandas as pd, numpy as np
 import os, sys, dataclasses
 
-import traceback
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
@@ -47,20 +45,21 @@ def _get_center(image: np.ndarray, view: str, horizontal_flip: str):
     return centers.extract_center(datum, image)
 
 
-def _read_dicom(path: str, prefix: str) -> list[DICOM]:
-    try:
-        with pydicom.read_file(path) as file:
-            image = file.pixel_array.astype('int32')
-            folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
-            view, horizontal_flip, category = _parse_folder_name(folder)
-            center = _get_center(image, view, horizontal_flip)
+def _read_dicom(path: str, prefix: str) -> DICOM:
+    with pydicom.read_file(path) as file:
+        image = file.pixel_array.astype('int32')
+        folder = path.removeprefix(prefix).lstrip('/').split('/')[0]
+        view, horizontal_flip, category = _parse_folder_name(folder)
+        center = _get_center(image, view, horizontal_flip)
 
         image = loading.flip_and_crop(image, view, horizontal_flip, center)
-        return [DICOM(path, image, category)]
+        return DICOM(path, image, category)
 
-    except BaseException as err:
-        print('Error at', path.removeprefix(prefix), ', message:', err)
-        traceback.print_exception(err)
+
+def _process_dicom(path: str, prefix: str) -> list[DICOM]:
+    try:
+        return [_read_dicom(path, prefix)]
+    except:
         return []
 
 
@@ -96,21 +95,29 @@ def _save_image(dcm: DICOM, category_index: int, category_name: str, dst_dir: st
 
 
 def main(src_dir: str, dst_dir: str):
-    dicoms = [dcm for path in _get_paths(src_dir) for dcm in _read_dicom(path, src_dir)]
+    paths = _get_paths(src_dir)
+    dicoms = []
+    for i, path in enumerate(paths):
+        for dcm in _process_dicom(path, src_dir):
+            dicoms.append(dcm)
+        print(f'Reading DICOMs: {100*(i+1)//len(paths)} %')
 
     categories = _sorted_categories(dicoms)
-    dicoms = _divide_dicoms(dicoms, categories)
+    buckets = _divide_dicoms(dicoms, categories)
 
     mapp = pd.DataFrame({'png': [], 'dicom': [], 'label': []}, dtype=str)
 
+    counter = 0
     for category_index, category_name in enumerate(categories):
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
-        for i, dcm in enumerate(dicoms[category_index]):
+        for i, dcm in enumerate(buckets[category_index]):
             mapp.loc[len(mapp), :] = _save_image(dcm, category_index, category_name, dst_dir, i)
-            print(f'{category_index}/{len(categories)}: {100 * i // len(dicoms[category_index])} %')
+            counter += 1
+            print(f'Saving PNGs: {100*counter//len(buckets)} %')
 
     mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
+    print('Done!')
 
 
 if __name__ == '__main__':
