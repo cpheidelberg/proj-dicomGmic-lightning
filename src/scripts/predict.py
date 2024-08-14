@@ -98,9 +98,9 @@ def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
     H, W = img.shape
     window_location = (0, H, 0, W)
 
-    for i, label in enumerate(parameters['class_names']):
+    for i in range(parameters["num_classes"]):
         maps = cv2.resize((saliency_maps[0,i,:,:] * 500).astype(np.uint8), (W, H))
-        process_saliency_map(img, maps, window_location, folder, filename, label, parameters['turn_on_visualization'])
+        process_saliency_map(img, maps, window_location, folder, filename, parameters["class_names"][i], parameters["turn_on_visualization"])
 
 
 def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization):
