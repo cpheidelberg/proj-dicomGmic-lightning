@@ -17,9 +17,7 @@ from src.modeling import gmic
 from src.data import dataset
 
 
-def visualize_example(input_img, saliency_maps, seg_masks,
-                      patch_locations, patch_img, patch_attentions,
-                      save_dir, parameters):
+def visualize_example(input_img, saliency_maps, seg_masks, patches, patch_img, patch_attentions, save_dir, parameters):
     """
     Function that visualizes the saliency maps for an example
     """
@@ -54,13 +52,13 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     subfigure.axis('off')
 
     # patch map
-    print(patch_locations)
+    print(patches)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
     subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-    subfigure.imshow(tools.get_crop_mask(
-        patch_locations[0, np.arange(parameters["K"]), :],
-        parameters["crop_shape"], (H, W),
-        "upper_left"), alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1])
+    subfigure.imshow(
+        tools.get_crop_mask(patches[0, np.arange(parameters["K"]), :], parameters["crop_shape"], (H, W), "upper_left"),
+        alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1],
+    )
 
     for seg_mask in seg_masks:
         if seg_mask is not None:
@@ -93,26 +91,22 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, turn_on_visualization):
+def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
-    input_img = input_img[0, 0, :, :]
-    H, W = input_img.shape
+    img = img[0, 0, :, :]
+    H, W = img.shape
     window_location = (0, H, 0, W)
 
-    saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
-    saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
-    saliency_maps_malignant = (saliency_maps[0,1,:,:]*500).astype(np.uint8)
-    saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
-
-    process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", turn_on_visualization)
-    process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", turn_on_visualization)
+    for i, label in enumerate(parameters['class_names']):
+        maps = cv2.resize((saliency_maps[0,i,:,:] * 500).astype(np.uint8), (W, H))
+        process_saliency_map(img, maps, window_location, folder, filename, label, parameters['turn_on_visualization'])
 
 
-def process_saliency_map(input_img, saliency_map, window_location, save_dir, file_path, label, turn_on_visualization):
+def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization):
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
     max_intensity = np.max(saliency_map)
     intensity_threshold = 0.1 * max_intensity  # 10% of the maximum intensity
@@ -151,7 +145,7 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             p[0] -= window_location[2]
             p[1] -= window_location[0]
 
-        with open(os.path.join(save_dir, f"{file_path}_polyline_{label}_{i}.txt"), 'w') as f:
+        with open(os.path.join(folder, f"{filename}_polyline_{label}_{i}.txt"), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
                 f.write(f"{point[0]}, {point[1]}\n")
@@ -161,11 +155,11 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
             # plt.imshow(input_img, cmap='gray', aspect='equal')
             plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-            print("Polyline saved to: ", os.path.join(save_dir, f"{file_path}_seg_{label}_{i}.png"))
-            plt.savefig(os.path.join(save_dir, f"{file_path}_seg_{label}_{i}.png"))
+            print("Polyline saved to: ", os.path.join(folder, f"{filename}_seg_{label}_{i}.png"))
+            plt.savefig(os.path.join(folder, f"{filename}_seg_{label}_{i}.png"))
 
     if not contours:
-        print(file_path, "\n\tNo contours found in the saliency map.")
+        print(filename, "\n\tNo contours found in the saliency map.")
 
 
 if __name__ == "__main__":

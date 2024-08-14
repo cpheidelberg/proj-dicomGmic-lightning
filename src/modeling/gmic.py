@@ -188,7 +188,7 @@ class GMIC(lightning.LightningModule):
             predict.visualize_example(img_numpy, saliency_maps, true_segs, patch_locations, patch_imgs, patch_attentions, save_dir, self.hparams)
 
         # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img_numpy, saliency_maps, self.hparams.segmentation_path, f"{batch_idx}.png", self.hparams.turn_on_visualization)
+        predict.save_saliency_maps(img_numpy, saliency_maps, self.hparams.segmentation_path, f"{batch_idx}.png", self.hparams)
         return y_fusion
 
 
