@@ -25,19 +25,24 @@ from src.data_loading import augmentations
 
 def flip_image(image, view, horizontal_flip) -> np.ndarray:
     """
-    If training mode, makes all images face right direction.
-    In medical, keeps the original directions unless horizontal_flip is set.
+    Flip images to ensure correct horizontal orientation
     """
     flip  = horizontal_flip == 'NO' and VIEWS.is_right(view)
     flip |= horizontal_flip == 'YES' and VIEWS.is_left(view)
     return np.fliplr(image) if flip else image
 
 
-def read_image(path, dtype='int32') -> np.ndarray:
+def read_image(path: str, dtype) -> np.ndarray:
+    """
+    Open an image and return as an NumPy array
+    """
     return np.array(pillow.open(path), dtype=dtype)
 
 
-def write_image(path, image):
+def write_image(path: str, image: np.ndarray):
+    """
+    Save an image from an NumPy array to a PNG file
+    """
     pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
@@ -46,18 +51,13 @@ def crop_image(image, view, best_center) -> np.ndarray:
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
-    image, _ = augmentations.random_augmentation_best_center(
+    return augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
         random_number_generator=np.random.RandomState(0),
         best_center=best_center,
-        view=view
-    )
-    return image.copy()
-
-
-def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
-    return crop_image(flip_image(image, view, horizontal_flip), view, best_center)
+        view=view,
+    )[0].copy()
 
 
 def _standardize(image):
@@ -67,18 +67,25 @@ def _standardize(image):
 
 
 def adjust_brightness(image: np.ndarray) -> np.ndarray:
+    """
+    Scale brightness to 0 - 65535 range
+    If the most common colour (i.e. probably the background colour) is too light,
+    we assume that it means that the background is light and tissue is dark
+    in this image, so we invert the colours to ensure that all images have light
+    tissue on dark background.
+    """
     image = image * (2 ** 16 - 1) // image.max()
     most_frequent = np.argmax(np.bincount(image.flatten()))
     return (2 ** 16 - 1) - image if most_frequent > 10000 else image
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
-    image = flip_and_crop(image, view, horizontal_flip, best_center)
+    image = crop_image(flip_image(image, view, horizontal_flip), view, best_center)
     _standardize(image)
     return image
 
 
-def read_image_standardized(path) -> np.ndarray:
+def read_image_processed(path, view, horizontal_flip, best_center):
     image = read_image(path, dtype=np.float32)
     _standardize(image)
-    return image
+    return crop_image(flip_image(image, view, horizontal_flip), view, best_center)
