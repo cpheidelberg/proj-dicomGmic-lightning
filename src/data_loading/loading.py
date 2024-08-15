@@ -80,12 +80,16 @@ def adjust_brightness(image: np.ndarray) -> np.ndarray:
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
+    """
+    Flip, crop and standardize
+    """
     image = crop_image(flip_image(image, view, horizontal_flip), view, best_center)
     _standardize(image)
     return image
 
 
 def read_image_processed(path, view, horizontal_flip, best_center):
-    image = read_image(path, dtype=np.float32)
-    _standardize(image)
-    return crop_image(flip_image(image, view, horizontal_flip), view, best_center)
+    """
+    Read an image into an NumPy array of float32, then flip, crop and standardize
+    """
+    return process_image(read_image(path, np.float32), view, horizontal_flip, best_center)
