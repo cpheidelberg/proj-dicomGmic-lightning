@@ -43,9 +43,8 @@ if __name__ == "__main__":
 
     sds_path = '../sdsHD/'
     
+    image_path = '/home/ubuntu/gmic/vindrmammo_data'
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
-    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
-    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
     dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
     label_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/finding_annotations.csv')
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
@@ -66,7 +65,7 @@ if __name__ == "__main__":
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path_train,
+        "image_path": image_path,
         "segmentation_path": seg_path,
         "output_path": output_path,
 
@@ -80,9 +79,7 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
-    # data = dataset.ClassificationImagesFromPickle(imageFolder=[image_path_test], dictPath=data_path, labelPath=label_path, top_c=parameters["num_classes"])
-    # data = dataset.H5Dataset(h5_filepath=h5_path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+    data = dataset.ClassificationImages([image_path], undersampling_rate=0.0, augmentation_rate=0.0, binary=False, augment=False)
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training

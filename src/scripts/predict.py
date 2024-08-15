@@ -199,9 +199,8 @@ if __name__ == "__main__":
 
     sds_path = '../sdsHD/'
     
+    image_path = '/home/ubuntu/gmic/vindrmammo_data'
     data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
-    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
-    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
     dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
     seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
     output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
@@ -217,7 +216,7 @@ if __name__ == "__main__":
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path_train,
+        "image_path": image_path,
         "segmentation_path": seg_path,
         "output_path": output_path,
         "turn_on_visualization": True,
@@ -232,27 +231,20 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    data = dataset.PredictionClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
-    parameters["class_names"] = data.unique_categories
-    # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
+    data = dataset.ClassificationImages([image_path], undersampling_rate=0.0, augmentation_rate=0.0, binary=False, augment=False)
+    parameters["class_names"] = data.labels
+
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
-    lightningModule = trainer.GMICTrainer(
-                        parameters=parameters,
-                        dataset_predict=dataTrain
-                    )
+    lightningModule = trainer.GMICTrainer(parameters=parameters, dataset_predict=dataTrain)
+
     if device == "gpu":
-        trainer = pl.Trainer(fast_dev_run=True,
-                            accelerator=device, 
-                            devices=[parameters["gpu_number"]],
-                        )
+        trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
     else:
-        trainer = pl.Trainer(fast_dev_run=True,
-                            accelerator=device, 
-                        )
+        trainer = pl.Trainer(fast_dev_run=True, accelerator=device)
         
     prediction = trainer.predict(lightningModule, ckpt_path=checkpoint_path)
     
-    print(f"Categories: {data.unique_categories}")
-    print("Prediction: {}".format(prediction))
+    print(f"Categories: {data.labels}")
+    print(f"Prediction: {prediction}")

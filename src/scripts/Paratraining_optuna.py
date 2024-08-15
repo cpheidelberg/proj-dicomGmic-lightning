@@ -41,9 +41,7 @@ if __name__ == "__main__":
 
     #dicom_file = '1-1.dcm'
     data_path = '../../../sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-    image_path_train = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    image_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/cropped_balanced'
+    image_path = '/home/ubuntu/gmic/vindrmammo_data'
     seg_path = '/home/na236/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation'
     output_path = '/home/na236/student1/sds_hd/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     label_file = "sample_data/annotations/finding_annotations.csv"
@@ -66,7 +64,7 @@ if __name__ == "__main__":
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path_train,
+        "image_path": image_path,
         "segmentation_path": seg_path,
         "output_path": output_path,
 
@@ -80,10 +78,9 @@ if __name__ == "__main__":
         "use_v1_global": False,
     }
 
-    dataTrain = dataset.ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c = parameters["num_classes"], dictPath = dict_path)
+    data_set = dataset.ClassificationImages([image_path], undersampling_rate=0.0, augmentation_rate=0.0, binary=False, augment=False)
 
-    # dataTrain = dataset.H5Dataset(h5_filepath="/home/pb438/medken/balanced_top6/dataset.h5")
-    dataTrain, dataValid, dataTest = random_split(dataTrain, [0.8, 0.1, 0.1])
+    dataTrain, dataValid, dataTest = random_split(data_set, [0.8, 0.1, 0.1])
 
     def objective(trial, dataTrain, dataValid, dataTest, parameters, model_path):
         #Training

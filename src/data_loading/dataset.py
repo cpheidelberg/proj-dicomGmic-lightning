@@ -1,332 +1,79 @@
+import os, h5py, time, sys, random
+import multiprocessing
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import os, ast, pickle, h5py, time, sys, shutil, random
-from tqdm import tqdm
-from PIL import Image
-import multiprocessing
-import resource
-
 import torch
-from torch.utils.data import Dataset, DataLoader, Subset
+
+import albumentations as alb, albumentations.pytorch as alp
+
+from tqdm import tqdm
+from torch.utils.data import Dataset, DataLoader
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
+
 from src.data_loading import loading
 
 
+def _geometric_mean(a: int, b: int, ratio: float) -> int:
+    return round(a ** ratio * b ** (1 - ratio))
+
+
+_aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBrightnessContrast(p=0.3), alp.ToTensorV2()])
+
+
 class ClassificationImages(Dataset):
+    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float, binary: bool, augment: bool):
+        tables = []
+        for data_dir in data_dirs:
+            data_dir = data_dir.removesuffix('/')
 
-    def __init__(self, imageFolder:str, dictPath: str, top_c=None, h5_file=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv(dictPath, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
+            mapping = pd.read_csv(f'{data_dir}/mapping.csv')
+            mapping['png'] = f'{data_dir}/' + mapping['png']
+            tables.append(mapping)
 
-        if top_c:
-            self.filterCategories(top_c)
+        table = pd.concat(tables)
+        labels = list(table['label'].value_counts().keys())
 
-        self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
-        print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
-        print(self.flatDictDF["finding_categories"].value_counts())
+        if binary:
+            self.images = [list(table[table['label'] == 'No Finding']['png']), list(table[table['label'] != 'No Finding']['png'])]
+            self.labels = ['No Finding', 'Suspicious']
+        else:
+            self.images = [list(table[table['label'] == label]['png']) for label in labels]
+            self.labels = labels
 
-        # print(self.getLabelCount())
+        c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
+        self.images[0] = random.sample(self.images[0], c_max)
+
+        self.sizes = [_geometric_mean(c_max, len(images), augmentation_rate) for images in self.images]
+        self.offsets = [sum(self.sizes[:i]) for i in range(len(self.images) + 1)]
+
+        self.augment = augment
+
+
+    def class_weights(self):
+        avg = self.offsets[-1] / len(self.sizes)
+        return [avg / size for size in self.sizes]
 
 
     def __len__(self):
-        return len(self.imageFiles)
+        return self.offsets[-1]
 
 
-    def __getitem__(self, idx):
-        
-        imagePath = self.imageFiles[idx]
+    def __getitem__(self, index: int):
+        label = next(i for i in range(len(self.images)) if self.offsets[i] <= index < self.offsets[i + 1])
+        position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
-
-        labelList = data["finding_categories"].iloc[0]
-        labelEnc = self.createHotEncoding(labelList)
-
-        return loaded_image, labelEnc
-
-
-    def getOrigFilename(self, idx):
-        if len(self.imageFiles[idx].split("/")[-1].split("_")) > 2:
-            original_file_name = "_".join(self.imageFiles[idx].split("/")[-1].split("_")[:-1]).strip(".png")
+        x = loading.read_image_standardized(self.images[label][position])
+        if self.augment:
+            x = _aug(image=x)['image']
         else:
-            original_file_name = self.imageFiles[idx].split("/")[-1].strip(".png")
-
-        return original_file_name
-
-
-    def getDataentry(self, original_file_name: str) -> pd.DataFrame:
-        """Find the entry of the original filename in self.flatDict["image"]"""
-        data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
-        if data.empty:
-            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
-        return data
-
-
-    def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
-        view = data["view"].iloc[0]
-        center = data["best_center"].iloc[0][view][0]
-
-        img = loading.read_image_processed(imagePath, view, data["horizontal_flip"].iloc[0], center)
-        img = np.expand_dims(img, 0).copy()
-
-        return torch.Tensor(img)
-
-            
-    def getLabelCount(self):
-        labelCount = {k: 0 for k in self.unique_categories}
-        for f in self.imageFiles:
-            
-            if len(f.split("/")[-1].split("_")) > 2:
-                original_file_name = "_".join(f.split("/")[-1].split("_")[:-1]).strip(".png")
-            else:
-                original_file_name = f.split("/")[-1].strip(".png")
-            data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
-            labelList = data["finding_categories"].iloc[0]
-            labelCount[labelList[0]] += 1
-        return labelCount
-
-
-    def createHotEncoding(self, labelList):
-        encoding = np.zeros(len(self.unique_categories), dtype=np.float32)
-        for label in labelList:
-            label_index = self.unique_categories.index(label)
-            encoding[label_index] = 1.0
-        if np.max(encoding) == 0:
-            print("No label found")
-
-        return encoding
-            
-
-    def convertLabels(self, df):
-        column = "finding_categories"
-        df[column] = df[column].apply(ast.literal_eval)
-
-        return df
-
-
-    def filterCategories(self, top_c=5):
-        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
-
-        class_counts = self.flatDictDF["finding_categories"].value_counts()
-        origLen = len(self.imageFiles)
-        origLength = len(self.flatDictDF)
-
-        class_counts = class_counts.sort_values(ascending=False)
-        top_labels = class_counts.head(top_c).index
-
-        removed_images = self.flatDictDF.loc[~self.flatDictDF['finding_categories'].isin(top_labels)]
-        removed_images = removed_images['image'].tolist()
-        self.flatDictDF = self.flatDictDF[self.flatDictDF["finding_categories"].isin(top_labels)]
-        self.flatDictDF.to_csv("removedTop5.csv")
-        self.imageFiles = [f for f in self.imageFiles if "_".join(f.split("/")[-1].split("_")[:2]).strip(".png") not in removed_images]
-
-        print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
-        print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
-
-
-class ClassificationImagesFromPickle(ClassificationImages):
-
-    def __init__(self, imageFolder:str, dictPath:str, labelPath:str, top_c=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.imageDict = self.loadPickle(dictPath)
-        print(self.imageDict[0])
-        self.flatDict = self.flattenDict(self.imageDict)
-        self.flatDictDF = pd.DataFrame(self.flatDict)
-
-        print(self.flatDictDF.info())
-        print(self.flatDictDF.iloc[0])
-
-        self.labels = pd.read_csv(labelPath)
-
-        # if top_c:
-        #     self.filterCategories(top_c)
-
-        self.labels = self.convertLabels(self.labels)
-        self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
-        print(self.unique_categories)
-
-        self.flatDictDF["finding_categories"] = None
-        self.addLabelstoDF()
-        self.flatDictDF.to_csv(f"dictionaryTop{top_c}.csv")
-
-
-    def __getitem__(self, idx):
-        
-        imagePath = self.imageFiles[idx]
-
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
-
-        labelList = data["finding_categories"]
-        labelEnc = self.createHotEncoding(labelList)
-
-        return loaded_image, labelEnc
-
-
-    def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
-        view = data["view"]
-        center = data["best_center"][view][0]
-
-        img = loading.read_image_processed(imagePath, view, data["horizontal_flip"], center)
-        img = np.expand_dims(img, 0).copy()
-
-        return torch.Tensor(img)
-
-
-    def getDataentry(self, original_file_name: str) -> pd.DataFrame:
-        """Find the entry of the original filename in self.flatDict["image"]"""
-        data = None
-        # index = None
-        print(self.flatDict[0]["image"])
-        for i, entry in enumerate(self.flatDict):
-            if entry["image"] == original_file_name:
-                studyID = entry["examID"]
-                imageID = entry["dicom"].split('/')[-1]
-                data = entry
-                print(data)
-                # index = i
-                break
-        if data is None:
-            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
-        return data
-
-
-    def flattenDict(self, data):
-        flatDict = []
-        for d in data:
-            dictLCC = self.extractImageDict(d, "L-CC")
-            dictRCC = self.extractImageDict(d, "R-CC")
-            dictLMLO = self.extractImageDict(d, "L-MLO")
-            dictRMLO = self.extractImageDict(d, "R-MLO")
-            flatDict.append(dictLCC)
-            flatDict.append(dictRCC)
-            flatDict.append(dictLMLO)
-            flatDict.append(dictRMLO)
-
-        return flatDict
-
-
-    def addLabelstoDF(self):
-        for i, f in enumerate(tqdm(self.imageFiles)):
-            f = f.split("/")[-1]
-            entry = self.flatDictDF[self.flatDictDF["image"] == f.strip(".png")]
-            index = self.flatDictDF.index[self.flatDictDF["image"] == f.strip(".png")].tolist()[0]
-
-            studyID = entry["examID"].iloc[0]
-            imageID = entry["dicom"].iloc[0].split('/')[-1]
-
-            labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
-            self.flatDictDF["finding_categories"].iloc[index] = labelList
-
-    
-    def loadPickle(self, path):
-        with open(path, "rb") as f:
-            data = pickle.load(f)
-
-        return data
-
-    
-    def extractImageDict(self, data, view):
-        imgDict = {}
-        imgDict["examID"] = data["examID"]
-        imgDict["imageID"] = data[view+"_path"].split("/")[-1]
-        imgDict["view"] = view
-        imgDict["image"] = data[view][0]
-        imgDict["dicom"] = data[view+"_path"]
-        imgDict["horizontal_flip"] = data["horizontal_flip"]
-        imgDict["best_center"] = data["best_center"]
-        imgDict["window_location"] = data["window_location"]
-
-        return imgDict
-
-
-    def filterCategories(self, top_c=5):
-        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
-
-        class_counts = self.labels["finding_categories"].value_counts()
-        origLen = len(self.imageFiles)
-        origLength = len(self.labels)
-        origLeng = len(self.flatDict)
-
-        class_counts = class_counts.sort_values(ascending=False)
-        top_labels = class_counts.head(top_c).index
-
-        filtered_labels = self.labels[self.labels['finding_categories'].apply(lambda x: any(label in x for label in top_labels))]
-        print(filtered_labels['finding_categories'].value_counts())
-        removed_labels = self.labels[~self.labels.index.isin(filtered_labels.index)]
-        assert len(self.labels) == len(filtered_labels) + len(removed_labels), "Filtering 'finding_annotations.csv' not successful"
-
-        self.labels = filtered_labels
-        filtered_exams_images = list(set((row["study_id"], row["image_id"]) for index, row in filtered_labels.iterrows()))
-
-        print(f"Anzahl der einzigartigen Studien- und Bild-IDs: {len(filtered_exams_images)}")
-
-        newImages = []
-        newDict = []
-        for exam_id, image_id in filtered_exams_images:
-            for d in self.flatDict:
-                if d["examID"] == exam_id and d["imageID"] == image_id:
-                    newDict.append(d)
-                    view = d["image"]
-                    break
-            for file in self.imageFiles:
-                if file.endswith(f"/{view}.png"):
-                    newImages.append(file)
-                    break
-
-        self.imageFiles = newImages
-        self.flatDict = newDict
-
-        print("{}/{} labels for {} retained categories".format(len(self.labels), origLength, top_c))
-        print("{}/{} dicts for {} retained categories".format(len(self.flatDict), origLeng, top_c))
-        print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
-
-
-class PredictionClassificationImages(ClassificationImages):
-
-    def __init__(self, imageFolder:str, dictPath: str, top_c=None, h5_file=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv(dictPath, converters={"best_center": self.safe_literal_eval, "window_location": self.safe_literal_eval, "finding_categories": self.safe_literal_eval})
-
-        if top_c:
-            self.filterCategories(top_c)
-
-        self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
-        print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
-        print(self.flatDictDF["finding_categories"].value_counts())
-
-
-    def safe_literal_eval(self, s):
-        try:
-            string = ast.literal_eval(s)
-            return string
-        except ValueError as e:
-            print(f"Fehler beim Parsen des Strings: {s}")
-            raise e
-
-    def __getitem__(self, idx):
-        
-        imagePath = self.imageFiles[idx]
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
-
-        labelList = data["finding_categories"].iloc[0]
-        labelEnc = self.createHotEncoding(labelList)
-
-        return loaded_image, labelEnc, data.to_dict("list")
+            x = np.expand_dims(x, 0)
+
+        y = np.zeros(len(self.images), dtype=np.float32)
+        y[label] = 1.0
+        return x, y
 
 
 class H5Dataset(Dataset):
@@ -381,7 +128,6 @@ class H5Dataset(Dataset):
 
 
 def create_chunked_h5(data):
-
     num_workers = multiprocessing.cpu_count() - 2
     dataloader = DataLoader(data, shuffle=True, num_workers=num_workers)
 
@@ -413,22 +159,10 @@ def create_chunked_h5(data):
     print(f"Gesamtzeit: {time.time() - start_time}")
 
 
-def main(): 
 
-    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    label_file = "sample_data/annotations/finding_annotations.csv"
-    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-
+if __name__ == "__main__":
     h5Path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5"
-
-    # data = ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=6)
-    # data = ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
     data = H5Dataset(h5_filepath=h5Path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
     # create_chunked_h5(data)
 
     print(data[0])
-
-
-if __name__ == "__main__":
-    main()
