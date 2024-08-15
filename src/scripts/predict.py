@@ -57,7 +57,7 @@ def visualize_example(img, saliency_maps, patches, patch_img, patch_attentions, 
     subfigure.axis('off')
 
     # class activation maps
-    for i, class_name in enumerate(parameters["class_names"]):
+    for i, class_name in zip(range(parameters["num_classes"]), parameters["class_names"]):
         subfigure = figure.add_subplot(1, total_num_subplots, 3 + i)
         subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
         resized_cam = cv2.resize(saliency_maps[0,i,:,:], (W, H))
