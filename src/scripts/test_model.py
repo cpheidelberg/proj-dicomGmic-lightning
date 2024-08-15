@@ -41,7 +41,7 @@ sys.path.append(parent_dir)
 
 from src.utilities import pickling, tools
 from src.modeling import gmic as gmic
-from src.data import loading
+from src.data_loading import loading
 from src.constants import VIEWS, PERCENT_T_DICT
 
 #assert torch.__version__ == '1.1.0', "GMIC not tested for pytorch > 1.1.0 (nor python3.8)"

@@ -8,7 +8,7 @@ import torchmetrics.functional.classification as metrics
 
 from src.modeling import cnn, classifier
 from src.scripts import predict
-from src.data import dataset
+from src.data_loading import dataset
 
 
 class GMIC(lightning.LightningModule):

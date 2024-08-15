@@ -11,7 +11,7 @@ parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
 from src.modeling import gmic
-from src.data import dataset
+from src.data_loading import dataset
 
 
 def run_training(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int, binary: bool, augment: bool):

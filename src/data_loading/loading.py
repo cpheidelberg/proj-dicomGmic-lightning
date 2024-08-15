@@ -20,7 +20,7 @@
 import numpy as np
 import PIL.Image as pillow
 from src.constants import VIEWS
-from src.data import augmentations
+from src.data_loading import augmentations
 
 
 def flip_image(image, view, horizontal_flip) -> np.ndarray:

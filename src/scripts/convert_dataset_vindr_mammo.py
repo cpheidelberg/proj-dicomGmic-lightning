@@ -3,7 +3,7 @@ import pandas as pd, os, os.path, ast, sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split('/')[:-2])
 sys.path.append(parent_dir)
-from src.data import loading
+from src.data_loading import loading
 
 
 def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: str, category_index: int, index: int):

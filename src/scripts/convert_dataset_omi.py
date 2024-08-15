@@ -10,7 +10,7 @@ sys.path.append(parent_dir)
 
 import src.cropping.crop_mammogram as cropping
 import src.optimal_centers.get_optimal_centers as centers
-import src.data.loading as loading
+import src.data_loading.loading as loading
 
 
 @dataclasses.dataclass(frozen=True)

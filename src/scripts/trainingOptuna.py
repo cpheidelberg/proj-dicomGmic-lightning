@@ -21,7 +21,7 @@ sys.path.append(parent_dir)
 
 from src.utilities import pickling, tools
 from src.modeling import gmic
-from src.data import loading, dataset
+from src.data_loading import loading, dataset
 from src.constants import VIEWS, PERCENT_T_DICT
 
 

@@ -14,7 +14,7 @@ sys.path.append(parent_dir)
 
 from src.utilities import tools
 from src.modeling import gmic
-from src.data import dataset
+from src.data_loading import dataset
 
 
 def visualize_example(img, saliency_maps, patches, patch_img, patch_attentions, save_dir, parameters):
