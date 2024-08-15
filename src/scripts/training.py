@@ -99,9 +99,4 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=False)
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
-    run_training(epochs=16, epoch_smote=16, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=False)
-    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
-    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=False)
+    run_training(epochs=8, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
