@@ -33,7 +33,7 @@ def flip_image(image, view, horizontal_flip) -> np.ndarray:
     return np.fliplr(image) if flip else image
 
 
-def read_image(path, dtype) -> np.ndarray:
+def read_image(path, dtype='int32') -> np.ndarray:
     return np.array(pillow.open(path), dtype=dtype)
 
 
@@ -42,6 +42,10 @@ def write_image(path, image):
 
 
 def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
+    """
+    Applies augmentation window with random noise in location and size
+    and return normalized cropped image.
+    """
     image = flip_image(image, view, horizontal_flip)
     image, _ = augmentations.random_augmentation_best_center(
         image=image,
@@ -61,16 +65,11 @@ def _standardize(image):
 
 def adjust_brightness(image: np.ndarray) -> np.ndarray:
     image = image * (2 ** 16 - 1) // image.max()
-    if np.argmax(np.bincount(image.flatten())) > 10000:
-        return (2 ** 16 - 1) - image
-    return image
+    most_frequent = np.argmax(np.bincount(image.flatten()))
+    return (2 ** 16 - 1) - image if most_frequent > 10000 else image
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
-    """
-    Applies augmentation window with random noise in location and size
-    and return normalized cropped image.
-    """
     image = flip_and_crop(image, view, horizontal_flip, best_center)
     _standardize(image)
     return image
