@@ -192,11 +192,11 @@ if __name__ == "__main__":
         "crop_shape": (512, 512), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 6, # output classes
+        "num_classes": 2, # output classes
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages([image_dir], undersampling_rate=0.0, augmentation_rate=0.0, binary=False, augment=False)
+    data = dataset.ClassificationImages([image_dir], undersampling_rate=0.0, augmentation_rate=0.0, binary=True, augment=False)
     parameters["class_names"] = data.labels
 
     ds_train, ds_valid, ds_test = random_split(data, [0.8, 0.1, 0.1])
