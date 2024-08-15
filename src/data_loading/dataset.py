@@ -70,18 +70,13 @@ class ClassificationImages(Dataset):
 
 
     def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
-
         view = data["view"].iloc[0]
-        loaded_image = loading.load_image(
-            image_path=imagePath,
-            view=view,
-            horizontal_flip=data["horizontal_flip"].iloc[0],
-        )
-        loaded_image = loading.process_image(loaded_image, view, data["best_center"].iloc[0][view][0])
-        loaded_image = np.expand_dims(loaded_image, 0).copy()
-        loaded_image = torch.Tensor(loaded_image)
+        center = data["best_center"].iloc[0][view][0]
 
-        return loaded_image
+        img = loading.read_image(imagePath)
+        img = loading.process_image(img, view, data["horizontal_flip"].iloc[0], center)
+
+        return torch.Tensor(np.expand_dims(img, 0).copy())
 
             
     def getLabelCount(self):
@@ -179,18 +174,13 @@ class ClassificationImagesFromPickle(ClassificationImages):
 
 
     def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
-
         view = data["view"]
-        loaded_image = loading.load_image(
-            image_path=imagePath,
-            view=view,
-            horizontal_flip=data["horizontal_flip"],
-        )
-        loaded_image = loading.process_image(loaded_image, view, data["best_center"][view][0])
-        loaded_image = np.expand_dims(loaded_image, 0).copy()
-        loaded_image = torch.Tensor(loaded_image)
+        center = data["best_center"][view][0]
 
-        return loaded_image
+        img = loading.read_image(imagePath)
+        img = loading.process_image(img, view, data["horizontal_flip"], center)
+
+        return torch.Tensor(np.expand_dims(img, 0).copy())
 
 
     def getDataentry(self, original_file_name: str) -> pd.DataFrame:

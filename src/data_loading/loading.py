@@ -18,73 +18,67 @@
 # ==============================================================================
 
 import numpy as np
+import PIL.Image as pillow
 from src.constants import VIEWS
-import imageio
-import src.data_loading.augmentations as augmentations
+from src.data_loading import augmentations
 
 
-def flip_image(image, view, horizontal_flip):
+def flip_image(image, view, horizontal_flip) -> np.ndarray:
     """
     If training mode, makes all images face right direction.
     In medical, keeps the original directions unless horizontal_flip is set.
     """
-    if horizontal_flip == 'NO':
-        if VIEWS.is_right(view):
-            image = np.fliplr(image)
-    elif horizontal_flip == 'YES':
-        if VIEWS.is_left(view):
-            image = np.fliplr(image)
-
-    return image
+    flip  = horizontal_flip == 'NO' and VIEWS.is_right(view)
+    flip |= horizontal_flip == 'YES' and VIEWS.is_left(view)
+    return np.fliplr(image) if flip else image
 
 
-def standard_normalize_single_image(image):
-    """
-    Standardizes an image in-place 
-    """
-    image -= np.mean(image)
-    image /= np.maximum(np.std(image), 10**(-5))
+def read_image(path, dtype='int32') -> np.ndarray:
+    return np.array(pillow.open(path), dtype=dtype)
 
 
-def read_image_png(file_name):
-    image = np.array(imageio.imread(file_name))
-    return image
+def write_image(path, image):
+    pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
-def load_image(image_path, view, horizontal_flip):
-    """
-    Loads a png or hdf5 image as floats and flips according to its view.
-    """
-    if image_path.endswith("png"):
-        image = read_image_png(image_path)
-    else:
-        raise RuntimeError()
-    image = image.astype(np.float32)
-    image = flip_image(image, view, horizontal_flip)
-    return image
-
-
-def process_image(image, view, best_center):
+def crop_image(image, view, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
-    cropped_image, _ = augmentations.random_augmentation_best_center(
+    image, _ = augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
         random_number_generator=np.random.RandomState(0),
         best_center=best_center,
         view=view
     )
-
-    # For test time only, normalize a copy of the cropped image
-    # in order to avoid changing the value of original image which gets augmented multiple times
-    cropped_image = cropped_image.copy()
-    standard_normalize_single_image(cropped_image)
-
-    return cropped_image
+    return image.copy()
 
 
+def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
+    return crop_image(flip_image(image, view, horizontal_flip), view, best_center)
 
 
+def _standardize(image):
+    # Standardizes an image in-place 
+    image -= np.mean(image)
+    image /= np.maximum(np.std(image), 10**(-5))
 
+
+def adjust_brightness(image: np.ndarray) -> np.ndarray:
+    image = image * (2 ** 16 - 1) // image.max()
+    most_frequent = np.argmax(np.bincount(image.flatten()))
+    return (2 ** 16 - 1) - image if most_frequent > 10000 else image
+
+
+def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
+    image = flip_and_crop(image, view, horizontal_flip, best_center)
+    _standardize(image)
+    return image
+
+
+def read_image_standardized(path) -> np.ndarray:
+    image = read_image(path, dtype=np.float32)
+    _standardize(image)
+    return image
