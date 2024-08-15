@@ -162,7 +162,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    model_path = 'tb_logs/awsTest/version_6/checkpoints/epoch\=7-step\=7920.ckpt'
+    model_path = r'tb_logs/awsTest/version_6/checkpoints/epoch=7-step=7920.ckpt'
 
     data_path = '/home/ubuntu/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output'
     image_dir = '/home/ubuntu/gmic/vindrmammo_data'
