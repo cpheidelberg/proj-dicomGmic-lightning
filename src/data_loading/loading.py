@@ -41,12 +41,11 @@ def write_image(path, image):
     pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
-def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
+def crop_image(image, view, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
-    image = flip_image(image, view, horizontal_flip)
     image, _ = augmentations.random_augmentation_best_center(
         image=image,
         input_size=(2944, 1920),
@@ -55,6 +54,14 @@ def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
         view=view
     )
     return image.copy()
+
+
+def flip_and_crop(image, view, horizontal_flip, best_center) -> np.ndarray:
+    """
+    Applies augmentation window with random noise in location and size
+    and return normalized cropped image.
+    """
+    return crop_image(flip_image(image, view, horizontal_flip), view, best_center)
 
 
 def _standardize(image):
