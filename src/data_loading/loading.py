@@ -46,18 +46,13 @@ def write_image(path: str, image: np.ndarray):
     pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
-def crop_image(image, view, best_center) -> np.ndarray:
+def _crop_image(image, view, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
-    return augmentations.random_augmentation_best_center(
-        image=image,
-        input_size=(2944, 1920),
-        random_number_generator=np.random.RandomState(0),
-        best_center=best_center,
-        view=view,
-    )[0].copy()
+    img, _ = augmentations.random_augmentation_best_center(image, (2944, 1920), np.random.RandomState(0), best_center=best_center, view=view)
+    return img.copy()
 
 
 def _standardize(image):
@@ -74,18 +69,18 @@ def adjust_brightness(image: np.ndarray) -> np.ndarray:
     in this image, so we invert the colours to ensure that all images have light
     tissue on dark background.
     """
-    image = image * (2 ** 16 - 1) // image.max()
-    most_frequent = np.argmax(np.bincount(image.flatten()))
-    return (2 ** 16 - 1) - image if most_frequent > 10000 else image
+    img = image * (2 ** 16 - 1) // image.max()
+    most_frequent = np.argmax(np.bincount(img.flatten()))
+    return (2 ** 16 - 1) - img if most_frequent > 10000 else img
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
     """
     Flip, crop and standardize
     """
-    image = crop_image(flip_image(image, view, horizontal_flip), view, best_center)
-    _standardize(image)
-    return image
+    img = _crop_image(flip_image(image, view, horizontal_flip), view, best_center)
+    _standardize(img)
+    return img
 
 
 def read_image_processed(path, view, horizontal_flip, best_center):
