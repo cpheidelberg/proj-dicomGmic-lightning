@@ -11,7 +11,7 @@ from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = "/".join(current_dir.split("/")[:-2])
+parent_dir = '/'.join(current_dir.split('/')[:-2])
 sys.path.append(parent_dir)
 
 from src.data_loading import loading
@@ -174,7 +174,7 @@ class H5Dataset(Dataset):
         self.h5_filepath = h5_filepath
         self.relevant_labels = relevant_labels
 
-        self.h5_file = h5py.File(self.h5_filepath, "r")
+        self.h5_file = h5py.File(self.h5_filepath, 'r')
         self.images = self.h5_file['images']
         self.labels = self.h5_file['labels']
 
@@ -246,13 +246,13 @@ def create_chunked_h5(data):
             dset_images[i] = image_np
             dset_labels[i] = label_np
 
-    print("Data has been successfully saved to 'balanced_top6/dataset.h5'")
-    print(f"Gesamtzeit: {time.time() - start_time}")
+    print('Data has been successfully saved to balanced_top6/dataset.h5')
+    print('Gesamtzeit:', time.time() - start_time)
 
 
-if __name__ == "__main__":
-    h5Path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5"
-    data = H5Dataset(h5_filepath=h5Path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+if __name__ == '__main__':
+    h5Path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5'
+    data = H5Dataset(h5Path, ['No Finding', 'Mass', 'Suspicious Calcification'])
     # create_chunked_h5(data)
 
     print(data[0])
