@@ -1,24 +1,13 @@
-import argparse, os, cv2
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from tqdm import tqdm
-import pydicom as dcm
-import sys
 import os
+import multiprocessing
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 import lightning.pytorch as pl
-import multiprocessing
+from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy, BinaryF1Score
 
-from src.utilities import pickling, tools
 from src.modeling import gmic
-from src.data_loading import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
 from src.scripts import predict
 
 

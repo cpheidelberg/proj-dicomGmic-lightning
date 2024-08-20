@@ -1,28 +1,20 @@
-import argparse, os, cv2, sys
+import os, cv2, sys
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from tqdm import tqdm
-import time
-import multiprocessing
 
 import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
-import pydicom as dcm
 
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.utilities import pickling, tools
-from src.modeling import gmic, trainer
-from src.data_loading import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
+from src.utilities import tools
+from src.modeling import trainer
+from src.data_loading import dataset
 
 
 def visualize_example(input_img, saliency_maps, seg_masks,
@@ -195,16 +187,10 @@ if __name__ == "__main__":
     # set path variables
     checkpoint_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
-    dicom_file = '1-1.dcm'
-
-    sds_path = '../sdsHD/'
     
     image_path = '/home/ubuntu/gmic/vindrmammo_data'
-    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
-    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
-    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
-    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
-    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+    output_path = '/home/ubuntu/gmic/predict_output'
+    seg_path = os.path.join(output_path, 'segmentation')
 
     # set hyperparameters
     parameters = {
@@ -237,14 +223,14 @@ if __name__ == "__main__":
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
-    lightningModule = trainer.GMICTrainer(parameters=parameters, dataset_predict=dataTrain)
+    gmic_trainer = trainer.GMICTrainer(parameters=parameters, dataset_predict=dataTrain)
 
     if device == "gpu":
-        trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
+        pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
     else:
-        trainer = pl.Trainer(fast_dev_run=True, accelerator=device)
+        pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device)
         
-    prediction = trainer.predict(lightningModule, ckpt_path=checkpoint_path)
+    prediction = pl_trainer.predict(gmic_trainer, ckpt_path=checkpoint_path)
     
     print(f"Categories: {data.labels}")
     print(f"Prediction: {prediction}")
