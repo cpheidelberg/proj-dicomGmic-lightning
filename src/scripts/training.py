@@ -4,18 +4,17 @@ import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
 from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.callbacks import EarlyStopping
 
-# import own files 
+# import own files
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.modeling import trainer
-from src.data_loading import dataset
+from src.modeling.trainer import GMICTrainer
+from src.data_loading.dataset import ClassificationImages
 
 
-def main(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int, binary: bool, augment: bool):
+def run_training(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int, binary: bool, augment: bool):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -32,10 +31,10 @@ def main(epochs: int, undersampling_rate: float, augmentation_rate: float, smote
     data_dirs = ['/home/ubuntu/gmic/vindrmammo_data'] #, '/home/ubuntu/gmic/omidb_data']
     image_path = '/home/ubuntu/gmic/vindrmammo_data'
     output_path = '/home/ubuntu/gmic/predict_output'
-    seg_path = os.path.join(output_path, 'segmentation')
+    segmentation_path = os.path.join(output_path, 'segmentation')
 
-    data = dataset.ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
-    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
+    dataset = ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
+    data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
 
     # set hyperparameters
     parameters = {
@@ -57,7 +56,7 @@ def main(epochs: int, undersampling_rate: float, augmentation_rate: float, smote
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
         "image_path": image_path,
-        "segmentation_path": seg_path,
+        "segmentation_path": segmentation_path,
         "output_path": output_path,
 
         # model related hyper-parameters
@@ -66,45 +65,41 @@ def main(epochs: int, undersampling_rate: float, augmentation_rate: float, smote
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": len(data.labels), # output classes
+        "num_classes": len(dataset.labels), # output classes
         "use_v1_global": False,
     }
 
     # Training
-    gmic_trainer = trainer.GMICTrainer(
-                        parameters=parameters,
-                        image_class_weights=data.class_weights(),
-                        dataset_train=dataTrain,
-                        dataset_valid=dataValid,
-                        dataset_test=dataTest,
-                        model_path=model_path
-                    )
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
-    early_stop_callback = EarlyStopping(
-                    monitor='val_loss',
-                    patience=5,
-                    strict=False,
-                    verbose=False,
-                    mode='min'
-                )
-    pl_trainer = pl.Trainer(fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-                        # limit_val_batches=0,
-                        # num_sanity_val_steps=0,
-                        max_epochs=parameters["epochs"], 
-                        # gradient_clip_val=1e-3,
-                        accelerator=device, 
-                        # devices=[parameters["gpu_number"]],
-                        devices=[1,2],
-                        logger=logger,
-                        # profiler="simple",
-                        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
-                        # callbacks=[ModelSummary(max_depth=2)],
-                    )
+    model = GMICTrainer(
+        parameters=parameters,
+        image_class_weights=dataset.class_weights(),
+        dataset_train=data_train,
+        dataset_valid=data_valid,
+        dataset_test=data_test,
+        model_path=model_path
+    )
 
-    pl_trainer.fit(model=gmic_trainer)    
+    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
+
+    trainer = pl.Trainer(
+        fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+        # limit_val_batches=0,
+        # num_sanity_val_steps=0,
+        max_epochs=parameters["epochs"], 
+        # gradient_clip_val=1e-3,
+        accelerator=device, 
+        # devices=[parameters["gpu_number"]],
+        devices=[1,2],
+        logger=logger,
+        # profiler="simple",
+        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+        # callbacks=[ModelSummary(max_depth=2)],
+    )
+
+    trainer.fit(model=model)    
     print("Training finished at: ", time.ctime())
-    pl_trainer.test(model=gmic_trainer)
+    trainer.test(model=model)
 
 
 if __name__ == "__main__":
-    main(epochs=16, epoch_smote=8, undersampling_rate=0.2, augmentation_rate=0.2, smote_rate=0.2, binary=True, augment=True)
+    run_training(epochs=16, epoch_smote=8, undersampling_rate=0.2, augmentation_rate=0.2, smote_rate=0.2, binary=True, augment=True)
