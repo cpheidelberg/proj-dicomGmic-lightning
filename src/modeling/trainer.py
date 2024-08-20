@@ -88,30 +88,49 @@ class GMICTrainer(pl.LightningModule):
         self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True)
 
 
-    def training_step(self, batch, batch_idx):
-        """Implementation of PyTorch training loop in Lightning called for each batch"""
-        img, y = batch
-        print(img.shape)
-        # y_index = int(torch.max(y, 1)[1])
-        # self.class_labels[y_index] += 1
+    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
+        y_fusion, y_global, y_local, global_vec, h_crops = self(image)
 
-        y_global, y_local, y_fusion = self(img)
+        if self._training_on_FV_next():
+            self.feature_vectors.add(y.argmax(dim=1).tolist(), global_vec.cpu().numpy(), h_crops.cpu().numpy())
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
-        
         loss = loss_fusion + loss_global + loss_local
 
         self._metrics('train', y_fusion, y)
+        self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
+        self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
+        self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
+        return loss
+
+
+    def _train_on_feature_vector(self, global_vec, h_crops, y):
+        y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
+
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_local = self.criterion(y_local, y)
+        loss = loss_fusion + loss_local
+
+        self._metrics('train', y_fusion, y)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
-        self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
-
         return loss
+
+
+    def training_step(self, batch, batch_idx):
+        """Implementation of PyTorch training loop in Lightning called for each batch"""
+        x, y = batch
+
+        if self._training_on_FV_now():
+            return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
+        else:
+            return self._train_on_image(image=x, y=y)
 
 
     def validation_step(self, batch, batch_idx):
