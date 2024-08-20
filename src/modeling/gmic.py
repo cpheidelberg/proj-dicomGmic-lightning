@@ -57,7 +57,7 @@ class GMIC(torch.nn.Module):
         self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
 
 
-    def forward(self, x_original):
+    def forward_cnn(self, x_original):
         """
         :param x_original: N,H,W,C numpy matrix
         """
@@ -83,15 +83,30 @@ class GMIC(torch.nn.Module):
         crops_variable = crops_variable.view(batch_size * num_crops, I, J).unsqueeze(1)
         h_crops = self.local_network.forward(crops_variable).view(batch_size, num_crops, -1)
 
+        # use max pooling to collapse the feature map
+        g1, _ = torch.max(h_g, dim=2)
+        global_vec, _ = torch.max(g1, dim=2)
+
+        return self.y_global, h_crops, global_vec
+
+
+    def forward_classifier(self, global_vec, h_crops):
         # MIL module
         # y_local is not directly used during inference
         z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
 
         # fusion branch
-        # use max pooling to collapse the feature map
-        g1, _ = torch.max(h_g, dim=2)
-        global_vec, _ = torch.max(g1, dim=2)
         concat_vec = torch.cat([global_vec, z], dim=1)
         self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
 
-        return self.y_fusion, self.y_global, self.y_local
+        return self.y_fusion, self.y_local
+
+
+    def forward(self, x_original):
+        """
+        :param x_original: N,H,W,C numpy matrix
+        """
+        y_global, h_crops, global_vec = self.forward_cnn(x_original)
+        y_fusion, y_local = self.forward_classifier(global_vec, h_crops)
+
+        return y_fusion, y_global, y_local
