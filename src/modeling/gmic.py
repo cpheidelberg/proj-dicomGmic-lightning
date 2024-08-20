@@ -22,13 +22,11 @@ Module that define the core logic of GMIC
 """
 
 import torch
-import torch.nn as nn
-import numpy as np
 from src.utilities import tools
 import src.modeling.modules as m
 
 
-class GMIC(nn.Module):
+class GMIC(torch.nn.Module):
     def __init__(self, parameters):
         super(GMIC, self).__init__()
 
@@ -56,56 +54,7 @@ class GMIC(nn.Module):
         self.attention_module.add_layers()
 
         # fusion branch
-        self.fusion_dnn = nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
-
-    def _convert_crop_position(self, crops_x_small, cam_size, x_original):
-        """
-        Function that converts the crop locations from cam_size to x_original
-        :param crops_x_small: N, k*c, 2 numpy matrix
-        :param cam_size: (h,w)
-        :param x_original: N, C, H, W pytorch variable
-        :return: N, k*c, 2 numpy matrix
-        """
-        # retrieve the dimension of both the original image and the small version
-        h, w = cam_size
-        _, _, H, W = x_original.size()
-
-        # interpolate the 2d index in h_small to index in x_original
-        top_k_prop_x = crops_x_small[:, :, 0] / h
-        top_k_prop_y = crops_x_small[:, :, 1] / w
-        # sanity check
-        assert np.max(top_k_prop_x) <= 1.0, "top_k_prop_x >= 1.0"
-        assert np.min(top_k_prop_x) >= 0.0, "top_k_prop_x <= 0.0"
-        assert np.max(top_k_prop_y) <= 1.0, "top_k_prop_y >= 1.0"
-        assert np.min(top_k_prop_y) >= 0.0, "top_k_prop_y <= 0.0"
-        # interpolate the crop position from cam_size to x_original
-        top_k_interpolate_x = np.expand_dims(np.around(top_k_prop_x * H), -1)
-        top_k_interpolate_y = np.expand_dims(np.around(top_k_prop_y * W), -1)
-        top_k_interpolate_2d = np.concatenate([top_k_interpolate_x, top_k_interpolate_y], axis=-1)
-        return top_k_interpolate_2d
-
-    def _retrieve_crop(self, x_original_pytorch, crop_positions, crop_method):
-        """
-        Function that takes in the original image and cropping position and returns the crops
-        :param x_original_pytorch: PyTorch Tensor array (N,C,H,W)
-        :param crop_positions:
-        :return:
-        """
-        batch_size, num_crops, _ = crop_positions.shape
-        crop_h, crop_w = self.experiment_parameters["crop_shape"]
-
-        output = torch.ones((batch_size, num_crops, crop_h, crop_w)).type_as(x_original_pytorch)
-        # if self.experiment_parameters["device_type"] == "gpu":
-        #     device = torch.device("cuda:{}".format(self.experiment_parameters["gpu_number"]))
-        #     output = output.to(device)
-        for i in range(batch_size):
-            for j in range(num_crops):
-                tools.crop_pytorch(x_original_pytorch[i, 0, :, :],
-                                                    self.experiment_parameters["crop_shape"],
-                                                    crop_positions[i,j,:],
-                                                    output[i,j,:,:],
-                                                    method=crop_method)
-        return output
+        self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
 
 
     def forward(self, x_original):
@@ -123,10 +72,10 @@ class GMIC(nn.Module):
         small_x_locations = self.retrieve_roi_crops.forward(x_original, self.cam_size, self.saliency_map)
 
         # convert crop locations that is on self.cam_size to x_original
-        self.patch_locations = self._convert_crop_position(small_x_locations, self.cam_size, x_original)
+        self.patch_locations = tools.scale_crops(small_x_locations, self.cam_size, x_original.size()[2:])
 
         # patch retriever
-        crops_variable = self._retrieve_crop(x_original, self.patch_locations, self.retrieve_roi_crops.crop_method)
+        crops_variable = tools.retrieve_crops(x_original, self.patch_locations, self.experiment_parameters["crop_shape"], self.retrieve_roi_crops.crop_method)
         self.patches = crops_variable.data.cpu().numpy()
 
         # detection network
