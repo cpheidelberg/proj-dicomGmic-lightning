@@ -65,7 +65,7 @@ class GMICTrainer(pl.LightningModule):
 
     def on_train_epoch_end(self):
         if self._training_on_FV_next():
-            for _, param in self.cnn.named_parameters():
+            for _, param in self.gmic.cnn_named_parameters():
                 param.requires_grad = False
 
         if self._training_on_FV_next() or self._training_on_FV_now():

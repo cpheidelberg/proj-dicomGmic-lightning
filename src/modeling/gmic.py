@@ -96,8 +96,7 @@ class GMIC(torch.nn.Module):
         z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
 
         # fusion branch
-        concat_vec = torch.cat([global_vec, z], dim=1)
-        self.y_fusion = torch.sigmoid(self.fusion_dnn(concat_vec))
+        self.y_fusion = torch.sigmoid(self.fusion_dnn(torch.cat([global_vec, z], dim=1)))
 
         return self.y_fusion, self.y_local
 
@@ -110,3 +109,8 @@ class GMIC(torch.nn.Module):
         y_fusion, y_local = self.forward_classifier(global_vec, h_crops)
 
         return y_fusion, y_global, y_local
+
+
+    def cnn_named_parameters(self):
+        classifier = ('fusion_dnn', 'classifier_linear', 'mil_attn_V', 'mil_attn_U', 'mil_attn_w')
+        return ((name, param) for name, param in self.named_parameters() if not name.startswith(classifier))
