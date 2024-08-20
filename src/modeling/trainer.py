@@ -2,7 +2,6 @@ import os
 import multiprocessing
 
 import torch
-import torch.nn as nn
 import lightning.pytorch as pl
 from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy, BinaryF1Score
@@ -13,7 +12,7 @@ from src.scripts import predict
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
+    def __init__(self, parameters, image_class_weights=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
 
@@ -29,7 +28,7 @@ class GMICTrainer(pl.LightningModule):
 
             print(f"Use pretrained model from {checkpoint_path}")
 
-        self.criterion = nn.BCELoss(reduction="sum")
+        self.criterion = torch.nn.BCELoss(torch.FloatTensor([image_class_weights]) if image_class_weights else None, reduction='sum')
 
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid

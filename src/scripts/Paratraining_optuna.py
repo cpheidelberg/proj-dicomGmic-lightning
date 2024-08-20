@@ -92,6 +92,7 @@ if __name__ == "__main__":
 
         lightningModule = trainer.GMICTrainer(
                             parameters=parameters,
+                            image_class_weights=data_set.class_weights(),
                             dataset_train=dataTrain,
                             dataset_valid=dataValid,
                             dataset_test=dataTest,

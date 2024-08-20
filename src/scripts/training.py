@@ -68,6 +68,7 @@ if __name__ == "__main__":
     # Training
     gmic_trainer = trainer.GMICTrainer(
                         parameters=parameters,
+                        image_class_weights=data.class_weights(),
                         dataset_train=dataTrain,
                         dataset_valid=dataValid,
                         dataset_test=dataTest,
