@@ -15,8 +15,7 @@ from src.modeling import trainer
 from src.data_loading import dataset
 
 
-if __name__ == "__main__":
-
+def main(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int, binary: bool, augment: bool):
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -30,21 +29,30 @@ if __name__ == "__main__":
     # set path variables
     model_path = 'models/'
 
+    data_dirs = ['/home/ubuntu/gmic/vindrmammo_data'] #, '/home/ubuntu/gmic/omidb_data']
     image_path = '/home/ubuntu/gmic/vindrmammo_data'
     output_path = '/home/ubuntu/gmic/predict_output'
     seg_path = os.path.join(output_path, 'segmentation')
+
+    data = dataset.ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
+    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 10,
+        "epochs": epochs,
         "batch_size": 4,
         "learning_rate": 1e-3,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
+
+        "undersampling_rate": undersampling_rate,
+        "augmentation_rate": augmentation_rate,
+        "smote_rate": smote_rate,
+        "epoch_smote": epoch_smote,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
@@ -58,12 +66,9 @@ if __name__ == "__main__":
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 6, # output classes
+        "num_classes": len(data.labels), # output classes
         "use_v1_global": False,
     }
-
-    data = dataset.ClassificationImages([image_path], undersampling_rate=0.0, augmentation_rate=0.0, binary=False, augment=False)
-    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
 
     # Training
     gmic_trainer = trainer.GMICTrainer(
@@ -95,8 +100,11 @@ if __name__ == "__main__":
                         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
                         # callbacks=[ModelSummary(max_depth=2)],
                     )
-    pl_trainer.fit(model=gmic_trainer)
-    
-    print("Training finished at: {}".format(time.ctime()))
 
+    pl_trainer.fit(model=gmic_trainer)    
+    print("Training finished at: ", time.ctime())
     pl_trainer.test(model=gmic_trainer)
+
+
+if __name__ == "__main__":
+    main(epochs=16, epoch_smote=8, undersampling_rate=0.2, augmentation_rate=0.2, smote_rate=0.2, binary=True, augment=True)
