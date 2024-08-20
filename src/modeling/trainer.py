@@ -204,9 +204,10 @@ class GMICTrainer(pl.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.train_dataset:
+        if self._training_on_FV_now():
+            return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
+        else:
             return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
-        return None
 
 
     def val_dataloader(self):
