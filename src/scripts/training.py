@@ -82,7 +82,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
 
     trainer = pl.Trainer(
-        fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+        fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
         # limit_val_batches=0,
         # num_sanity_val_steps=0,
         max_epochs=parameters["epochs"], 
