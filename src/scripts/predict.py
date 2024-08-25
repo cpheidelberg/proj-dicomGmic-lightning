@@ -173,7 +173,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    checkpoint_path = 'tb_logs/balanced/version_0/checkpoints/epoch=8-step=31664.ckpt' # 2 classes
+    checkpoint_path = 'tb_logs/balanced/version_0/checkpoints/epoch=7-step=31664.ckpt' # 2 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
     
     image_dir = '/home/ubuntu/gmic/vindrmammo_data'
