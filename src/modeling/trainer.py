@@ -83,9 +83,9 @@ class GMICTrainer(pl.LightningModule):
 
     def _metrics(self, prefix: str, y_hat: torch.Tensor, y: torch.Tensor):
         y = y.type(torch.int)
-        self.log(f"{prefix}_acc", metrics.binary_accuracy(y_hat, y), on_step=False, on_epoch=True)
-        self.log(f"{prefix}_f1",  metrics.binary_f1_score(y_hat, y), on_step=False, on_epoch=True)
-        self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True)
+        self.log(f"{prefix}_acc", metrics.binary_accuracy(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"{prefix}_f1",  metrics.binary_f1_score(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
 
 
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
