@@ -57,25 +57,27 @@ class GMIC(torch.nn.Module):
         self.fusion_dnn = torch.nn.Linear(parameters["post_processing_dim"]+512, parameters["num_classes"])
 
 
-    def forward_cnn(self, x_original):
+    def forward_cnn(self, x):
         """
-        :param x_original: N,H,W,C numpy matrix
+        Execute the forward step of the CNN part of the GMIC, converting
+        the input image into y_global and the feature vector (h_crops & global_vec).
+        - x: (N,H,W,C) Tensor
         """
         # global network: x_small -> class activation map
-        h_g, self.saliency_map = self.global_network.forward(x_original)
+        h_g, self.saliency_map = self.global_network.forward(x)
 
         # calculate y_global
         # note that y_global is not directly used in inference
         self.y_global = self.aggregation_function.forward(self.saliency_map)
 
         # region proposal network
-        small_x_locations = self.retrieve_roi_crops.forward(x_original, self.cam_size, self.saliency_map)
+        small_x_locations = self.retrieve_roi_crops.forward(x, self.cam_size, self.saliency_map)
 
-        # convert crop locations that is on self.cam_size to x_original
-        self.patch_locations = tools.scale_crops(small_x_locations, self.cam_size, x_original.size()[2:])
+        # convert crop locations that is on self.cam_size to x
+        self.patch_locations = tools.scale_crops(small_x_locations, self.cam_size, x.size()[2:])
 
         # patch retriever
-        crops_variable = tools.retrieve_crops(x_original, self.patch_locations, self.experiment_parameters["crop_shape"], self.retrieve_roi_crops.crop_method)
+        crops_variable = tools.retrieve_crops(x, self.patch_locations, self.experiment_parameters["crop_shape"], self.retrieve_roi_crops.crop_method)
         self.patches = crops_variable.data.cpu().numpy()
 
         # detection network
@@ -91,6 +93,14 @@ class GMIC(torch.nn.Module):
 
 
     def forward_classifier(self, global_vec, h_crops):
+        """
+        Execute the forward step of the classification step of the GMIC,
+        converting the feature vector (global_vec & h_crops) into y_fusion
+        and y_local.
+        - global_vec: Tensor
+        - h_crops: Tensor
+        """
+
         # MIL module
         # y_local is not directly used during inference
         print(f'{global_vec.shape=}, {h_crops.shape=}')
@@ -102,16 +112,20 @@ class GMIC(torch.nn.Module):
         return self.y_fusion, self.y_local
 
 
-    def forward(self, x_original):
+    def forward(self, x):
         """
-        :param x_original: N,H,W,C numpy matrix
+        Execute the forward step for the entire GMIC.
+        - x: N,H,W,C Tensor
         """
-        y_global, h_crops, global_vec = self.forward_cnn(x_original)
+        y_global, h_crops, global_vec = self.forward_cnn(x)
         y_fusion, y_local = self.forward_classifier(global_vec, h_crops)
 
         return y_fusion, y_global, y_local
 
 
     def cnn_named_parameters(self):
+        """
+        Filter named parameters and return only those used in the forward_cnn() step.
+        """
         classifier = ('fusion_dnn', 'classifier_linear', 'mil_attn_V', 'mil_attn_U', 'mil_attn_w')
         return ((name, param) for name, param in self.named_parameters() if not name.startswith(classifier))

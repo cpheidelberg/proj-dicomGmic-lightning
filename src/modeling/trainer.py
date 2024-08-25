@@ -56,21 +56,33 @@ class GMICTrainer(pl.LightningModule):
 
 
     def _training_on_FV_now(self):
+        """
+        Checks whether the trainer is training on feature vectors
+        in the current epoch.
+        """
         return self.current_epoch >= self.hparams.epoch_smote
 
 
     def _training_on_FV_next(self):
+        """
+        Checks whether the trainer is going to train on feature vectors
+        in the next epoch.
+        """
         return self.current_epoch + 1 == self.hparams.epoch_smote
 
 
     def on_train_epoch_end(self):
         if self._training_on_FV_next():
+            # Disable tuning for CNN when training on feature vectors, because
+            # we are passing feature vectors only to the classifier (CNN
+            # takes original image and returns feature vector).
             for _, param in self.gmic.cnn_named_parameters():
                 param.requires_grad = False
 
         if self._training_on_FV_next() or self._training_on_FV_now():
             self.feature_vectors.synthesise()
 
+            # Update class weights in self.criterion after synthesizing new vectors
             device = self.criterion.weight.device
             weights = self.feature_vectors.class_weights()
             self.criterion = torch.nn.BCELoss(torch.FloatTensor([weights]).to(device), reduction='sum')
@@ -92,6 +104,7 @@ class GMICTrainer(pl.LightningModule):
         y_global, h_crops, global_vec = self.gmic.forward_cnn(image)
         y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
 
+        # Save the feature vectors in the last epoch before switching to SMOTE
         if self._training_on_FV_next():
             self.feature_vectors.add(y.argmax(dim=1).tolist(), global_vec.cpu().numpy(), h_crops.cpu().numpy())
 

@@ -140,8 +140,7 @@ class SMOTE:
 
 class FeatureVectors(Dataset):
     """
-    Dataset representing feature vectors to be oversampled using
-    the SMOTE technique.
+    Dataset representing feature vectors oversampled using the SMOTE technique
     """
 
     def __init__(self, smote_rate: float):
@@ -180,6 +179,9 @@ class FeatureVectors(Dataset):
 
 
     def class_weights(self):
+        """
+        Class weights after oversampling is applied
+        """
         sizes = [len(vectors) for vectors in self._synthetic]
         avg = sum(sizes) / len(sizes)
         return [avg / size for size in sizes]
