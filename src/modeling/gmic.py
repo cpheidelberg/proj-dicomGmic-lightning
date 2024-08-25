@@ -93,6 +93,7 @@ class GMIC(torch.nn.Module):
     def forward_classifier(self, global_vec, h_crops):
         # MIL module
         # y_local is not directly used during inference
+        print(f'{global_vec.shape=}, {h_crops.shape=}')
         z, self.patch_attns, self.y_local = self.attention_module.forward(h_crops)
 
         # fusion branch

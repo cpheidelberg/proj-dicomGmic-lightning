@@ -34,7 +34,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     segmentation_path = os.path.join(output_path, 'segmentation')
 
     dataset = ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
-    data_train, data_valid, data_test, _ = random_split(dataset, [0.08, 0.01, 0.01, 0.9])
+    data_train, data_valid, data_test, _ = random_split(dataset, [0.01, 0.01, 0.01, 0.97])
 
     # set hyperparameters
     parameters = {
@@ -102,6 +102,6 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
+    run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
     run_training(epochs=8, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
     run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
-    run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
