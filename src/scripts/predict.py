@@ -91,20 +91,16 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, hparams):
+def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
-    input_img = input_img[0, 0, :, :]
-    H, W = input_img.shape
+    img = img[0, 0, :, :]
+    H, W = img.shape
     window_location = (0, H, 0, W)
 
-    saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
-    saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
-    saliency_maps_malignant = (saliency_maps[0,1,:,:]*500).astype(np.uint8)
-    saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
-
-    process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", hparams.turn_on_visualization)
-    process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", hparams.turn_on_visualization)
+    for i in range(parameters["num_classes"]):
+        maps = cv2.resize((saliency_maps[0,i,:,:] * 500).astype(np.uint8), (W, H))
+        process_saliency_map(img, maps, window_location, folder, filename, parameters["class_names"][i], parameters["turn_on_visualization"])
 
 
 def process_saliency_map(input_img, saliency_map, window_location, save_dir, file_path, label, turn_on_visualization):
