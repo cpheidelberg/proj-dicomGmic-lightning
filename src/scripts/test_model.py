@@ -247,10 +247,8 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
                 dicom_path = os.path.join(datum[str(view) + "_path"], dicom_file)
                 # load image
                 # the image is already flipped so no need to do it again
-                loaded_image = loading.read_image_processed(
-                    os.path.join(parameters["image_path"], short_file_path + ".png"),
-                    view, datum["horizontal_flip"], datum["best_center"][view][0],
-                )
+                loaded_image = loading.read_image(os.path.join(parameters["image_path"], short_file_path + ".png"), 'float32')
+                loaded_image = loading.process_image(loaded_image, view, datum["horizontal_flip"], datum["best_center"][view][0])
 
                 # DELETED: load segmentation if available -  because not available
 

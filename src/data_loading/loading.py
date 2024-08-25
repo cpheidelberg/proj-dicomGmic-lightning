@@ -83,8 +83,7 @@ def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
     return img
 
 
-def read_image_processed(path, view, horizontal_flip, best_center):
-    """
-    Read an image into an NumPy array of float32, then flip, crop and standardize
-    """
-    return process_image(read_image(path, np.float32), view, horizontal_flip, best_center)
+def read_image_standardized(image) -> np.ndarray:
+    img = read_image(image, 'float32')
+    _standardize(img)
+    return img
