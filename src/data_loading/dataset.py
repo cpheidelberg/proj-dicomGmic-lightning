@@ -105,6 +105,10 @@ class ClassificationImages(Dataset):
 
 
 class SMOTE:
+    """
+    This class implements the SMOTE algorithm: https://arxiv.org/abs/1106.1813
+    """
+
     def __init__(self, points: list[np.ndarray]):
         self._points = points
         self._tree = scipy.spatial.KDTree(points)
@@ -121,6 +125,11 @@ class SMOTE:
         return u + (v - u) * self._rng.random(len(v))
 
     def generate(self, n: int, k: int):
+        """
+        Oversample the points given to the constructor.
+        - n: how many times to oversample
+        - k: how many k-closest neighbours to consider
+        """
         for point in self._points:
             nearest = self._nearest_neighbours(point, k)
             selected = self._sample_with_replacement(nearest, n)
@@ -130,6 +139,10 @@ class SMOTE:
 
 
 class FeatureVectors(Dataset):
+    """
+    Dataset representing feature vectors oversampled using the SMOTE technique.
+    """
+
     def __init__(self, smote_rate: float):
         self._original = []
         self._synthetic = []
