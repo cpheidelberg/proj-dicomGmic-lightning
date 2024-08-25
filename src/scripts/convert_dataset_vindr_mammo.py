@@ -10,7 +10,7 @@ sys.path.append(parent_dir)
 from src.data_loading import loading
 
 
-def _process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: str, category_index: int, index: int):
+def process_image(src_dir: str, dst_dir: str, line: pd.Series, category_name: str, category_index: int, index: int):
     src_name = line['image'] + '.png'
     dst_name = f'{category_index}/{index}.png'
     dcm_name = '/'.join(line['dicom'].split('/')[-2:])
@@ -48,7 +48,7 @@ def main():
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
         for i, line in enumerate(dctn[dctn['finding_categories'] == category_name].iloc):
-            mapp.loc[len(mapp), :] = _process_image(src_dir, dst_dir, line, category_name, category_index, i)
+            mapp.loc[len(mapp), :] = process_image(src_dir, dst_dir, line, category_name, category_index, i)
 
             counter += 1
             print(f'#{counter} - {100*counter//len(dctn)} %')
