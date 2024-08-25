@@ -94,6 +94,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         # profiler="simple",
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
+        reload_dataloaders_every_n_epochs=1,
     )
 
     trainer.fit(model=model)    
