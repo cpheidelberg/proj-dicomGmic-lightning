@@ -140,10 +140,18 @@ class SMOTE:
 
 class FeatureVectors(Dataset):
     """
-    Dataset representing feature vectors oversampled using the SMOTE technique.
+    Dataset representing feature vectors to be oversampled using
+    the SMOTE technique.
     """
 
     def __init__(self, smote_rate: float):
+        """
+        - smote_rate: How much to oversample smaller classes (from 0.0 to 1.0).
+            All classes except for the largest one will be oversampled to size
+            C'' = (C' ** (1 - S)) * (A' ** S), where C' is the size of
+            the given class after augmentation, A' is the size of the largest
+            class after undersampling and S is the SMOTE rate.
+        """
         self._original = []
         self._synthetic = []
         self._smote_rate = smote_rate
@@ -151,6 +159,11 @@ class FeatureVectors(Dataset):
 
 
     def synthesise(self):
+        """
+        Use SMOTE to create new feature vectors from the previously
+        added feature vectors.
+        """
+
         if self._smote is None:
             self._smote = [SMOTE(np.array(original, dtype=np.float32)) for original in self._original]
 
@@ -183,6 +196,10 @@ class FeatureVectors(Dataset):
 
 
     def add(self, labels, global_vec, h_crops):
+        """
+        Store a feature vector from training, to be later used in synthesize
+        """
+
         for label, gv, hc in zip(labels, global_vec, h_crops):
             if label >= len(self._original):
                 self._original += [[] for _ in range(label - len(self._original) + 1)]
