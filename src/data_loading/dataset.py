@@ -5,8 +5,6 @@ import pandas as pd
 import torch
 import scipy.spatial
 
-import albumentations as alb, albumentations.pytorch as alp
-
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 
@@ -14,14 +12,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = '/'.join(current_dir.split('/')[:-2])
 sys.path.append(parent_dir)
 
-from src.data_loading import loading
+from src.data_loading import loading, augmentations
 
 
 def _geometric_mean(a: int, b: int, ratio: float) -> int:
     return round(a ** ratio * b ** (1 - ratio))
-
-
-_aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBrightnessContrast(p=0.3), alp.ToTensorV2()])
 
 
 class ClassificationImages(Dataset):
@@ -67,10 +62,7 @@ class ClassificationImages(Dataset):
         position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
         x = loading.read_image_standardized(self.images[label][position])
-        if self.augment:
-            x = _aug(image=x)['image']
-        else:
-            x = np.expand_dims(x, 0)
+        x = augmentations.augment_image(x, augment=self.augment)
 
         y = np.zeros(len(self.images), dtype=np.float32)
         y[label] = 1.0
