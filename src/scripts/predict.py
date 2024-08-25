@@ -96,21 +96,20 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, turn_on_visualization):
+def save_saliency_maps(input_img, saliency_maps, save_dir, file_path, hparams):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
-    view = file_path.split('_')[1].split('.')[0]
-    window_location = datum["window_location"][0][view][0]
+    window_location = (0, H, 0, W)
 
     saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
     saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
     saliency_maps_malignant = (saliency_maps[0,1,:,:]*500).astype(np.uint8)
     saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
 
-    process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", turn_on_visualization)
-    process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", turn_on_visualization)
+    process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", hparams.turn_on_visualization)
+    process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", hparams.turn_on_visualization)
 
 
 def process_saliency_map(input_img, saliency_map, window_location, save_dir, file_path, label, turn_on_visualization):

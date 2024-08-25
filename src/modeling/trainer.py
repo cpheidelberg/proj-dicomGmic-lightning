@@ -171,9 +171,9 @@ class GMICTrainer(pl.LightningModule):
     
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
-        img, y, data = batch
-
+        img, y = batch
         print(y)
+
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
@@ -185,16 +185,15 @@ class GMICTrainer(pl.LightningModule):
         saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
         if self.hparams.turn_on_visualization:
             patch_locations = self.gmic.patch_locations
-            patch_imgs = self.gmic.patches
-            patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
-            save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
+            patches = self.gmic.patches
+            patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            save_dir = os.path.join(self.hparams.output_path, f"visualization/{batch_idx}.png")
             predict.visualize_example(img_numpy, saliency_maps, true_segs,
-                        patch_locations, patch_imgs, patch_attentions,
+                        patch_locations, patches, patch_attns,
                         save_dir, self.hparams)
-                
-        # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
 
+        # save predicted regions of interest as polyline
+        predict.save_saliency_maps(img_numpy, saliency_maps, self.hparams.segmentation_path, f"{batch_idx}.png", self.hparams)
         return y_fusion
 
 
