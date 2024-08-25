@@ -21,6 +21,36 @@ def _geometric_mean(a: int, b: int, ratio: float) -> int:
 
 class ClassificationImages(Dataset):
     def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float, binary: bool, augment: bool):
+        """
+        Create a Dataset of images stored in data directories. Apply
+        undersampling and/or augmentation if requested.
+        - data_dirs: Directories containing the classification images as PNGs.
+            Each directory contains a file mapping.csv which lists all images
+            in the directory. The CSV file has three columns: png (file path
+            of the PNG, relative to the directory), dicom (the original DICOM)
+            and label (the string representing the class).
+        - undersampling_rate: How much to undersample the largest class.
+            Its value can be from 0.0 up to 1.0. The largest class will be
+            undersampled to the size of A' = (A ** (1 - U)) * (B ** U), where
+            A is the size of the largest class, B is the size of the second
+            largest class and U is the undersampling rate.
+        - augmentation_rate: How much to oversample the smaller classes by augmentation.
+            If augmentation_rate > 0.0, all classes except for the largest one
+            will be resized to C' = (C ** (1 - G)) * (A' ** G), where C is
+            the original size of the given class, A' is the size of the largest
+            class after undersampling and G is the augmentation rate.
+            Dataset will return the same image multiple times with different
+            random augmentations to simulate a larger class.
+        - binary: Whether to merge all suspicious classes into one.
+            If binary=True, all classes which are not "No Finding" are merged
+            together to one class called "Suspicious"
+        - augment: Whether to enable augmentation.
+            If augment=False, augmentation is disabled. In such a case, setting
+            augmentation_rate other than 0.0 has no effect other than making
+            the program slower. If augment=True, images are randomly augmented
+            each time they are loaded.
+        """
+
         tables = []
         for data_dir in data_dirs:
             data_dir = data_dir.removesuffix('/')
@@ -35,6 +65,10 @@ class ClassificationImages(Dataset):
         if binary:
             self.images = [list(table[table['label'] == 'No Finding']['png']), list(table[table['label'] != 'No Finding']['png'])]
             self.labels = ['No Finding', 'Suspicious']
+
+            if len(self.images[0]) < len(self.images[1]):
+                self.images.reverse()
+                self.labels.reverse()
         else:
             self.images = [list(table[table['label'] == label]['png']) for label in labels]
             self.labels = labels
