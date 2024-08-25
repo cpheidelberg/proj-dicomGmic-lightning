@@ -84,8 +84,7 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
         subfigure.axis('off')
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
-    
-    print(save_path)
+
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     plt.savefig(save_path, bbox_inches='tight', format="png", dpi=500)
@@ -105,7 +104,6 @@ def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
 
 
 def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization):
-    print(folder, filename, label)
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
     os.makedirs(folder, exist_ok=True)
