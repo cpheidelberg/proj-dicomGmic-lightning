@@ -46,7 +46,7 @@ def write_image(path: str, image: np.ndarray):
     pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
-def _crop_image(image, view, best_center) -> np.ndarray:
+def crop_image(image, view, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
@@ -78,7 +78,7 @@ def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
     """
     Flip, crop and standardize
     """
-    img = _crop_image(flip_image(image, view, horizontal_flip), view, best_center)
+    img = crop_image(flip_image(image, view, horizontal_flip), view, best_center)
     _standardize(img)
     return img
 
