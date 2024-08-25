@@ -77,7 +77,7 @@ class GMICTrainer(pl.LightningModule):
 
 
     def forward(self, image):
-        y_fusion, y_global, y_local = self.gmic(image)
+        y_fusion, y_global, y_local = self.gmic.forward(image)
         return y_global, y_local, y_fusion
 
 
@@ -89,7 +89,8 @@ class GMICTrainer(pl.LightningModule):
 
 
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
-        y_fusion, y_global, y_local, global_vec, h_crops = self(image)
+        y_global, h_crops, global_vec = self.gmic.forward_cnn(image)
+        y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
 
         if self._training_on_FV_next():
             self.feature_vectors.add(y.argmax(dim=1).tolist(), global_vec.cpu().numpy(), h_crops.cpu().numpy())
