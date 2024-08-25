@@ -16,7 +16,7 @@ from src.modeling import trainer
 from src.data_loading import dataset
 
 
-def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, save_dir, parameters):
+def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, save_path, parameters):
     """
     Function that visualizes the saliency maps for an example
     """
@@ -85,8 +85,10 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
     
-    print(save_dir)
-    plt.savefig(save_dir, bbox_inches='tight', format="png", dpi=500)
+    print(save_path)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    plt.savefig(save_path, bbox_inches='tight', format="png", dpi=500)
     plt.close()
 
 
@@ -102,10 +104,11 @@ def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
         process_saliency_map(img, maps, window_location, folder, filename, parameters["class_names"][i], parameters["turn_on_visualization"])
 
 
-def process_saliency_map(input_img, saliency_map, window_location, save_dir, file_path, label, turn_on_visualization):
+def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization):
+    print(folder, filename, label)
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
     max_intensity = np.max(saliency_map)
     intensity_threshold = 0.1 * max_intensity  # 10% of the maximum intensity
@@ -144,7 +147,7 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             p[0] -= window_location[2]
             p[1] -= window_location[0]
 
-        with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
+        with open(os.path.join(folder, "{0}_polyline_{1}_{2}.txt".format(filename, label, i)), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
                 f.write(f"{point[0]}, {point[1]}\n")
@@ -154,11 +157,11 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
             # plt.imshow(input_img, cmap='gray', aspect='equal')
             plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-            print("Polyline saved to: {}".format(os.path.join(save_dir, "{}_seg_{}_{}.png".format(file_path, label, i))))
-            plt.savefig(os.path.join(save_dir, "{0}_seg_{1}_{2}.png".format(file_path, label, i)))
+            print("Polyline saved to: {}".format(os.path.join(folder, "{}_seg_{}_{}.png".format(filename, label, i))))
+            plt.savefig(os.path.join(folder, "{0}_seg_{1}_{2}.png".format(filename, label, i)))
 
     if not contours:
-        print(file_path, "\n\tNo contours found in the saliency map.")
+        print(filename, "\n\tNo contours found in the saliency map.")
 
 
 if __name__ == "__main__":
