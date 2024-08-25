@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 import torch
-from torch.utils.data import random_split
 import lightning.pytorch as pl
 
 # import own files 
@@ -211,10 +210,8 @@ if __name__ == "__main__":
     data = dataset.ClassificationImages([image_dir], undersampling_rate=0.0, augmentation_rate=0.0, binary=True, augment=False)
     parameters["class_names"] = data.labels
 
-    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
-
     # Training
-    gmic_trainer = trainer.GMICTrainer(parameters=parameters, image_class_weights=data.class_weights(), dataset_predict=dataTrain)
+    gmic_trainer = trainer.GMICTrainer(parameters=parameters, image_class_weights=data.class_weights(), dataset_predict=data)
 
     if device == "gpu":
         pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
