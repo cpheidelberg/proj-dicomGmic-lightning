@@ -88,8 +88,8 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device, 
-        # devices=[parameters["gpu_number"]],
-        devices=[1,2],
+        devices=[parameters["gpu_number"]],
+        # devices=[1,2],
         logger=logger,
         # profiler="simple",
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
