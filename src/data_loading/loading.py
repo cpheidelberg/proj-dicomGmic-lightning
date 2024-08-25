@@ -32,9 +32,12 @@ def flip_image(image, view, horizontal_flip) -> np.ndarray:
     return np.fliplr(image) if flip else image
 
 
+
 def read_image(path: str, dtype) -> np.ndarray:
     """
-    Open an image and return as an NumPy array
+    Open an image and return it as an NumPy array
+    - path: the file path from which to read
+    - dtype: the type of the resulting array
     """
     return np.array(pillow.open(path), dtype=dtype)
 
@@ -42,6 +45,8 @@ def read_image(path: str, dtype) -> np.ndarray:
 def write_image(path: str, image: np.ndarray):
     """
     Save an image from an NumPy array to a PNG file
+    - path: the file path where the image will be saved
+    - image: the image to be saved
     """
     pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
@@ -56,6 +61,10 @@ def crop_image(image, view, best_center) -> np.ndarray:
 
 
 def _standardize(image):
+    """
+    Standardizes the image in-place; insuring that its pixel values are
+    distributed with mean = 0 and sd = 1
+    """
     # Standardizes an image in-place 
     image -= np.mean(image)
     image /= np.maximum(np.std(image), 10**(-5))
@@ -84,6 +93,10 @@ def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
 
 
 def read_image_standardized(image) -> np.ndarray:
+    """
+    Reads an image as float32 and standardizes it
+    - path: the file path from which to read
+    """
     img = read_image(image, 'float32')
     _standardize(img)
     return img
