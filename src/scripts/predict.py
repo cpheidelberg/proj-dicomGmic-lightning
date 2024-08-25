@@ -163,7 +163,6 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
 
 
 if __name__ == "__main__":
-
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -175,12 +174,12 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    checkpoint_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
+    checkpoint_path = 'tb_logs/balanced/version_0/checkpoints/epoch=8-step=31664.ckpt' # 2 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
     
-    image_path = '/home/ubuntu/gmic/vindrmammo_data'
+    image_dir = '/home/ubuntu/gmic/vindrmammo_data'
     output_path = '/home/ubuntu/gmic/predict_output'
-    seg_path = os.path.join(output_path, 'segmentation')
+    segmentation_path = os.path.join(output_path, 'segmentation')
 
     # set hyperparameters
     parameters = {
@@ -190,10 +189,12 @@ if __name__ == "__main__":
         "batch_size": 1,
         "pretrained": False,
 
+        "smote_rate": 0.0,
+
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path,
-        "segmentation_path": seg_path,
+        "image_path": image_dir,
+        "segmentation_path": segmentation_path,
         "output_path": output_path,
         "turn_on_visualization": True,
 
@@ -203,11 +204,11 @@ if __name__ == "__main__":
         "crop_shape": (512, 512), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 3, # output classes
+        "num_classes": 2, # output classes
         "use_v1_global": False,
     }
 
-    data = dataset.ClassificationImages([image_path], undersampling_rate=0.0, augmentation_rate=0.0, binary=False, augment=False)
+    data = dataset.ClassificationImages([image_dir], undersampling_rate=0.0, augmentation_rate=0.0, binary=True, augment=False)
     parameters["class_names"] = data.labels
 
     dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
