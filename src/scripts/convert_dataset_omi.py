@@ -13,6 +13,22 @@ import src.optimal_centers.get_optimal_centers as centers
 import src.data_loading.loading as loading
 
 
+"""
+This script reads data from the OMI dataset and converts it to
+the format we use in data_loading.dataset.ClassificationImages.
+
+Output format:
+- root directory `vindrmammo_data`
+    - subdirectories `0`, `1`, ..., `K-1` for the top K classes (here, K = 5)
+        Each subdirectory contains PNGs representing scans belonging to
+        the class. The PNGs are preprocessed, prepared to be given to the GMIC.
+    - CSV file `mapping.csv` which has one line per image with three columns:
+        - png: file path of the PNG image, relative to vindrmammo_data (e.g. "2/1357.png")
+        - dicom: file path of the original DICOM file
+        - label: string representing the class (e.g. "Suspicious Calcification")
+"""
+
+
 Category = typing.Literal['Mass', 'Suspicious Calcification', 'Focal Asymmetry', 'Architectural Distortion', 'No Finding']
 Dicom = tuple[str, np.ndarray, Category]
 
