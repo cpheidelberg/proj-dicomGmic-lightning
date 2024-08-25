@@ -185,11 +185,11 @@ class GMICTrainer(pl.LightningModule):
         saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
         if self.hparams.turn_on_visualization:
             patch_locations = self.gmic.patch_locations
-            patches = self.gmic.patches
+            patch_img = self.gmic.patches
             patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
             save_dir = os.path.join(self.hparams.output_path, f"visualization/{batch_idx}.png")
             predict.visualize_example(img_numpy, saliency_maps, true_segs,
-                        patch_locations, patches, patch_attns,
+                        patch_locations, patch_img, patch_attns,
                         save_dir, self.hparams)
 
         # save predicted regions of interest as polyline

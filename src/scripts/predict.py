@@ -17,15 +17,12 @@ from src.modeling import trainer
 from src.data_loading import dataset
 
 
-def visualize_example(input_img, saliency_maps, seg_masks,
-                      patch_locations, patch_img, patch_attentions,
-                      save_dir, parameters):
+def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, save_dir, parameters):
     """
     Function that visualizes the saliency maps for an example
     """
     # colormap lists
-    _, _, h, w = saliency_maps.shape
-    _, _, H, W = input_img.shape
+    _, _, H, W = img.shape
 
     # set up colormaps for benign and malignant
     alphas = np.abs(np.linspace(0, 0.95, 259))
@@ -42,11 +39,11 @@ def visualize_example(input_img, saliency_maps, seg_masks,
 
     # input image
     subfigure = figure.add_subplot(1, total_num_subplots, 1)
-    subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
+    subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
     
-    for idx, seg_mask in enumerate(seg_masks):
+    for i, seg_mask in enumerate(seg_masks):
         if seg_mask is not None:
-            if idx == 0:
+            if i == 0:
                 subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_green, clim=[0.9, 1])
             else:
                 subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_red, clim=[0.9, 1])
@@ -57,11 +54,11 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     # patch map
     print(patch_locations)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
-    subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-    subfigure.imshow(tools.get_crop_mask(
-        patch_locations[0, np.arange(parameters["K"]), :],
-        parameters["crop_shape"], (H, W),
-        "upper_left"), alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1])
+    subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
+    subfigure.imshow(
+        tools.get_crop_mask(patch_locations[0, np.arange(parameters["K"]), :], parameters["crop_shape"], (H, W), "upper_left"),
+        alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1]
+    )
 
     for seg_mask in seg_masks:
         if seg_mask is not None:
@@ -71,22 +68,20 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     subfigure.axis('off')
 
     # class activation maps
-    for idx, class_name in enumerate(parameters["class_names"]):
-        subfigure = figure.add_subplot(1, total_num_subplots, 3 + idx)
-        subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-        resized_cam = cv2.resize(saliency_maps[0, idx, :, :], (W, H))
-        if idx == 0: # "No Finding"
-            subfigure.imshow(resized_cam, cmap=alpha_green, clim=[0.0, 1.0])
-        else:
-            subfigure.imshow(resized_cam, cmap=alpha_red, clim=[0.0, 1.0])
+    for i, class_name in enumerate(parameters["class_names"]):
+        subfigure = figure.add_subplot(1, total_num_subplots, 3 + i)
+        subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
+        resized_cam = cv2.resize(saliency_maps[0, i, :, :], (W, H))
+        
+        subfigure.imshow(resized_cam, cmap=alpha_green if i == 0 else alpha_red, clim=[0.0, 1.0])
+
         subfigure.set_title("SM: " + class_name)
         subfigure.axis('off')
 
     # crops
     for crop_idx in range(parameters["K"]):
         subfigure = figure.add_subplot(1, total_num_subplots, 3 + parameters["num_classes"] + crop_idx)
-        subfigure.imshow(patch_img[0, crop_idx, :, :], cmap='gray', alpha=.8, interpolation='nearest',
-                         aspect='equal')
+        subfigure.imshow(patch_img[0, crop_idx, :, :], cmap='gray', alpha=.8, interpolation='nearest', aspect='equal')
         subfigure.axis('off')
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
