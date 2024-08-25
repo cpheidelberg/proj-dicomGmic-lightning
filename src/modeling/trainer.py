@@ -177,9 +177,8 @@ class GMICTrainer(pl.LightningModule):
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
-        y_global, y_local, y_fusion = self(img)  # Add an extra dimension for batch
+        _, _, y_fusion = self(img)  # Add an extra dimension for batch
         img_numpy = img.data.cpu().numpy()
-        pred_numpy = y_fusion.data.cpu().numpy()
 
         # save visualization
         saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
