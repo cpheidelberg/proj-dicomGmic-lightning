@@ -114,12 +114,8 @@ def run_active_learning(exam_list_path, model_path, json_path, model_index, para
             short_file_path = datum[view][0]
             # load image
             # the image is already flipped so no need to do it again
-            loaded_image = loading.load_image(
-                image_path=os.path.join(parameters["image_path"], short_file_path + ".png"),
-                view=view,
-                horizontal_flip=datum["horizontal_flip"],
-            )
-            loaded_image = loading.process_image(loaded_image, view, datum["best_center"][view][0])
+            loaded_image = loading.read_image(os.path.join(parameters["image_path"], short_file_path + ".png"), 'float32')
+            loaded_image = loading.process_image(loaded_image, view, datum["horizontal_flip"], datum["best_center"][view][0])
 
             # convert python 2D array into 4D torch tensor in N,C,H,W format
             x_original = np.expand_dims(np.expand_dims(loaded_image, 0), 0).copy()

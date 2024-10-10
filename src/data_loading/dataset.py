@@ -1,342 +1,229 @@
+import os, h5py, time, sys, random
+import multiprocessing
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import os, ast, pickle, h5py, time, sys, shutil, random
-from tqdm import tqdm
-from PIL import Image
-import multiprocessing
-import resource
-
 import torch
-from torch.utils.data import Dataset, DataLoader, Subset
+import scipy.spatial
+
+from tqdm import tqdm
+from torch.utils.data import Dataset, DataLoader
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = "/".join(current_dir.split("/")[:-2])
+parent_dir = '/'.join(current_dir.split('/')[:-2])
 sys.path.append(parent_dir)
-from src.data_loading import loading
+
+from src.data_loading import loading, augmentations
+
+
+def _geometric_mean(a: int, b: int, ratio: float) -> int:
+    return round(a ** ratio * b ** (1 - ratio))
 
 
 class ClassificationImages(Dataset):
+    def __init__(self, data_dirs: list[str], undersampling_rate: float, augmentation_rate: float, binary: bool, augment: bool):
+        """
+        Create a Dataset of images stored in data directories. Apply
+        undersampling and/or augmentation if requested.
+        - data_dirs: Directories containing the classification images as PNGs.
+            Each directory contains a file mapping.csv which lists all images
+            in the directory. The CSV file has three columns: png (file path
+            of the PNG, relative to the directory), dicom (the original DICOM)
+            and label (the string representing the class).
+        - undersampling_rate: How much to undersample the largest class.
+            Its value can be from 0.0 up to 1.0. The largest class will be
+            undersampled to the size of A' = (A ** (1 - U)) * (B ** U), where
+            A is the size of the largest class, B is the size of the second
+            largest class and U is the undersampling rate.
+        - augmentation_rate: How much to oversample the smaller classes by augmentation.
+            If augmentation_rate > 0.0, all classes except for the largest one
+            will be resized to C' = (C ** (1 - G)) * (A' ** G), where C is
+            the original size of the given class, A' is the size of the largest
+            class after undersampling and G is the augmentation rate.
+            Dataset will return the same image multiple times with different
+            random augmentations to simulate a larger class.
+        - binary: Whether to merge all suspicious classes into one.
+            If binary=True, all classes which are not "No Finding" are merged
+            together to one class called "Suspicious"
+        - augment: Whether to enable augmentation.
+            If augment=False, augmentation is disabled. In such a case, setting
+            augmentation_rate other than 0.0 has no effect other than making
+            the program slower. If augment=True, images are randomly augmented
+            each time they are loaded.
+        """
 
-    def __init__(self, imageFolder:str, dictPath: str, top_c=None, h5_file=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv(dictPath, converters={"best_center": ast.literal_eval, "finding_categories": ast.literal_eval})
+        tables = []
+        for data_dir in data_dirs:
+            data_dir = data_dir.removesuffix('/')
 
-        if top_c:
-            self.filterCategories(top_c)
+            mapping = pd.read_csv(f'{data_dir}/mapping.csv')
+            mapping['png'] = f'{data_dir}/' + mapping['png']
+            tables.append(mapping)
 
-        self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
-        print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
-        print(self.flatDictDF["finding_categories"].value_counts())
+        table = pd.concat(tables)
+        labels = list(table['label'].value_counts().keys())
 
-        # print(self.getLabelCount())
+        if binary:
+            self.images = [list(table[table['label'] == 'No Finding']['png']), list(table[table['label'] != 'No Finding']['png'])]
+            self.labels = ['No Finding', 'Suspicious']
+
+            if len(self.images[0]) < len(self.images[1]):
+                self.images.reverse()
+                self.labels.reverse()
+        else:
+            self.images = [list(table[table['label'] == label]['png']) for label in labels]
+            self.labels = labels
+
+        c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
+        self.images[0] = random.sample(self.images[0], c_max)
+
+        self.sizes = [_geometric_mean(c_max, len(images), augmentation_rate) for images in self.images]
+        self.offsets = [sum(self.sizes[:i]) for i in range(len(self.images) + 1)]
+
+        self.augment = augment
+
+
+    def class_weights(self):
+        avg = self.offsets[-1] / len(self.sizes)
+        return [avg / size for size in self.sizes]
 
 
     def __len__(self):
-        return len(self.imageFiles)
+        return self.offsets[-1]
 
 
-    def __getitem__(self, idx):
-        
-        imagePath = self.imageFiles[idx]
+    def __getitem__(self, index: int):
+        label = next(i for i in range(len(self.images)) if self.offsets[i] <= index < self.offsets[i + 1])
+        position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
+        x = loading.read_image_standardized(self.images[label][position])
+        x = augmentations.augment_image(x, augment=self.augment)
 
-        labelList = data["finding_categories"].iloc[0]
-        labelEnc = self.createHotEncoding(labelList)
-
-        return loaded_image, labelEnc
+        y = np.zeros(len(self.images), dtype=np.float32)
+        y[label] = 1.0
+        return x, y
 
 
-    def getOrigFilename(self, idx):
-        if len(self.imageFiles[idx].split("/")[-1].split("_")) > 2:
-            original_file_name = "_".join(self.imageFiles[idx].split("/")[-1].split("_")[:-1]).strip(".png")
-        else:
-            original_file_name = self.imageFiles[idx].split("/")[-1].strip(".png")
 
-        return original_file_name
+class SMOTE:
+    """
+    This class implements the SMOTE algorithm: https://arxiv.org/abs/1106.1813
+    """
+
+    def __init__(self, points: list[np.ndarray]):
+        self._points = points
+        self._tree = scipy.spatial.KDTree(points)
+        self._rng = np.random.default_rng()
+
+    def _nearest_neighbours(self, point: np.ndarray, k: int) -> np.ndarray:
+        _, indices = self._tree.query(point, k=k+1)
+        return self._points[indices[1:]]
+
+    def _sample_with_replacement(self, items: np.ndarray, size: int):
+        return items[self._rng.integers(0, len(items), size)]
+
+    def _random_linear_combination(self, u: np.ndarray, v: np.ndarray):
+        return u + (v - u) * self._rng.random(len(v))
+
+    def generate(self, n: int, k: int):
+        """
+        Oversample the points given to the constructor.
+        - n: how many times to oversample
+        - k: how many k-closest neighbours to consider
+        """
+        for point in self._points:
+            nearest = self._nearest_neighbours(point, k)
+            selected = self._sample_with_replacement(nearest, n)
+            for neighbour in selected:
+                yield self._random_linear_combination(point, neighbour)
 
 
-    def getDataentry(self, original_file_name: str) -> pd.DataFrame:
-        """Find the entry of the original filename in self.flatDict["image"]"""
-        data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
-        if data.empty:
-            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
-        return data
+
+class FeatureVectors(Dataset):
+    """
+    Dataset representing feature vectors oversampled using the SMOTE technique
+    """
+
+    def __init__(self, smote_rate: float):
+        """
+        - smote_rate: How much to oversample smaller classes (from 0.0 to 1.0).
+            All classes except for the largest one will be oversampled to size
+            C'' = (C' ** (1 - S)) * (A' ** S), where C' is the size of
+            the given class after augmentation, A' is the size of the largest
+            class after undersampling and S is the SMOTE rate.
+        """
+        self._original = []
+        self._synthetic = []
+        self._smote_rate = smote_rate
+        self._smote = None
 
 
-    def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
+    def synthesise(self):
+        """
+        Use SMOTE to create new feature vectors from the previously
+        added feature vectors.
+        """
 
-        view = data["view"].iloc[0]
-        loaded_image = loading.load_image(
-            image_path=imagePath,
-            view=view,
-            horizontal_flip=data["horizontal_flip"].iloc[0],
-        )
-        loaded_image = loading.process_image(loaded_image, view, data["best_center"].iloc[0][view][0])
-        loaded_image = np.expand_dims(loaded_image, 0).copy()
-        loaded_image = torch.Tensor(loaded_image)
+        if self._smote is None:
+            self._smote = [SMOTE(np.array(original, dtype=np.float32)) for original in self._original]
 
-        return loaded_image
+        self._synthetic.clear()
+        largest = max(len(original) for original in self._original)
 
-            
-    def getLabelCount(self):
-        labelCount = {k: 0 for k in self.unique_categories}
-        for f in self.imageFiles:
-            
-            if len(f.split("/")[-1].split("_")) > 2:
-                original_file_name = "_".join(f.split("/")[-1].split("_")[:-1]).strip(".png")
+        for original, smote in zip(self._original, self._smote):
+            target = _geometric_mean(largest, len(original), self._smote_rate)
+
+            if len(original) >= target:
+                self._synthetic.append(original)
             else:
-                original_file_name = f.split("/")[-1].strip(".png")
-            data = self.flatDictDF[self.flatDictDF["image"] == original_file_name]
-            labelList = data["finding_categories"].iloc[0]
-            labelCount[labelList[0]] += 1
-        return labelCount
+                self._synthetic.append(list(smote.generate(target // len(original), k=5)))
 
 
-    def createHotEncoding(self, labelList):
-        encoding = np.zeros(len(self.unique_categories), dtype=np.float32)
-        for label in labelList:
-            label_index = self.unique_categories.index(label)
-            encoding[label_index] = 1.0
-        if np.max(encoding) == 0:
-            print("No label found")
-
-        return encoding
-            
-
-    def convertLabels(self, df):
-        column = "finding_categories"
-        df[column] = df[column].apply(ast.literal_eval)
-
-        return df
+    def class_weights(self):
+        """
+        Class weights after oversampling is applied
+        """
+        sizes = [len(vectors) for vectors in self._synthetic]
+        avg = sum(sizes) / len(sizes)
+        return [avg / size for size in sizes]
 
 
-    def filterCategories(self, top_c=5):
-        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
-
-        class_counts = self.flatDictDF["finding_categories"].value_counts()
-        origLen = len(self.imageFiles)
-        origLength = len(self.flatDictDF)
-
-        class_counts = class_counts.sort_values(ascending=False)
-        top_labels = class_counts.head(top_c).index
-
-        removed_images = self.flatDictDF.loc[~self.flatDictDF['finding_categories'].isin(top_labels)]
-        removed_images = removed_images['image'].tolist()
-        self.flatDictDF = self.flatDictDF[self.flatDictDF["finding_categories"].isin(top_labels)]
-        self.flatDictDF.to_csv("removedTop5.csv")
-        self.imageFiles = [f for f in self.imageFiles if "_".join(f.split("/")[-1].split("_")[:2]).strip(".png") not in removed_images]
-
-        print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
-        print("{}/{} dictionary entries for {} retained categories".format(len(self.flatDictDF), origLength, top_c))
+    def _to_vector(self, global_vec: np.ndarray, h_crops: np.ndarray):
+        return np.concatenate((global_vec.flatten(), h_crops.flatten()), dtype=np.float32)
 
 
-class ClassificationImagesFromPickle(ClassificationImages):
-
-    def __init__(self, imageFolder:str, dictPath:str, labelPath:str, top_c=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.imageDict = self.loadPickle(dictPath)
-        print(self.imageDict[0])
-        self.flatDict = self.flattenDict(self.imageDict)
-        self.flatDictDF = pd.DataFrame(self.flatDict)
-
-        print(self.flatDictDF.info())
-        print(self.flatDictDF.iloc[0])
-
-        self.labels = pd.read_csv(labelPath)
-
-        # if top_c:
-        #     self.filterCategories(top_c)
-
-        self.labels = self.convertLabels(self.labels)
-        self.unique_categories = list(set([label for labels in self.labels["finding_categories"] for label in labels]))
-        print(self.unique_categories)
-
-        self.flatDictDF["finding_categories"] = None
-        self.addLabelstoDF()
-        self.flatDictDF.to_csv(f"dictionaryTop{top_c}.csv")
+    def _from_vector(self, vector: np.ndarray):
+        global_vec = vector[:256].reshape((256,)).astype(np.float32, copy=False)
+        h_crops = vector[256:].reshape((-1, 512)).astype(np.float32, copy=False)
+        return global_vec, h_crops
 
 
-    def __getitem__(self, idx):
-        
-        imagePath = self.imageFiles[idx]
+    def add(self, labels, global_vec, h_crops):
+        """
+        Store a feature vector from training, to be later used in synthesize
+        """
 
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
+        for label, gv, hc in zip(labels, global_vec, h_crops):
+            if label >= len(self._original):
+                self._original += [[] for _ in range(label - len(self._original) + 1)]
 
-        labelList = data["finding_categories"]
-        labelEnc = self.createHotEncoding(labelList)
-
-        return loaded_image, labelEnc
+            self._original[label].append(self._to_vector(gv, hc))
 
 
-    def getImage(self, imagePath: str, data: pd.DataFrame) -> torch.Tensor:
-
-        view = data["view"]
-        loaded_image = loading.load_image(
-            image_path=imagePath,
-            view=view,
-            horizontal_flip=data["horizontal_flip"],
-        )
-        loaded_image = loading.process_image(loaded_image, view, data["best_center"][view][0])
-        loaded_image = np.expand_dims(loaded_image, 0).copy()
-        loaded_image = torch.Tensor(loaded_image)
-
-        return loaded_image
+    def __len__(self):
+        return sum(len(vectors) for vectors in self._synthetic)
 
 
-    def getDataentry(self, original_file_name: str) -> pd.DataFrame:
-        """Find the entry of the original filename in self.flatDict["image"]"""
-        data = None
-        # index = None
-        print(self.flatDict[0]["image"])
-        for i, entry in enumerate(self.flatDict):
-            if entry["image"] == original_file_name:
-                studyID = entry["examID"]
-                imageID = entry["dicom"].split('/')[-1]
-                data = entry
-                print(data)
-                # index = i
-                break
-        if data is None:
-            raise ValueError(f"Original file name '{original_file_name}' not found in flatDict")
-        return data
+    def __getitem__(self, i: int):
+        label = 0
+        while i >= len(self._synthetic[label]):
+            i -= len(self._synthetic[label])
+            label += 1
 
+        x = self._from_vector(self._synthetic[label][i])
+        y = np.zeros(len(self._synthetic), dtype=np.float32)
+        y[label] = 1
+        return x, y
 
-    def flattenDict(self, data):
-        flatDict = []
-        for d in data:
-            dictLCC = self.extractImageDict(d, "L-CC")
-            dictRCC = self.extractImageDict(d, "R-CC")
-            dictLMLO = self.extractImageDict(d, "L-MLO")
-            dictRMLO = self.extractImageDict(d, "R-MLO")
-            flatDict.append(dictLCC)
-            flatDict.append(dictRCC)
-            flatDict.append(dictLMLO)
-            flatDict.append(dictRMLO)
-
-        return flatDict
-
-
-    def addLabelstoDF(self):
-        for i, f in enumerate(tqdm(self.imageFiles)):
-            f = f.split("/")[-1]
-            entry = self.flatDictDF[self.flatDictDF["image"] == f.strip(".png")]
-            index = self.flatDictDF.index[self.flatDictDF["image"] == f.strip(".png")].tolist()[0]
-
-            studyID = entry["examID"].iloc[0]
-            imageID = entry["dicom"].iloc[0].split('/')[-1]
-
-            labelList = self.labels.loc[self.labels["study_id"] == studyID].loc[self.labels["image_id"] == imageID]["finding_categories"].iloc[0]
-            self.flatDictDF["finding_categories"].iloc[index] = labelList
-
-    
-    def loadPickle(self, path):
-        with open(path, "rb") as f:
-            data = pickle.load(f)
-
-        return data
-
-    
-    def extractImageDict(self, data, view):
-        imgDict = {}
-        imgDict["examID"] = data["examID"]
-        imgDict["imageID"] = data[view+"_path"].split("/")[-1]
-        imgDict["view"] = view
-        imgDict["image"] = data[view][0]
-        imgDict["dicom"] = data[view+"_path"]
-        imgDict["horizontal_flip"] = data["horizontal_flip"]
-        imgDict["best_center"] = data["best_center"]
-        imgDict["window_location"] = data["window_location"]
-
-        return imgDict
-
-
-    def filterCategories(self, top_c=5):
-        """Filter labels dataframe for top_c most occuring finding_categories and remove corresponding images from imageList"""
-
-        class_counts = self.labels["finding_categories"].value_counts()
-        origLen = len(self.imageFiles)
-        origLength = len(self.labels)
-        origLeng = len(self.flatDict)
-
-        class_counts = class_counts.sort_values(ascending=False)
-        top_labels = class_counts.head(top_c).index
-
-        filtered_labels = self.labels[self.labels['finding_categories'].apply(lambda x: any(label in x for label in top_labels))]
-        print(filtered_labels['finding_categories'].value_counts())
-        removed_labels = self.labels[~self.labels.index.isin(filtered_labels.index)]
-        assert len(self.labels) == len(filtered_labels) + len(removed_labels), "Filtering 'finding_annotations.csv' not successful"
-
-        self.labels = filtered_labels
-        filtered_exams_images = list(set((row["study_id"], row["image_id"]) for index, row in filtered_labels.iterrows()))
-
-        print(f"Anzahl der einzigartigen Studien- und Bild-IDs: {len(filtered_exams_images)}")
-
-        newImages = []
-        newDict = []
-        for exam_id, image_id in filtered_exams_images:
-            for d in self.flatDict:
-                if d["examID"] == exam_id and d["imageID"] == image_id:
-                    newDict.append(d)
-                    view = d["image"]
-                    break
-            for file in self.imageFiles:
-                if file.endswith(f"/{view}.png"):
-                    newImages.append(file)
-                    break
-
-        self.imageFiles = newImages
-        self.flatDict = newDict
-
-        print("{}/{} labels for {} retained categories".format(len(self.labels), origLength, top_c))
-        print("{}/{} dicts for {} retained categories".format(len(self.flatDict), origLeng, top_c))
-        print("{}/{} images for {} retained categories".format(len(self.imageFiles), origLen, top_c))
-
-
-class PredictionClassificationImages(ClassificationImages):
-
-    def __init__(self, imageFolder:str, dictPath: str, top_c=None, h5_file=None):
-        self.imageFolder = imageFolder
-        self.imageFiles = [folder_path+file for folder_path in imageFolder for file in os.listdir(folder_path)]
-        random.shuffle(self.imageFiles)
-        self.flatDictDF = pd.read_csv(dictPath, converters={"best_center": self.safe_literal_eval, "window_location": self.safe_literal_eval, "finding_categories": self.safe_literal_eval})
-
-        if top_c:
-            self.filterCategories(top_c)
-
-        self.unique_categories = list(self.flatDictDF["finding_categories"].explode().unique())
-        print("{} classes: {}".format(len(self.unique_categories), self.unique_categories))
-        print(self.flatDictDF["finding_categories"].value_counts())
-
-
-    def safe_literal_eval(self, s):
-        try:
-            string = ast.literal_eval(s)
-            return string
-        except ValueError as e:
-            print(f"Fehler beim Parsen des Strings: {s}")
-            raise e
-
-    def __getitem__(self, idx):
-        
-        imagePath = self.imageFiles[idx]
-        original_file_name = self.getOrigFilename(idx)
-        data = self.getDataentry(original_file_name)
-        loaded_image = self.getImage(imagePath, data)
-
-        labelList = data["finding_categories"].iloc[0]
-        labelEnc = self.createHotEncoding(labelList)
-
-        return loaded_image, labelEnc, data.to_dict("list")
 
 
 class H5Dataset(Dataset):
@@ -345,7 +232,7 @@ class H5Dataset(Dataset):
         self.h5_filepath = h5_filepath
         self.relevant_labels = relevant_labels
 
-        self.h5_file = h5py.File(self.h5_filepath, "r")
+        self.h5_file = h5py.File(self.h5_filepath, 'r')
         self.images = self.h5_file['images']
         self.labels = self.h5_file['labels']
 
@@ -391,7 +278,6 @@ class H5Dataset(Dataset):
 
 
 def create_chunked_h5(data):
-
     num_workers = multiprocessing.cpu_count() - 2
     dataloader = DataLoader(data, shuffle=True, num_workers=num_workers)
 
@@ -418,27 +304,13 @@ def create_chunked_h5(data):
             dset_images[i] = image_np
             dset_labels[i] = label_np
 
-    print("Data has been successfully saved to 'balanced_top6/dataset.h5'")
+    print('Data has been successfully saved to balanced_top6/dataset.h5')
+    print('Gesamtzeit:', time.time() - start_time)
 
-    print(f"Gesamtzeit: {time.time() - start_time}")
 
-
-def main(): 
-
-    image_path_train = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/'
-    image_path_test = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/'
-    label_file = "sample_data/annotations/finding_annotations.csv"
-    data_path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl'
-
-    h5Path = "../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5"
-
-    # data = ClassificationImages(imageFolder=[image_path_train, image_path_test], top_c=6)
-    # data = ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
-    data = H5Dataset(h5_filepath=h5Path, relevant_labels=["No Finding", "Mass", "Suspicious Calcification"])
+if __name__ == '__main__':
+    h5Path = '../sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5'
+    data = H5Dataset(h5Path, ['No Finding', 'Mass', 'Suspicious Calcification'])
     # create_chunked_h5(data)
 
     print(data[0])
-
-
-if __name__ == "__main__":
-    main()

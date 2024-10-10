@@ -1,46 +1,37 @@
-import argparse, os, cv2
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from tqdm import tqdm
-import pydicom as dcm
-import sys
 import os
+import multiprocessing
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 import lightning.pytorch as pl
-import multiprocessing
+from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy, BinaryF1Score
+import torchmetrics.functional.classification as metrics
 
-from src.utilities import pickling, tools
 from src.modeling import gmic
-from src.data_loading import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
 from src.scripts import predict
+from src.data_loading import dataset
 
 
 class GMICTrainer(pl.LightningModule):
 
-    def __init__(self, parameters, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
+    def __init__(self, parameters, image_class_weights=None, dataset_train=None, dataset_valid=None, dataset_test=None, dataset_predict=None, model_path = None):
         super(GMICTrainer, self).__init__()
         self.save_hyperparameters(parameters)
 
         self.gmic = gmic.GMIC(parameters)
+        self.feature_vectors = dataset.FeatureVectors(self.hparams.smote_rate)
+
         # load pretrained model layers suitable for new model config
         if parameters["pretrained"]:
             if "model_idx" in parameters: # use a pretrained model
                 checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
             elif model_path: # use a self trained model
-                checkpoint_path = os.path.join(model_path)
-            model_state_dict = torch.load(checkpoint_path)
-            self.initPretrainedWeights(model_state_dict)
+                checkpoint_path = model_path
 
+            self.init_pretrained_weights(torch.load(checkpoint_path))
             print(f"Use pretrained model from {checkpoint_path}")
 
-        self.criterion = nn.BCELoss(reduction="sum")
+        self.criterion = torch.nn.BCELoss(torch.FloatTensor([image_class_weights]) if image_class_weights else None, reduction='sum')
 
         self.train_dataset = dataset_train
         self.valid_dataset = dataset_valid
@@ -51,63 +42,109 @@ class GMICTrainer(pl.LightningModule):
         self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
         self.train_f1 = BinaryF1Score()
 
-        # self.class_labels = np.zeros(len(parameters["class_labels"]))
 
-
-    def initPretrainedWeights(self, state_dict):
+    def init_pretrained_weights(self, state: dict[str, object]):
         """Load state_dict for layers independent of variable class number and freeze for transfer learning"""
-        remove_keywords = ("fusion_dnn", "classifier_linear", "left_postprocess_net")
-        remove_keys = []
-        for key in state_dict.keys():
-            if key.startswith(remove_keywords):
-                remove_keys.append(key)
-                
-        for key in remove_keys:
-            del state_dict[key]
+        removed = ("fusion_dnn", "classifier_linear", "left_postprocess_net")
 
-        self.gmic.load_state_dict(state_dict, strict=False)
+        state = {key: val for key, val in state.items() if not key.startswith(removed)}
+        self.gmic.load_state_dict(state, strict=False)
+
         # Freeze layers except for fine-tuning
         for name, param in self.gmic.named_parameters():
-            if name.startswith(remove_keywords) or "fine-tuning" in self.hparams and self.hparams["fine-tuning"]:
-                param.requires_grad = True
-            else:
+            param.requires_grad = name.startswith(removed) or self.hparams.get("fine-tuning", False)
+
+
+    def _training_on_FV_now(self):
+        """
+        Checks whether the trainer is training on feature vectors
+        in the current epoch.
+        """
+        return self.current_epoch >= self.hparams.epoch_smote
+
+
+    def _training_on_FV_next(self):
+        """
+        Checks whether the trainer is going to train on feature vectors
+        in the next epoch.
+        """
+        return self.current_epoch + 1 == self.hparams.epoch_smote
+
+
+    def on_train_epoch_end(self):
+        if self._training_on_FV_next():
+            # Disable tuning for CNN when training on feature vectors, because
+            # we are passing feature vectors only to the classifier (CNN
+            # takes original image and returns feature vector).
+            for _, param in self.gmic.cnn_named_parameters():
                 param.requires_grad = False
+
+        if self._training_on_FV_next() or self._training_on_FV_now():
+            self.feature_vectors.synthesise()
+
+            # Update class weights in self.criterion after synthesizing new vectors
+            device = self.criterion.weight.device
+            weights = self.feature_vectors.class_weights()
+            self.criterion = torch.nn.BCELoss(torch.FloatTensor([weights]).to(device), reduction='sum')
 
 
     def forward(self, image):
-
-        y_fusion, y_global, y_local = self.gmic(image)
+        y_fusion, y_global, y_local = self.gmic.forward(image)
         return y_global, y_local, y_fusion
 
 
-    def training_step(self, batch, batch_idx):
-        """Implementation of PyTorch training loop in Lightning called for each batch"""
-        img, y = batch
-        print(img.shape)
-        # y_index = int(torch.max(y, 1)[1])
-        # self.class_labels[y_index] += 1
+    def _metrics(self, prefix: str, y_hat: torch.Tensor, y: torch.Tensor):
+        y = y.type(torch.int)
+        self.log(f"{prefix}_acc", metrics.binary_accuracy(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"{prefix}_f1",  metrics.binary_f1_score(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
 
-        y_global, y_local, y_fusion = self(img)
+
+    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
+        y_global, h_crops, global_vec = self.gmic.forward_cnn(image)
+        y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
+
+        # Save the feature vectors in the last epoch before switching to SMOTE
+        if self._training_on_FV_next():
+            self.feature_vectors.add(y.argmax(dim=1).tolist(), global_vec.cpu().numpy(), h_crops.cpu().numpy())
 
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
-        
         loss = loss_fusion + loss_global + loss_local
 
-        self.train_acc(y_fusion, y)
-        self.train_f1(y_fusion, y)
-        self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
-        self.log("train_f1", self.train_f1, on_step=False, on_epoch=True)
-        
+        self._metrics('train', y_fusion, y)
+        self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
+        self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
+        self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
+        return loss
+
+
+    def _train_on_feature_vector(self, global_vec, h_crops, y):
+        y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
+
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_local = self.criterion(y_local, y)
+        loss = loss_fusion + loss_local
+
+        self._metrics('train', y_fusion, y)
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
-        self.log("train_loss_global", loss_global, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-
         self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
-
         return loss
+
+
+    def training_step(self, batch, batch_idx):
+        """Implementation of PyTorch training loop in Lightning called for each batch"""
+        x, y = batch
+
+        if self._training_on_FV_now():
+            return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
+        else:
+            return self._train_on_image(image=x, y=y)
 
 
     def validation_step(self, batch, batch_idx):
@@ -122,6 +159,7 @@ class GMICTrainer(pl.LightningModule):
 
         loss = loss_fusion + loss_global + loss_local
         
+        self._metrics('val', y_fusion, y)
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
 
         return loss
@@ -138,7 +176,7 @@ class GMICTrainer(pl.LightningModule):
         loss_local = self.criterion(y_local, y)
         loss = loss_fusion + loss_global + loss_local
 
-        # Log loss for each batch
+        self._metrics('test', y_fusion, y)
         self.log("test_loss", loss, on_epoch=True, sync_dist=True)
 
         return loss
@@ -146,30 +184,28 @@ class GMICTrainer(pl.LightningModule):
     
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
-        img, y, data = batch
-
+        img, y = batch
         print(y)
+
         true_segs = [None for _ in range(len(y[0]))]
 
         # forward propagation
-        y_global, y_local, y_fusion = self(img)  # Add an extra dimension for batch
+        _, _, y_fusion = self(img)  # Add an extra dimension for batch
         img_numpy = img.data.cpu().numpy()
-        pred_numpy = y_fusion.data.cpu().numpy()
 
         # save visualization
         saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
         if self.hparams.turn_on_visualization:
             patch_locations = self.gmic.patch_locations
-            patch_imgs = self.gmic.patches
-            patch_attentions = self.gmic.patch_attns[0, :].data.cpu().numpy()
-            save_dir = os.path.join(self.hparams.output_path, "visualization", "{}.png".format(data["image"][0][0]))
+            patch_img = self.gmic.patches
+            patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            save_dir = os.path.join(self.hparams.output_path, f"visualization/{batch_idx}.png")
             predict.visualize_example(img_numpy, saliency_maps, true_segs,
-                        patch_locations, patch_imgs, patch_attentions,
+                        patch_locations, patch_img, patch_attns,
                         save_dir, self.hparams)
-                
-        # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img_numpy, saliency_maps, data, self.hparams.segmentation_path, data["image"][0][0], self.hparams.turn_on_visualization)
 
+        # save predicted regions of interest as polyline
+        predict.save_saliency_maps(img_numpy, saliency_maps, self.hparams.segmentation_path, f"{batch_idx}.png", self.hparams)
         return y_fusion
 
 
@@ -180,9 +216,10 @@ class GMICTrainer(pl.LightningModule):
 
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
-        if self.train_dataset:
+        if self._training_on_FV_now():
+            return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
+        else:
             return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
-        return None
 
 
     def val_dataloader(self):

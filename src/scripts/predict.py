@@ -1,39 +1,27 @@
-import argparse, os, cv2, sys
+import os, cv2, sys
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from tqdm import tqdm
-import time
-import multiprocessing
 
 import torch
-from torch.utils.data import random_split
 import lightning.pytorch as pl
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
-import pydicom as dcm
 
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.utilities import pickling, tools
-from src.modeling import gmic, trainer
-from src.data_loading import loading, dataset
-from src.constants import VIEWS, PERCENT_T_DICT
+from src.utilities import tools
+from src.modeling import trainer
+from src.data_loading import dataset
 
 
-def visualize_example(input_img, saliency_maps, seg_masks,
-                      patch_locations, patch_img, patch_attentions,
-                      save_dir, parameters):
+def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, save_path, parameters):
     """
     Function that visualizes the saliency maps for an example
     """
     # colormap lists
-    _, _, h, w = saliency_maps.shape
-    _, _, H, W = input_img.shape
+    _, _, H, W = img.shape
 
     # set up colormaps for benign and malignant
     alphas = np.abs(np.linspace(0, 0.95, 259))
@@ -50,11 +38,11 @@ def visualize_example(input_img, saliency_maps, seg_masks,
 
     # input image
     subfigure = figure.add_subplot(1, total_num_subplots, 1)
-    subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
+    subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
     
-    for idx, seg_mask in enumerate(seg_masks):
+    for i, seg_mask in enumerate(seg_masks):
         if seg_mask is not None:
-            if idx == 0:
+            if i == 0:
                 subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_green, clim=[0.9, 1])
             else:
                 subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_red, clim=[0.9, 1])
@@ -65,11 +53,11 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     # patch map
     print(patch_locations)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
-    subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-    subfigure.imshow(tools.get_crop_mask(
-        patch_locations[0, np.arange(parameters["K"]), :],
-        parameters["crop_shape"], (H, W),
-        "upper_left"), alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1])
+    subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
+    subfigure.imshow(
+        tools.get_crop_mask(patch_locations[0, np.arange(parameters["K"]), :], parameters["crop_shape"], (H, W), "upper_left"),
+        alpha=0.7, cmap=cm.YlGnBu, clim=[0.9, 1]
+    )
 
     for seg_mask in seg_masks:
         if seg_mask is not None:
@@ -79,52 +67,46 @@ def visualize_example(input_img, saliency_maps, seg_masks,
     subfigure.axis('off')
 
     # class activation maps
-    for idx, class_name in enumerate(parameters["class_names"]):
-        subfigure = figure.add_subplot(1, total_num_subplots, 3 + idx)
-        subfigure.imshow(input_img[0, 0, :, :], aspect='equal', cmap='gray')
-        resized_cam = cv2.resize(saliency_maps[0, idx, :, :], (W, H))
-        if idx == 0: # "No Finding"
-            subfigure.imshow(resized_cam, cmap=alpha_green, clim=[0.0, 1.0])
-        else:
-            subfigure.imshow(resized_cam, cmap=alpha_red, clim=[0.0, 1.0])
+    for i, class_name in enumerate(parameters["class_names"]):
+        subfigure = figure.add_subplot(1, total_num_subplots, 3 + i)
+        subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
+        resized_cam = cv2.resize(saliency_maps[0, i, :, :], (W, H))
+        
+        subfigure.imshow(resized_cam, cmap=alpha_green if i == 0 else alpha_red, clim=[0.0, 1.0])
+
         subfigure.set_title("SM: " + class_name)
         subfigure.axis('off')
 
     # crops
     for crop_idx in range(parameters["K"]):
         subfigure = figure.add_subplot(1, total_num_subplots, 3 + parameters["num_classes"] + crop_idx)
-        subfigure.imshow(patch_img[0, crop_idx, :, :], cmap='gray', alpha=.8, interpolation='nearest',
-                         aspect='equal')
+        subfigure.imshow(patch_img[0, crop_idx, :, :], cmap='gray', alpha=.8, interpolation='nearest', aspect='equal')
         subfigure.axis('off')
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
-    
-    print(save_dir)
-    plt.savefig(save_dir, bbox_inches='tight', format="png", dpi=500)
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    plt.savefig(save_path, bbox_inches='tight', format="png", dpi=500)
     plt.close()
 
 
-def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, turn_on_visualization):
+def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
     """Store saliency maps for benign and malignant tissue as separate layers and polylines"""
 
-    input_img = input_img[0, 0, :, :]
-    H, W = input_img.shape
-    view = file_path.split('_')[1].split('.')[0]
-    window_location = datum["window_location"][0][view][0]
+    img = img[0, 0, :, :]
+    H, W = img.shape
+    window_location = (0, H, 0, W)
 
-    saliency_maps_benign = (saliency_maps[0,0,:,:]*500).astype(np.uint8)
-    saliency_maps_benign = cv2.resize(saliency_maps_benign, (W, H))
-    saliency_maps_malignant = (saliency_maps[0,1,:,:]*500).astype(np.uint8)
-    saliency_maps_malignant = cv2.resize(saliency_maps_malignant, (W, H))
-
-    process_saliency_map(input_img, saliency_maps_benign, window_location, save_dir, file_path, "benign", turn_on_visualization)
-    process_saliency_map(input_img, saliency_maps_malignant, window_location, save_dir, file_path, "malignant", turn_on_visualization)
+    for i in range(parameters["num_classes"]):
+        maps = cv2.resize((saliency_maps[0,i,:,:] * 500).astype(np.uint8), (W, H))
+        process_saliency_map(img, maps, window_location, folder, filename, parameters["class_names"][i], parameters["turn_on_visualization"])
 
 
-def process_saliency_map(input_img, saliency_map, window_location, save_dir, file_path, label, turn_on_visualization):
+def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization):
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(folder, exist_ok=True)
 
     max_intensity = np.max(saliency_map)
     intensity_threshold = 0.1 * max_intensity  # 10% of the maximum intensity
@@ -163,7 +145,7 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             p[0] -= window_location[2]
             p[1] -= window_location[0]
 
-        with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
+        with open(os.path.join(folder, "{0}_polyline_{1}_{2}.txt".format(filename, label, i)), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
                 f.write(f"{point[0]}, {point[1]}\n")
@@ -173,15 +155,14 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
             image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
             # plt.imshow(input_img, cmap='gray', aspect='equal')
             plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-            print("Polyline saved to: {}".format(os.path.join(save_dir, "{}_seg_{}_{}.png".format(file_path, label, i))))
-            plt.savefig(os.path.join(save_dir, "{0}_seg_{1}_{2}.png".format(file_path, label, i)))
+            print("Polyline saved to: {}".format(os.path.join(folder, "{}_seg_{}_{}.png".format(filename, label, i))))
+            plt.savefig(os.path.join(folder, "{0}_seg_{1}_{2}.png".format(filename, label, i)))
 
     if not contours:
-        print(file_path, "\n\tNo contours found in the saliency map.")
+        print(filename, "\n\tNo contours found in the saliency map.")
 
 
 if __name__ == "__main__":
-
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -193,19 +174,12 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    checkpoint_path = 'tb_logs_helix/balanced/version_5/checkpoints/epoch=255-step=1387520.ckpt' # 3 classes
+    checkpoint_path = 'tb_logs/balanced/version_0/checkpoints/epoch=7-step=31664.ckpt' # 2 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
-    dicom_file = '1-1.dcm'
-
-    sds_path = '../sdsHD/'
     
-    data_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl')
-    image_path_train = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_cropped_top5/')
-    image_path_test = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/cropped_images/')
-    dict_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/dictionary.csv')
-    seg_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/segmentation')
-    output_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output')
-    h5_path = os.path.join(sds_path, 'sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/balanced_top6/dataset.h5')
+    image_dir = '/home/ubuntu/gmic/vindrmammo_data'
+    output_path = '/home/ubuntu/gmic/predict_output'
+    segmentation_path = os.path.join(output_path, 'segmentation')
 
     # set hyperparameters
     parameters = {
@@ -215,10 +189,12 @@ if __name__ == "__main__":
         "batch_size": 1,
         "pretrained": False,
 
+        "smote_rate": 0.0,
+
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
-        "image_path": image_path_train,
-        "segmentation_path": seg_path,
+        "image_path": image_dir,
+        "segmentation_path": segmentation_path,
         "output_path": output_path,
         "turn_on_visualization": True,
 
@@ -228,31 +204,22 @@ if __name__ == "__main__":
         "crop_shape": (512, 512), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": 3, # output classes
+        "num_classes": 2, # output classes
         "use_v1_global": False,
     }
 
-    data = dataset.PredictionClassificationImages(imageFolder=[image_path_train, image_path_test], dictPath=dict_path, top_c=parameters["num_classes"])
-    parameters["class_names"] = data.unique_categories
-    # data = dataset.ClassificationFromLabels(imageFolder=[image_path_train, image_path_test], dictPath=data_path, labelPath=label_file, top_c=3)
-    dataTrain, dataValid, dataTest = random_split(data, [0.8, 0.1, 0.1])
+    data = dataset.ClassificationImages([image_dir], undersampling_rate=0.0, augmentation_rate=0.0, binary=True, augment=False)
+    parameters["class_names"] = data.labels
 
     # Training
-    lightningModule = trainer.GMICTrainer(
-                        parameters=parameters,
-                        dataset_predict=dataTrain
-                    )
+    gmic_trainer = trainer.GMICTrainer(parameters=parameters, image_class_weights=data.class_weights(), dataset_predict=data)
+
     if device == "gpu":
-        trainer = pl.Trainer(fast_dev_run=True,
-                            accelerator=device, 
-                            devices=[parameters["gpu_number"]],
-                        )
+        pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
     else:
-        trainer = pl.Trainer(fast_dev_run=True,
-                            accelerator=device, 
-                        )
+        pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device)
         
-    prediction = trainer.predict(lightningModule, ckpt_path=checkpoint_path)
+    prediction = pl_trainer.predict(gmic_trainer, ckpt_path=checkpoint_path)
     
-    print(f"Categories: {data.unique_categories}")
-    print("Prediction: {}".format(prediction))
+    print(f"Categories: {data.labels}")
+    print(f"Prediction: {prediction}")
