@@ -3,6 +3,12 @@ import pandas as pd
 import numpy as np
 import os, json, sys
 import typing
+import logging
+import multiprocessing
+from tqdm import tqdm
+
+# Set up logging
+logging.basicConfig(filename='error_log.txt', level=logging.ERROR)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
@@ -61,52 +67,92 @@ def get_center(image: np.ndarray, view: str, horizontal_flip: str):
 
 
 def process_dicom(path: str, data: dict) -> Dicom:
-    with pydicom.read_file(path) as file:
-        image = file.pixel_array
-        view = f'{file.ImageLaterality}-{file.ViewPosition}'
-        horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
+    try:
+        with pydicom.dcmread(path) as file:
+            image = file.pixel_array
+            view = f'{file.ImageLaterality}-{file.ViewPosition}'
+            horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
 
-    category = get_category(data)
-    center = get_center(image, view, horizontal_flip)
+        category = get_category(data)
+        center = get_center(image, view, horizontal_flip)
 
-    image = loading.flip_image(image, view, horizontal_flip)
-    image = loading.crop_image(image, view, center)
-    return (path, image, category)
+        image = loading.flip_image(image, view, horizontal_flip)
+        image = loading.crop_image(image, view, center)
 
+        return (path, image, category)
+    
+    except FileNotFoundError:
+        logging.error(f'File not found: {path}')
+        return None
+    
+    except Exception as e:
+        logging.error(f'Error processing DICOM file {path}: {e}')
+        return None
+    
+    except Exception as e:
+        print(f"Something went wrong: {e}")
 
 def process_dicoms(inputs: list[tuple[str, dict]]) -> list[Dicom]:
     dicoms = []
     for path, data in inputs:
-        try:
-            dicoms.append(process_dicom(path, data))
-        except:
-            pass
+        dicom = process_dicom(path, data)
+        if dicom is not None:
+            dicoms.append(dicom)
     return dicoms
 
 
 def process_patient(root: str, patient: str) -> list[Dicom]:
+    """Load patient data from JSON file"""
     scans = []
-    with open(os.path.join(root, 'DATA', patient, f'IMAGEDB_{patient}.json')) as file:
-        try:
+    try:
+        with open(os.path.join(root, 'data', patient, f'IMAGEDB_{patient}.json')) as file:
             loaded = json.loads(file.read())['STUDIES']
-        except:
-            print('Could not load JSON for patient:', patient)
-            return []
+    except FileNotFoundError:
+        logging.error(f'JSON file not found for patient: {patient}')
+        return []
+    except json.JSONDecodeError:
+        logging.error(f'Error decoding JSON for patient: {patient}')
+        return []
 
     folders = [(folder, val) for folder, it in loaded.items() for val in it.values()]
     dicts = [(folder, val) for folder, val in folders if isinstance(val, dict)]
     scans = [(f'{folder}/{key}.dcm', val) for folder, dic in dicts for key, val in dic.items()]
     findings = {scan: (list(lesions.values()) if lesions else []) for scan, lesions in scans}
 
-    studies = os.listdir(os.path.join(root, 'IMAGES', patient))
-    images = [f'{study}/{img}' for study in studies for img in os.listdir(os.path.join(root, 'IMAGES', patient, study))]
-    paths = [(os.path.join(root, 'IMAGES', patient, img), findings[img]) for img in images]
+    try:
+        studies = os.listdir(os.path.join(root, 'images', patient))
+    except FileNotFoundError:
+        logging.error(f'Image folder not found for patient: {patient}')
+        return []
+
+    images = [f'{study}/{img}' for study in studies for img in os.listdir(os.path.join(root, 'images', patient, study))]
+    paths = []
+    for img in images:
+        if img in findings:
+            paths.append((os.path.join(root, 'images', patient, img), findings[img]))
+        else:
+            logging.error(f'KeyError: {img} not found in findings for patient: {patient}')
 
     return process_dicoms(paths)
 
 
 def process_patients(root: str):
-    return [dcm for patient in os.listdir(os.path.join(root, 'IMAGES')) for dcm in process_patient(root, patient)]
+    try:
+        patients = sorted(os.listdir(os.path.join(root, 'images')))[:2]
+    except FileNotFoundError:
+        logging.error('Root images directory not found')
+        return []
+
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+        results = list(tqdm(
+            pool.starmap(process_patient, [(root, patient) for patient in patients]),
+            total=len(patients),
+            desc="Processing Patients"
+        ))
+    
+    return [dcm for patient_results in results for dcm in patient_results]
+
+    return [dcm for patient in patients for dcm in process_patient(root, patient)]
 
 
 def sorted_categories(dicoms: list[Dicom]) -> list[Category]:
@@ -141,12 +187,21 @@ def main(src_dir: str, dst_dir: str):
     for category_index, category_name in enumerate(categories):
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
 
-        for i, dcm in enumerate(dicoms[category_index]):
-            mapp.loc[len(mapp), :] = save_image(dcm, category_index, category_name, dst_dir, i)
-            print(f'{category_index}/{len(categories)}: {100 * i // len(dicoms[category_index])} %')
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+            results = list(tqdm(
+                pool.starmap(
+                    save_image,
+                    [(dcm, category_index, category_name, dst_dir, i) for i, dcm in enumerate(dicoms[category_index])]
+                ),
+                total=len(dicoms[category_index]),
+                desc=f"Saving images for category {category_name}"
+            ))
+            
+        for result in results:
+            mapp.loc[len(mapp), :] = result
 
     mapp.to_csv(os.path.join(dst_dir, 'mapping.csv'))
 
 
 if __name__ == '__main__':
-    main('/home/ubuntu/sdsHD/sd21c015/DataBaseMammography/OMI_SAMPLE', '/home/ubuntu/gmic/omidb_data')
+    main(src_dir='/home/pb438/medken/testData', dst_dir='/home/pb438/medken/testData/extracted')
