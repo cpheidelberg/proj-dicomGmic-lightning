@@ -138,7 +138,7 @@ def process_patient(root: str, patient: str) -> list[Dicom]:
 
 def process_patients(root: str):
     try:
-        patients = [p for p in os.listdir(os.path.join(root, 'images')) if not p.startswith("._")]
+        patients = [p for p in os.listdir(os.path.join(root, 'images')) if p.startswith("demd1")]
         patients = sorted(patients)
     except FileNotFoundError:
         logging.error('Root images directory not found')
@@ -205,4 +205,4 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main(src_dir='/Users/pb438/sdsHD/sd24f004/FFDM/demd/', dst_dir='/Users/pb438/sdsHD/sd24f004/FFDM/demd/extracted')
+    main(src_dir='/mnt/sds-hd/sd24f004/FFDM/demd/', dst_dir='/mnt/sds-hd/sd24f004/FFDM/demd/extracted')
