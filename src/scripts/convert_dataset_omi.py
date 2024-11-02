@@ -89,9 +89,7 @@ def process_dicom(path: str, data: dict) -> Dicom:
         logging.error(f'Error processing DICOM file {path}: {e}')
         return None
     
-    except Exception as e:
-        print(f"Something went wrong: {e}")
-
+    
 def process_dicoms(inputs: list[tuple[str, dict]]) -> list[Dicom]:
     dicoms = []
     for path, data in inputs:
