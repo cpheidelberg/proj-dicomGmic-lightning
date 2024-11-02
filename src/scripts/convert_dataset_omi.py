@@ -118,12 +118,12 @@ def process_patient(root: str, patient: str) -> list[Dicom]:
     findings = {scan: (list(lesions.values()) if lesions else []) for scan, lesions in scans}
 
     try:
-        studies = os.listdir(os.path.join(root, 'images', patient))
+        studies = [study for study in os.listdir(os.path.join(root, 'images', patient)) if not study.startswith("._")]
     except FileNotFoundError:
         logging.error(f'Image folder not found for patient: {patient}')
         return []
 
-    images = [f'{study}/{img}' for study in studies for img in os.listdir(os.path.join(root, 'images', patient, study))]
+    images = [f'{study}/{img}' for study in studies for img in os.listdir(os.path.join(root, 'images', patient, study)) if not img.startswith("._")]
     paths = []
     for img in images:
         if img in findings:
@@ -136,7 +136,8 @@ def process_patient(root: str, patient: str) -> list[Dicom]:
 
 def process_patients(root: str):
     try:
-        patients = sorted(os.listdir(os.path.join(root, 'images')))[:2]
+        patients = [p for p in os.listdir(os.path.join(root, 'images')) if p.startswith("demd1")]
+        patients = sorted(patients)
     except FileNotFoundError:
         logging.error('Root images directory not found')
         return []
@@ -150,7 +151,7 @@ def process_patients(root: str):
     
     return [dcm for patient_results in results for dcm in patient_results]
 
-    return [dcm for patient in patients for dcm in process_patient(root, patient)]
+    # return [dcm for patient in patients for dcm in process_patient(root, patient)]
 
 
 def sorted_categories(dicoms: list[Dicom]) -> list[Category]:
@@ -202,4 +203,4 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main(src_dir='/home/pb438/medken/testData', dst_dir='/home/pb438/medken/testData/extracted')
+    main(src_dir='/mnt/sds-hd/sd24f004/FFDM/demd/', dst_dir='/mnt/sds-hd/sd24f004/FFDM/demd/extracted')
