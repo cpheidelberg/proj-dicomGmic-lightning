@@ -5,6 +5,7 @@ import os, json, sys
 import typing
 import logging
 import multiprocessing
+import shutil
 from tqdm import tqdm
 
 # Set up logging
@@ -66,30 +67,43 @@ def get_center(image: np.ndarray, view: str, horizontal_flip: str):
     return centers.extract_center(datum, image)
 
 
+def determine_view(laterality: str, viewPosition: str) -> str:
+
+    if viewPosition == 'ML' or viewPosition == 'LM':
+        viewPosition = 'MLO'
+
+    view = f"{laterality}-{viewPosition}"
+    return view
+
+
 def process_dicom(path: str, data: dict) -> Dicom:
     try:
         with pydicom.dcmread(path) as file:
             image = file.pixel_array
-            view = f'{file.ImageLaterality}-{file.ViewPosition}'
+            view = determine_view(file.ImageLaterality, file.ViewPosition)
             horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
-
         category = get_category(data)
         center = get_center(image, view, horizontal_flip)
 
-        image = loading.flip_image(image, view, horizontal_flip)
-        image = loading.crop_image(image, view, center)
-
-        return (path, image, category)
+        category_folder = os.path.join('/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted', "temporary", category)
+        os.makedirs(category_folder, exist_ok=True)
+        image_path = os.path.join(category_folder, "-".join(path.split("/")[-3:]).replace(".dcm", ".png"))
+        if not os.path.exists(image_path):
+            image = loading.flip_image(image, view, horizontal_flip)
+            image = loading.crop_image(image, view, center)
+            loading.write_image(image_path, image)
+        
+        return (path, image_path, category, view, center)
     
     except FileNotFoundError:
         logging.error(f'File not found: {path}')
         return None
     
-    except Exception as e:
-        logging.error(f'Error processing DICOM file {path}: {e}')
+    except Exception:
+        logging.error(f'Error processing DICOM file {path}', exc_info=True)
         return None
     
-    
+
 def process_dicoms(inputs: list[tuple[str, dict]]) -> list[Dicom]:
     dicoms = []
     for path, data in inputs:
@@ -134,46 +148,56 @@ def process_patient(root: str, patient: str) -> list[Dicom]:
     return process_dicoms(paths)
 
 
+def process_patient_star(args: list) -> list[Dicom]:
+    return process_patient(*args)
+
+
 def process_patients(root: str):
     try:
-        patients = [p for p in os.listdir(os.path.join(root, 'images')) if p.startswith("demd1")]
+        patients = [p for p in os.listdir(os.path.join(root, 'images')) if p.startswith("demd")]
         patients = sorted(patients)
     except FileNotFoundError:
         logging.error('Root images directory not found')
         return []
 
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+    patient_list = [(root, patient) for patient in patients]
+    print(f"Number of patients: {len(patient_list)}")
+    with multiprocessing.Pool(multiprocessing.cpu_count()-3) as pool:
         results = list(tqdm(
-            pool.starmap(process_patient, [(root, patient) for patient in patients]),
-            total=len(patients),
+            pool.imap(process_patient_star, patient_list),
+            total=len(patient_list),
             desc="Processing Patients"
         ))
     
     return [dcm for patient_results in results for dcm in patient_results]
 
-    # return [dcm for patient in patients for dcm in process_patient(root, patient)]
-
 
 def sorted_categories(dicoms: list[Dicom]) -> list[Category]:
     sizes = {}
-    for _, _, category in dicoms:
+    print(f"Total number of DICOMs: {len(dicoms)}")
+    for _, _, category, _, _ in dicoms:
         sizes[category] = sizes.get(category, 0) + 1
+    print(f"Registered categories: {sizes}")
     return sorted(sizes.keys(), key=lambda category: -sizes[category])
 
 
 def group_by_category(dicoms: list[Dicom], categories: list[Category]) -> list[list[Dicom]]:
     split = [[] for _ in categories]
-    for path, image, category in dicoms:
-        split[categories.index(category)].append((path, image, category))
+    for path, image, category, view, center in dicoms:
+        split[categories.index(category)].append((path, image, category, view, center))
     return split
 
 
-def save_image(dcm: Dicom, category_index: int, category_name: Category, dst_dir: str, index: int):
+def save_image(dcm: Dicom, category_index: int, category_name: Category, dst_dir: str, index: int) -> list:
     dst_name = f'{category_index}/{index}.png'
     dcm_name = '/'.join(dcm[0].split('/')[-3:])
 
-    loading.write_image(os.path.join(dst_dir, dst_name), dcm[1])
-    return [dst_name, dcm_name, category_name]
+    os.rename(dcm[1], os.path.join(dst_dir, dst_name))
+    return [dst_name, dcm_name, category_name, dcm[3], dcm[4]]
+
+
+def save_image_star(args: list) -> list:
+    return save_image(*args)
 
 
 def main(src_dir: str, dst_dir: str):
@@ -181,17 +205,15 @@ def main(src_dir: str, dst_dir: str):
     categories = sorted_categories(dicom_list)
     dicoms = group_by_category(dicom_list, categories)
 
-    mapp = pd.DataFrame({'png': [], 'dicom': [], 'label': []}, dtype=str)
+    mapp = pd.DataFrame({'png': [], 'dicom': [], 'label': [], 'view': [], 'center': []}, dtype=str)
 
+    print(f"Categories: {categories}")
     for category_index, category_name in enumerate(categories):
         os.makedirs(os.path.join(dst_dir, str(category_index)), exist_ok=True)
-
-        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+        dicom_list = [(dcm, category_index, category_name, dst_dir, i) for i, dcm in enumerate(dicoms[category_index])]
+        with multiprocessing.Pool(multiprocessing.cpu_count()-3) as pool:
             results = list(tqdm(
-                pool.starmap(
-                    save_image,
-                    [(dcm, category_index, category_name, dst_dir, i) for i, dcm in enumerate(dicoms[category_index])]
-                ),
+                pool.imap(save_image, dicom_list),
                 total=len(dicoms[category_index]),
                 desc=f"Saving images for category {category_name}"
             ))
@@ -203,4 +225,4 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main(src_dir='/mnt/sds-hd/sd24f004/FFDM/demd/', dst_dir='/mnt/sds-hd/sd24f004/FFDM/demd/extracted')
+    main(src_dir='/home/pb438/sdsHD/sd24f004/FFDM/demd/', dst_dir='/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted')
