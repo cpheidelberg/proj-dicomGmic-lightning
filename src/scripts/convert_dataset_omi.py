@@ -76,7 +76,7 @@ def determine_view(laterality: str, viewPosition: str) -> str:
     return view
 
 
-def process_dicom(path: str, data: dict) -> Dicom:
+def process_dicom(path: str, data: dict, dstDir: str) -> Dicom:
     try:
         with pydicom.dcmread(path) as file:
             image = file.pixel_array
@@ -85,7 +85,7 @@ def process_dicom(path: str, data: dict) -> Dicom:
         category = get_category(data)
         center = get_center(image, view, horizontal_flip)
 
-        category_folder = os.path.join('/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted', "temporary", category)
+        category_folder = os.path.join(dstDir, "temporary", category)
         os.makedirs(category_folder, exist_ok=True)
         image_path = os.path.join(category_folder, "-".join(path.split("/")[-3:]).replace(".dcm", ".png"))
         if not os.path.exists(image_path):
@@ -106,14 +106,14 @@ def process_dicom(path: str, data: dict) -> Dicom:
 
 def process_dicoms(inputs: list[tuple[str, dict]]) -> list[Dicom]:
     dicoms = []
-    for path, data in inputs:
-        dicom = process_dicom(path, data)
+    for path, data, dstDir in inputs:
+        dicom = process_dicom(path, data, dstDir)
         if dicom is not None:
             dicoms.append(dicom)
     return dicoms
 
 
-def process_patient(root: str, patient: str) -> list[Dicom]:
+def process_patient(root: str, patient: str, dstDir: str) -> list[Dicom]:
     """Load patient data from JSON file"""
     scans = []
     try:
@@ -141,7 +141,7 @@ def process_patient(root: str, patient: str) -> list[Dicom]:
     paths = []
     for img in images:
         if img in findings:
-            paths.append((os.path.join(root, 'images', patient, img), findings[img]))
+            paths.append((os.path.join(root, 'images', patient, img), findings[img], dstDir))
         else:
             logging.error(f'KeyError: {img} not found in findings for patient: {patient}')
 
@@ -152,7 +152,7 @@ def process_patient_star(args: list) -> list[Dicom]:
     return process_patient(*args)
 
 
-def process_patients(root: str):
+def process_patients(root: str, dstDir: str) -> list[Dicom]:
     try:
         patients = [p for p in os.listdir(os.path.join(root, 'images')) if p.startswith("demd")]
         patients = sorted(patients)
@@ -160,7 +160,8 @@ def process_patients(root: str):
         logging.error('Root images directory not found')
         return []
 
-    patient_list = [(root, patient) for patient in patients]
+    patient_list = [(root, patient, dstDir) for patient in patients]
+
     print(f"Number of patients: {len(patient_list)}")
     with multiprocessing.Pool(multiprocessing.cpu_count()-3) as pool:
         results = list(tqdm(
@@ -201,7 +202,7 @@ def save_image_star(args: list) -> list:
 
 
 def main(src_dir: str, dst_dir: str):
-    dicom_list = process_patients(src_dir)
+    dicom_list = process_patients(src_dir, dst_dir)
     categories = sorted_categories(dicom_list)
     dicoms = group_by_category(dicom_list, categories)
 
@@ -213,7 +214,7 @@ def main(src_dir: str, dst_dir: str):
         dicom_list = [(dcm, category_index, category_name, dst_dir, i) for i, dcm in enumerate(dicoms[category_index])]
         with multiprocessing.Pool(multiprocessing.cpu_count()-3) as pool:
             results = list(tqdm(
-                pool.imap(save_image, dicom_list),
+                pool.imap(save_image_star, dicom_list),
                 total=len(dicoms[category_index]),
                 desc=f"Saving images for category {category_name}"
             ))
@@ -225,4 +226,4 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main(src_dir='/home/pb438/sdsHD/sd24f004/FFDM/demd/', dst_dir='/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted')
+    main(src_dir='../../../testData', dst_dir='../../../testData/extracted')
