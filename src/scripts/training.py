@@ -28,19 +28,20 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     # set path variables
     model_path = 'models/'
 
-    data_dirs = ['/home/ubuntu/gmic/vindrmammo_data'] #, '/home/ubuntu/gmic/omidb_data']
-    image_path = '/home/ubuntu/gmic/vindrmammo_data'
-    output_path = '/home/ubuntu/gmic/predict_output'
+    data_dirs = ['/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted'] #, '/home/ubuntu/gmic/omidb_data']
+    image_path = '/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted'
+    output_path = '/home/pb438/sdsHD/sd24f004/FFDM/demd/predicted'
     segmentation_path = os.path.join(output_path, 'segmentation')
 
     dataset = ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
+    print(dataset)
     data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
-        "gpu_number": 0,
+        "gpu_number": 1,
         "epochs": epochs,
         "batch_size": 4,
         "learning_rate": 1e-3,
@@ -88,7 +89,8 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device, 
-        devices=[parameters["gpu_number"]],
+        devices=[1],
+        # devices=[parameters["gpu_number"]],
         # devices=[1,2],
         logger=logger,
         # profiler="simple",
@@ -103,6 +105,6 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
-    run_training(epochs=8, epoch_smote=8, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
-    run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
-    run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
+    run_training(epochs=128, epoch_smote=128, undersampling_rate=0.5, augmentation_rate=1.0, smote_rate=0.0, binary=True, augment=True)
+    # run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
+    # run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)

@@ -69,10 +69,11 @@ class ClassificationImages(Dataset):
             if len(self.images[0]) < len(self.images[1]):
                 self.images.reverse()
                 self.labels.reverse()
+            print(f'Binary classification: {len(self.images[0])} No Finding, {len(self.images[1])} Suspicious')
         else:
             self.images = [list(table[table['label'] == label]['png']) for label in labels]
             self.labels = labels
-
+            print(f"Multiclass classification: {', '.join(f'{len(images)} {label}' for images, label in zip(self.images, self.labels))}")
         c_max = _geometric_mean(len(self.images[1]), len(self.images[0]), undersampling_rate)
         self.images[0] = random.sample(self.images[0], c_max)
 
@@ -80,6 +81,7 @@ class ClassificationImages(Dataset):
         self.offsets = [sum(self.sizes[:i]) for i in range(len(self.images) + 1)]
 
         self.augment = augment
+        print(self.offsets, self.sizes)
 
 
     def class_weights(self):

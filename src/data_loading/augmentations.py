@@ -22,6 +22,10 @@ import numpy as np
 import albumentations as alb
 import albumentations.pytorch as alp
 
+import sys, os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = "/".join(current_dir.split("/")[:-2])
+sys.path.append(parent_dir)
 from src.constants import VIEWS
 
 
