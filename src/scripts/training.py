@@ -101,10 +101,12 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
     trainer.fit(model=model)    
     print("Training finished at: ", time.ctime())
-    trainer.test(model=model)
+    # trainer.test(model=model)
+
+    return trainer
 
 
 if __name__ == "__main__":
-    run_training(epochs=128, epoch_smote=128, undersampling_rate=0.5, augmentation_rate=1.0, smote_rate=0.0, binary=True, augment=True)
+    trainer = run_training(epochs=128, epoch_smote=128, undersampling_rate=0.5, augmentation_rate=1.0, smote_rate=0.0, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
