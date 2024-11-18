@@ -28,9 +28,9 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     # set path variables
     model_path = 'models/'
 
-    data_dirs = ['/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted'] #, '/home/ubuntu/gmic/omidb_data']
-    image_path = '/home/pb438/sdsHD/sd24f004/FFDM/demd/extracted'
-    output_path = '/home/pb438/sdsHD/sd24f004/FFDM/demd/predicted'
+    data_dirs = ['/mnt/sds-hd/sd24f004/FFDM/demd/extracted'] #, '/home/ubuntu/gmic/omidb_data']
+    image_path = '/mnt/sds-hd/sdsHD/sd24f004/FFDM/demd/extracted'
+    output_path = '/mnt/sds-hd/sdsHD/sd24f004/FFDM/demd/predicted'
     segmentation_path = os.path.join(output_path, 'segmentation')
 
     dataset = ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
@@ -41,7 +41,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     parameters = {
         # training related hyper-parameters
         "device_type": device,
-        "gpu_number": 1,
+        "gpu_number": 0,
         "epochs": epochs,
         "batch_size": 4,
         "learning_rate": 1e-3,
@@ -89,7 +89,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device, 
-        devices=[1],
+        devices="auto",
         # devices=[parameters["gpu_number"]],
         # devices=[1,2],
         logger=logger,

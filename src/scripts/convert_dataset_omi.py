@@ -226,4 +226,4 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main(src_dir='../../../testData', dst_dir='../../../testData/extracted')
+    main(src_dir='/mnt/sds-hd/sd24f004/FFDM/demd/', dst_dir='/mnt/sds-hd/sd24f004/FFDM/demd/extracted')
