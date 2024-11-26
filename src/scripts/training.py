@@ -34,7 +34,6 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
     segmentation_path = os.path.join(output_path, 'segmentation')
 
     dataset = ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
-    print(dataset)
     data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
 
     # set hyperparameters
@@ -43,8 +42,8 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "device_type": device,
         "gpu_number": 0,
         "epochs": epochs,
-        "batch_size": 4,
-        "learning_rate": 1e-3,
+        "batch_size": 16,
+        "learning_rate": 1e-4,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
