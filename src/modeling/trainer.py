@@ -118,7 +118,6 @@ class GMICTrainer(pl.LightningModule):
         self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
         self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
         self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
         return loss
 
 
@@ -161,6 +160,7 @@ class GMICTrainer(pl.LightningModule):
         
         self._metrics('val', y_fusion, y)
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
+        self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
 
         return loss
 

@@ -80,7 +80,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         model_path=model_path
     )
 
-    logger = pl.loggers.TensorBoardLogger("tb_logs", name="balanced", log_graph=True)
+    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
 
     trainer = pl.Trainer(
         fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
@@ -89,11 +89,10 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=device, 
-        devices=[1],
+        devices="auto",
         # devices=[parameters["gpu_number"]],
         # devices=[1,2],
         logger=logger,
-        # profiler="simple",
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
         reload_dataloaders_every_n_epochs=1,
