@@ -1,27 +1,15 @@
-import argparse, os, cv2, sys
-import numpy as np
-import pandas as pd
+import os, sys
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import torch
-from torch.utils.data import random_split
-import lightning.pytorch as pl
-from lightning.pytorch.strategies import DDPStrategy
-from lightning.pytorch.callbacks import ModelSummary, EarlyStopping
 import optuna
 import time
-
-from tqdm import tqdm
-import pydicom as dcm
+from lightning.pytorch.callbacks import Timer
+from lightning.pytorch.loggers import TensorBoardLogger, CSVLogger
 
 # import own files 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = "/".join(current_dir.split("/")[:-2])
 sys.path.append(parent_dir)
 
-from src.utilities import pickling, tools
-from src.modeling import gmic, trainer
-from src.data_loading import loading, dataset
 from src.scripts import training
 
 
@@ -30,7 +18,7 @@ def objective(trial):
     # parameters["batch_size"] = trial.suggest_categorical("batch_size", [1,2,4,8,16,32])
     undersampling_rate = trial.suggest_float("undersampling_rate", 0, 1)
     augmentation_rate = trial.suggest_float("augmentation_rate", 0, 1)
-
+    
     # Create and train the LightningModule
     trainer = training.run_training(epochs=32, epoch_smote=32, undersampling_rate=undersampling_rate, augmentation_rate=augmentation_rate, smote_rate=0.0, binary=True, augment=True)
 
@@ -45,8 +33,13 @@ def objective(trial):
 if __name__ == "__main__":
 
     # Optimize hyperparameters using Optuna
-    study = optuna.create_study(direction="minimize", pruner=optuna.pruners.MedianPruner(
-        n_startup_trials=3, n_warmup_steps=30)
+    study_name = "opt"
+    storage_name = f"sqlite:///{study_name}.db"
+    study = optuna.create_study(direction="minimize", 
+        pruner=optuna.pruners.MedianPruner(n_startup_trials=3, n_warmup_steps=30),
+        study_name=study_name,
+        storage=storage_name,
+        load_if_exists=True,
     )
     study.optimize(lambda trial: objective(trial), n_trials=16) # n_jobs for multi_processing
     print("Optimization finished")
