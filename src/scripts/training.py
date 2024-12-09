@@ -42,8 +42,8 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "device_type": device,
         "gpu_number": 0,
         "epochs": epochs,
-        "batch_size": 16,
-        "learning_rate": 1e-4,
+        "batch_size": 1,
+        "learning_rate": 3e-5,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
@@ -97,7 +97,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         reload_dataloaders_every_n_epochs=1,
     )
 
-    trainer.fit(model=model)    
+    trainer.fit(model=model, ckpt_path="optuna_logs/balanced/version_0/checkpoints/epoch=127-step=1214592.ckpt")    
     print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
 
@@ -105,6 +105,6 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
-    trainer = run_training(epochs=128, epoch_smote=128, undersampling_rate=0.5, augmentation_rate=1.0, smote_rate=0.0, binary=True, augment=True)
+    trainer = run_training(epochs=128, epoch_smote=128, undersampling_rate=0.74, augmentation_rate=0.86, smote_rate=0.0, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
