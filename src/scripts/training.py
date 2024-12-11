@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
 from lightning.pytorch.strategies import DDPStrategy
+from lightning.pytorch.callbacks import StochasticWeightAveraging
 
 # import own files
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -113,5 +114,3 @@ if __name__ == "__main__":
     }
 
     trainer = run_training(parameters)
-    # run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
-    # run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
