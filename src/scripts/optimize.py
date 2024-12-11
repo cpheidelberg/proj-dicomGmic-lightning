@@ -15,12 +15,12 @@ from src.scripts import training
 
 def objective(trial):
     # Define hyperparameter search space
-    # parameters["batch_size"] = trial.suggest_categorical("batch_size", [1,2,4,8,16,32])
-    undersampling_rate = trial.suggest_float("undersampling_rate", 0, 1)
-    augmentation_rate = trial.suggest_float("augmentation_rate", 0, 1)
+    parameters["batch_size"] = trial.suggest_categorical("batch_size", [1,2,4,8,16,32])
+    # undersampling_rate = trial.suggest_float("undersampling_rate", 0, 1)
+    # augmentation_rate = trial.suggest_float("augmentation_rate", 0, 1)
     
     # Create and train the LightningModule
-    trainer = training.run_training(epochs=32, epoch_smote=32, undersampling_rate=undersampling_rate, augmentation_rate=augmentation_rate, smote_rate=0.0, binary=True, augment=True)
+    trainer = training.run_training(epochs=32, epoch_smote=32, undersampling_rate=1.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
 
     # Return the metric to be optimized (e.g., validation loss)
     best_val_loss = trainer.callback_metrics["val_loss"].item()

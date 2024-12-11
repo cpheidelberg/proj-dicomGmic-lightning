@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import random_split
 import lightning.pytorch as pl
 from lightning.pytorch.strategies import DDPStrategy
+from lightning.pytorch.callbacks import StochasticWeightAveraging
 
 # import own files
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +44,7 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "gpu_number": 0,
         "epochs": epochs,
         "batch_size": 1,
-        "learning_rate": 3e-5,
+        "learning_rate": 1e-4,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
@@ -94,10 +95,12 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         logger=logger,
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
+        callbacks=[StochasticWeightAveraging(swa_lrs=1e-2)],
         reload_dataloaders_every_n_epochs=1,
     )
 
-    trainer.fit(model=model, ckpt_path="optuna_logs/balanced/version_0/checkpoints/epoch=127-step=1214592.ckpt")    
+    # trainer.fit(model=model, ckpt_path="optuna_logs/balanced/version_0/checkpoints/epoch=127-step=1214592.ckpt")    
+    trainer.fit(model=model)
     print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
 
@@ -105,6 +108,6 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
 
 if __name__ == "__main__":
-    trainer = run_training(epochs=128, epoch_smote=128, undersampling_rate=0.74, augmentation_rate=0.86, smote_rate=0.0, binary=True, augment=True)
+    trainer = run_training(epochs=256, epoch_smote=256, undersampling_rate=1.0, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)
