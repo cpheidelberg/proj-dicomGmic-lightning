@@ -14,7 +14,49 @@ from src.modeling.trainer import GMICTrainer
 from src.data_loading.dataset import ClassificationImages
 
 
-def run_training(epochs: int, undersampling_rate: float, augmentation_rate: float, smote_rate: float, epoch_smote: int, binary: bool, augment: bool):
+def run_training(parameters):
+
+    dataset = ClassificationImages(parameters["data_dirs"], parameters["undersampling_rate"], parameters["augmentation_rate"], parameters["binary"], parameters["augment"])
+    data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
+
+    # Training
+    model = GMICTrainer(
+        parameters=parameters,
+        image_class_weights=dataset.class_weights(),
+        dataset_train=data_train,
+        dataset_valid=data_valid,
+        dataset_test=data_test,
+        model_path=parameters["model_path"]
+    )
+
+    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
+
+    trainer = pl.Trainer(
+        fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+        # limit_val_batches=0,
+        # num_sanity_val_steps=0,
+        max_epochs=parameters["epochs"], 
+        # gradient_clip_val=1e-3,
+        accelerator=parameters["device_type"], 
+        # devices="auto",
+        # devices=[parameters["gpu_number"]],
+        devices=[1,2],
+        logger=logger,
+        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
+        # callbacks=[ModelSummary(max_depth=2)],
+        reload_dataloaders_every_n_epochs=1,
+    )
+
+    # trainer.fit(model=model, ckpt_path="models/epoch=127-step=1214592.ckpt")    
+    trainer.fit(model=model)    
+    print("Training finished at: ", time.ctime())
+    # trainer.test(model=model)
+
+    return trainer
+
+
+if __name__ == "__main__":
+
     # check if GPU is available
     if torch.cuda.is_available():
         print(f"{torch.cuda.device_count()} GPUs are available")
@@ -27,37 +69,38 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
 
     # set path variables
     model_path = 'models/'
-
-    data_dirs = ['/mnt/sds-hd/sd24f004/FFDM/demd/extracted'] #, '/home/ubuntu/gmic/omidb_data']
-    image_path = '/mnt/sds-hd/sdsHD/sd24f004/FFDM/demd/extracted'
-    output_path = '/mnt/sds-hd/sdsHD/sd24f004/FFDM/demd/predicted'
+    data_dirs = ['../../sdsHD/sd24f004/FFDM/demd/extracted']
+    image_path = '../../sdsHD/sdsHD/sd24f004/FFDM/demd/extracted'
+    output_path = '../../sdsHD/sdsHD/sd24f004/FFDM/demd/predicted'
     segmentation_path = os.path.join(output_path, 'segmentation')
-
-    dataset = ClassificationImages(data_dirs, undersampling_rate, augmentation_rate, binary, augment)
-    data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": epochs,
+        "epochs": 256,
         "batch_size": 1,
         "learning_rate": 3e-5,
+        "regularization": 1e-4,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
 
-        "undersampling_rate": undersampling_rate,
-        "augmentation_rate": augmentation_rate,
-        "smote_rate": smote_rate,
-        "epoch_smote": epoch_smote,
+        "undersampling_rate": 1.0,
+        "augmentation_rate": 0.0,
+        "binary": True,
+        "augment": True,
+        "smote_rate": 0.0,
+        "epoch_smote": 256,
 
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
+        "data_dirs": data_dirs,
         "image_path": image_path,
         "segmentation_path": segmentation_path,
         "output_path": output_path,
+        "model_path": model_path,
 
         # model related hyper-parameters
         "cam_size": (46, 30),
@@ -65,46 +108,10 @@ def run_training(epochs: int, undersampling_rate: float, augmentation_rate: floa
         "crop_shape": (256, 256), # patch size
         "percent_t": 0.03,
         "post_processing_dim": 256,
-        "num_classes": len(dataset.labels), # output classes
+        "num_classes": 2, # output classes (=len(dataset.labels))
         "use_v1_global": False,
     }
 
-    # Training
-    model = GMICTrainer(
-        parameters=parameters,
-        image_class_weights=dataset.class_weights(),
-        dataset_train=data_train,
-        dataset_valid=data_valid,
-        dataset_test=data_test,
-        model_path=model_path
-    )
-
-    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
-
-    trainer = pl.Trainer(
-        fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-        # limit_val_batches=0,
-        # num_sanity_val_steps=0,
-        max_epochs=parameters["epochs"], 
-        # gradient_clip_val=1e-3,
-        accelerator=device, 
-        devices="auto",
-        # devices=[parameters["gpu_number"]],
-        # devices=[1,2],
-        logger=logger,
-        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
-        # callbacks=[ModelSummary(max_depth=2)],
-        reload_dataloaders_every_n_epochs=1,
-    )
-
-    trainer.fit(model=model, ckpt_path="optuna_logs/balanced/version_0/checkpoints/epoch=127-step=1214592.ckpt")    
-    print("Training finished at: ", time.ctime())
-    # trainer.test(model=model)
-
-    return trainer
-
-
-if __name__ == "__main__":
-    trainer = run_training(epochs=128, epoch_smote=128, undersampling_rate=0.74, augmentation_rate=0.86, smote_rate=0.0, binary=True, augment=True)
+    trainer = run_training(parameters)
     # run_training(epochs=8, epoch_smote=4, undersampling_rate=0.0, augmentation_rate=0.0, smote_rate=0.5, binary=True, augment=True)
     # run_training(epochs=8, epoch_smote=8, undersampling_rate=0.5, augmentation_rate=0.0, smote_rate=0.0, binary=True, augment=True)

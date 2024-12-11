@@ -102,6 +102,8 @@ class ClassificationImages(Dataset):
 
         y = np.zeros(len(self.images), dtype=np.float32)
         y[label] = 1.0
+        path = self.images[label][position]
+        # return x, y, path
         return x, y
 
 

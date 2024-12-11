@@ -174,11 +174,11 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    checkpoint_path = 'tb_logs/balanced/version_0/checkpoints/epoch=7-step=31664.ckpt' # 2 classes
+    checkpoint_path = 'models/epoch=127-step=1214592.ckpt' # 2 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
     
-    image_dir = '/home/ubuntu/gmic/vindrmammo_data'
-    output_path = '/home/ubuntu/gmic/predict_output'
+    image_dir = 'data/OMI-DB_sample_binary'
+    output_path = 'output/prediction'
     segmentation_path = os.path.join(output_path, 'segmentation')
 
     # set hyperparameters

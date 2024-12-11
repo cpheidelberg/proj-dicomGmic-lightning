@@ -1,8 +1,0 @@
-The dicom_exams folder with a set of 3 exams was too large to be uploaded. 
-Thus, a .zip file was created and has to be integrated into this folder sample_data. 
-It can be downloaded here: https://nextcloud.toca.com/s/sqkCtnweCZNCBg7
-
-Following exams are included:
-- DBT-P00032 (Label: Normal)
-- DBT-P02919 (Label: Benign) (=Normal?)
-- DBT-P00538 (Label: Cancer) (=Malignant)

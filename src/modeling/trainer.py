@@ -37,7 +37,7 @@ class GMICTrainer(pl.LightningModule):
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
-
+        
         # metrics
         self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
         self.train_f1 = BinaryF1Score()
@@ -103,6 +103,7 @@ class GMICTrainer(pl.LightningModule):
     def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
         y_global, h_crops, global_vec = self.gmic.forward_cnn(image)
         y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
+        saliency_map = self.gmic.saliency_map
 
         # Save the feature vectors in the last epoch before switching to SMOTE
         if self._training_on_FV_next():
@@ -111,12 +112,15 @@ class GMICTrainer(pl.LightningModule):
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
-        loss = loss_fusion + loss_global + loss_local
+        loss_reg = torch.nn.MSELoss()(saliency_map[0,0], saliency_map[0,1])
+        # loss = loss_fusion + loss_global + loss_local
+        loss = loss_global + loss_local + self.hparams.regularization * loss_reg
 
         self._metrics('train', y_fusion, y)
         self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
         self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
         self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
+        self.log('train_loss_reg', loss_reg, on_epoch=True, sync_dist=True)
         self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
@@ -184,8 +188,8 @@ class GMICTrainer(pl.LightningModule):
     
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
-        img, y = batch
-        print(y)
+        img, y, path = batch
+        print(f"Predicting image {batch_idx} with classifiction {y} at path {path}")
 
         true_segs = [None for _ in range(len(y[0]))]
 
