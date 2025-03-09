@@ -174,7 +174,7 @@ if __name__ == "__main__":
         device = "cpu"
 
     # set path variables
-    checkpoint_path = 'models/epoch=127-step=1214592.ckpt' # 2 classes
+    checkpoint_path = 'GMIC/y8zglucn/checkpoints/epoch=255-step=33024.ckpt' # 2 classes
     # model_path = 'tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt' # 6 classes
     
     image_dir = 'data/OMI-DB_sample_binary'
@@ -215,7 +215,10 @@ if __name__ == "__main__":
     gmic_trainer = trainer.GMICTrainer(parameters=parameters, image_class_weights=data.class_weights(), dataset_predict=data)
 
     if device == "gpu":
-        pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device, devices=[parameters["gpu_number"]])
+        pl_trainer = pl.Trainer(fast_dev_run=True, 
+                                accelerator=device, 
+                                devices=[parameters["gpu_number"]]
+                        )
     else:
         pl_trainer = pl.Trainer(fast_dev_run=True, accelerator=device)
         

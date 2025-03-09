@@ -18,8 +18,8 @@ from src.data_loading.dataset import ClassificationImages
 def run_training(parameters):
 
     dataset = ClassificationImages(parameters["data_dirs"], parameters["undersampling_rate"], parameters["augmentation_rate"], parameters["binary"], parameters["augment"])
+    parameters["class_names"] = dataset.labels
     data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
-
     # Training
     model = GMICTrainer(
         parameters=parameters,
@@ -27,31 +27,33 @@ def run_training(parameters):
         dataset_train=data_train,
         dataset_valid=data_valid,
         dataset_test=data_test,
+        dataset_predict=data_test,
         model_path=parameters["model_path"]
     )
 
-    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
+    # logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
+    logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
 
     trainer = pl.Trainer(
-        fast_dev_run=True, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
+        fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
         # limit_val_batches=0,
         # num_sanity_val_steps=0,
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=parameters["device_type"], 
         # devices="auto",
-        # devices=[parameters["gpu_number"]],
-        devices=[1,2],
+        devices=[parameters["gpu_number"]],
         logger=logger,
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
         reload_dataloaders_every_n_epochs=1,
     )
 
-    # trainer.fit(model=model, ckpt_path="models/epoch=127-step=1214592.ckpt")    
+    # trainer.fit(model=model, ckpt_path="GMIC/y8zglucn/checkpoints/epoch=255-step=33024.ckpt")    
     trainer.fit(model=model)    
     print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
+    # trainer.predict(model=model, ckpt_path="optuna_logs/balanced/version_7/checkpoints/epoch=15-step=112.ckpt")
 
     return trainer
 
@@ -71,8 +73,9 @@ if __name__ == "__main__":
     # set path variables
     model_path = 'models/'
     data_dirs = ['../../sdsHD/sd24f004/FFDM/demd/extracted']
-    image_path = '../../sdsHD/sdsHD/sd24f004/FFDM/demd/extracted'
-    output_path = '../../sdsHD/sdsHD/sd24f004/FFDM/demd/predicted'
+    image_path = '../../sdsHD/sd24f004/FFDM/demd/extracted'
+    # output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
+    output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
     segmentation_path = os.path.join(output_path, 'segmentation')
 
     # set hyperparameters
@@ -80,8 +83,8 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 256,
-        "batch_size": 1,
+        "epochs": 128,
+        "batch_size": 4,
         "learning_rate": 3e-5,
         "regularization": 1e-4,
         "pretrained": True,
@@ -102,6 +105,7 @@ if __name__ == "__main__":
         "segmentation_path": segmentation_path,
         "output_path": output_path,
         "model_path": model_path,
+        "turn_on_visualization": True,
 
         # model related hyper-parameters
         "cam_size": (46, 30),

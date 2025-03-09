@@ -1,8 +1,10 @@
 # exclude large data folder for manual editing
 *_data*/
-*_output*/
+data/
+*output*/
 *.h5
 balanced_top6/
+models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -25,6 +27,10 @@ lib64/
 parts/
 sdist/
 tb_logs*/
+lightning_logs*/
+optuna_logs*/
+GMIC/
+wandb/
 var/
 wheels/
 share/python-wheels/

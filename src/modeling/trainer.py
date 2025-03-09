@@ -38,7 +38,6 @@ class GMICTrainer(pl.LightningModule):
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
         
-        # metrics
         self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
         self.train_f1 = BinaryF1Score()
 
@@ -188,8 +187,8 @@ class GMICTrainer(pl.LightningModule):
     
     def predict_step(self, batch, batch_idx):
         """Predict the output for a single image."""
-        img, y, path = batch
-        print(f"Predicting image {batch_idx} with classifiction {y} at path {path}")
+        img, y = batch
+        print(f"Predicting image {batch_idx} with classifiction {y}")
 
         true_segs = [None for _ in range(len(y[0]))]
 
