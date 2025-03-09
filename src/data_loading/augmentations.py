@@ -272,7 +272,10 @@ def random_augmentation_best_center(image, input_size, random_number_generator, 
         return sampled_joint_image[:, :, 0], sampled_joint_image[:, :, 1:]
 
 
-_aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), p=0.3), alb.RandomBrightnessContrast(p=0.3), alp.ToTensorV2()])
+_aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), scale=(0.95,1) p=0.3), 
+                    alb.RandomBrightnessContrast(brightness_limit=(0.1, 0.1), contrast_limit=(0.1, 0.1), p=0.3), 
+                    alp.ToTensorV2()
+                ])
 def augment_image(x, augment: bool):
     if augment:
         return _aug(image=x)['image']
