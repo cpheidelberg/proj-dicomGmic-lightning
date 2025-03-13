@@ -25,6 +25,7 @@ class GMICTrainer(pl.LightningModule):
         if parameters["pretrained"]:
             if "model_idx" in parameters: # use a pretrained model
                 checkpoint_path = os.path.join(model_path, "sample_model_" + str(parameters["model_idx"]) + ".p")
+                print("******************** our path "+ checkpoint_path)
             elif model_path: # use a self trained model
                 checkpoint_path = model_path
 
@@ -86,6 +87,16 @@ class GMICTrainer(pl.LightningModule):
             weights = self.feature_vectors.class_weights()
             self.criterion = torch.nn.BCELoss(torch.FloatTensor([weights]).to(device), reduction='sum')
 
+
+    def on_after_backward(self):
+        """Log gradient norms"""
+        total_norm = 0
+        for p in self.parameters():
+            if p.grad is not None:
+                total_norm += p.grad.data.norm(2).item() ** 2
+        total_norm = total_norm ** 0.5
+        self.log("gradient_norm", total_norm, on_step=True, on_epoch=True, sync_dist=True)
+        
 
     def forward(self, image):
         y_fusion, y_global, y_local = self.gmic.forward(image)
@@ -202,6 +213,7 @@ class GMICTrainer(pl.LightningModule):
             patch_locations = self.gmic.patch_locations
             patch_img = self.gmic.patches
             patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            os.makedirs("visualization", exist_ok=True)
             save_dir = os.path.join(self.hparams.output_path, f"visualization/{batch_idx}.png")
             predict.visualize_example(img_numpy, saliency_maps, true_segs,
                         patch_locations, patch_img, patch_attns,
