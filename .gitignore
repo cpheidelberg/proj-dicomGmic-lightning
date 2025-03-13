@@ -1,6 +1,8 @@
 # exclude large data folder for manual editing
 *_data*/
 data/
+segmentation*/
+visualization/
 *output*/
 *.h5
 balanced_top6/

@@ -51,9 +51,9 @@ def run_training(parameters):
 
     # trainer.fit(model=model, ckpt_path="GMIC/y8zglucn/checkpoints/epoch=255-step=33024.ckpt")    
     trainer.fit(model=model)    
-    print("Training finished at: ", time.ctime())
+    # print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
-    # trainer.predict(model=model, ckpt_path="optuna_logs/balanced/version_7/checkpoints/epoch=15-step=112.ckpt")
+    # trainer.predict(model=model, ckpt_path="GMIC/0veifs4j/checkpoints/epoch=255-step=98816.ckpt")
 
     return trainer
 
@@ -72,27 +72,31 @@ if __name__ == "__main__":
 
     # set path variables
     model_path = 'models/'
-    data_dirs = ['../../sdsHD/sd24f004/FFDM/demd/extracted']
-    image_path = '../../sdsHD/sd24f004/FFDM/demd/extracted'
+    # data_dirs = ['../../sdsHD/sd24f004/FFDM/demd/extracted']
+    # image_path = '../../sdsHD/sd24f004/FFDM/demd/extracted'
     # output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
-    output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
-    segmentation_path = os.path.join(output_path, 'segmentation')
+    data_dirs = ['/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'] #, '/home/ubuntu/gmic/omidb_data']
+    image_path = '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'
+    output_path = '' # '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/predicted/'
+    # segmentation_path = os.path.join(output_path, 'segmentation')
+    segmentation_path = os.path.join(output_path, 'segmentation_verification')
+
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 128,
-        "batch_size": 4,
-        "learning_rate": 3e-5,
+        "epochs": 256,
+        "batch_size": 64,
+        "learning_rate": 1e-5,
         "regularization": 1e-4,
         "pretrained": True,
         "fine-tuning": False,
         "model_idx": 2,
 
         "undersampling_rate": 1.0,
-        "augmentation_rate": 0.0,
+        "augmentation_rate": 0.2,
         "binary": True,
         "augment": True,
         "smote_rate": 0.0,
