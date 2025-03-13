@@ -68,6 +68,7 @@ def _standardize(image):
     # Standardizes an image in-place 
     image -= np.mean(image)
     image /= np.maximum(np.std(image), 10**(-5))
+    return image
 
 
 def adjust_brightness(image: np.ndarray) -> np.ndarray:
