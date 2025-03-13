@@ -20,7 +20,6 @@
 import cv2
 import numpy as np
 import albumentations as alb
-import albumentations.pytorch as alp
 
 import sys, os
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -271,13 +270,13 @@ def random_augmentation_best_center(image, input_size, random_number_generator, 
     else:
         return sampled_joint_image[:, :, 0], sampled_joint_image[:, :, 1:]
 
-_aug = alb.Compose([alb.RandomResizedCrop((2944, 1920), scale=(0.95, 1), p=0.2), 
-                    # alb.RandomBrightnessContrast(brightness_limit=(0.1, 0.1), contrast_limit=(0.1, 0.1), p=0.3), 
-                    alb.Normalize(mean=(0,0,0), std=(1,1,1)),
-                    alp.ToTensorV2()
-                ])
+
+
 def augment_image(x, augment: bool):
+    transform = alb.Compose([alb.RandomResizedCrop((2944, 1920), scale=(0.95, 1), p=0.3), 
+                        alb.RandomBrightnessContrast(brightness_limit=(0.1, 0.1), contrast_limit=(0.1, 0.1), p=0.3), 
+                    ])
     if augment:
-        return _aug(image=x)['image']
+        return transform(image=x)['image']
     else:
         return np.expand_dims(x, 0)

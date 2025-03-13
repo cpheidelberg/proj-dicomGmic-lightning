@@ -7,6 +7,8 @@ import scipy.spatial
 
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
+import albumentations as alb
+import albumentations.pytorch as alp
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = '/'.join(current_dir.split('/')[:-2])
@@ -81,6 +83,7 @@ class ClassificationImages(Dataset):
         self.offsets = [sum(self.sizes[:i]) for i in range(len(self.images) + 1)]
 
         self.augment = augment
+        self.transform = alb.Compose([alp.ToTensorV2()])
         print(self.offsets, self.sizes)
 
 
@@ -97,12 +100,14 @@ class ClassificationImages(Dataset):
         label = next(i for i in range(len(self.images)) if self.offsets[i] <= index < self.offsets[i + 1])
         position = (index - self.offsets[label]) * len(self.images[label]) // self.sizes[label]
 
-        x = loading.read_image_standardized(self.images[label][position])
+        path = self.images[label][position]
+        x = loading.read_image(path, 'float32')
         x = augmentations.augment_image(x, augment=self.augment)
+        x = loading._standardize(image=x)
+        x = self.transform(image=x)['image']
 
         y = np.zeros(len(self.images), dtype=np.float32)
         y[label] = 1.0
-        path = self.images[label][position]
         # return x, y, path
         return x, y
 
