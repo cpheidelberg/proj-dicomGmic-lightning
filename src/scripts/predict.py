@@ -51,7 +51,6 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
     subfigure.axis('off')
 
     # patch map
-    print(patch_locations)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
     subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
     subfigure.imshow(

@@ -110,7 +110,7 @@ class GMICTrainer(pl.LightningModule):
         self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
 
 
-    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor):
+    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor, idx: int):
         y_global, h_crops, global_vec = self.gmic.forward_cnn(image)
         y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
         saliency_map = self.gmic.saliency_map
@@ -132,6 +132,10 @@ class GMICTrainer(pl.LightningModule):
         self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
         self.log('train_loss_reg', loss_reg, on_epoch=True, sync_dist=True)
         self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
+        
+        if idx == self.current_epoch and self.current_epoch % 10 == 0:
+            self._visualize_results(mode="train", img=image, y=y, idx=idx)
+
         return loss
 
 
@@ -157,7 +161,7 @@ class GMICTrainer(pl.LightningModule):
         if self._training_on_FV_now():
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
         else:
-            return self._train_on_image(image=x, y=y)
+            return self._train_on_image(image=x, y=y, idx=batch_idx)
 
 
     def validation_step(self, batch, batch_idx):
@@ -175,6 +179,9 @@ class GMICTrainer(pl.LightningModule):
         self._metrics('val', y_fusion, y)
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
         self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
+        
+        if batch_idx == self.current_epoch and self.current_epoch % 10 == 0:
+            self._visualize_results(mode="valid", img=img, y=y, idx=batch_idx)
 
         return loss
 
@@ -201,26 +208,10 @@ class GMICTrainer(pl.LightningModule):
         img, y = batch
         print(f"Predicting image {batch_idx} with classifiction {y}")
 
-        true_segs = [None for _ in range(len(y[0]))]
-
         # forward propagation
         _, _, y_fusion = self(img)  # Add an extra dimension for batch
-        img_numpy = img.data.cpu().numpy()
 
-        # save visualization
-        saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
-        if self.hparams.turn_on_visualization:
-            patch_locations = self.gmic.patch_locations
-            patch_img = self.gmic.patches
-            patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
-            os.makedirs("visualization", exist_ok=True)
-            save_dir = os.path.join(self.hparams.output_path, f"visualization/{batch_idx}.png")
-            predict.visualize_example(img_numpy, saliency_maps, true_segs,
-                        patch_locations, patch_img, patch_attns,
-                        save_dir, self.hparams)
-
-        # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img_numpy, saliency_maps, self.hparams.segmentation_path, f"{batch_idx}.png", self.hparams)
+        self._visualize_results(mode="predict", img=img, y=y, idx=batch_idx)
         return y_fusion
 
 
@@ -255,3 +246,25 @@ class GMICTrainer(pl.LightningModule):
         if self.predict_dataset:
             return DataLoader(self.predict_dataset, batch_size=1, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
+    
+
+    def _visualize_results(self, mode: str, img: torch.tensor, y: torch.tensor, path: str, idx: int):
+        """Save visualization of results and store polylines"""
+        img = img.data.cpu().numpy()
+        segs = [None for _ in range(len(y[0]))]
+        path = os.path.splitext(os.path.basename(path))[0]
+
+        # save visualization
+        saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
+        if self.hparams.turn_on_visualization:
+            patch_locations = self.gmic.patch_locations
+            patch_img = self.gmic.patches
+            patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
+            os.makedirs(f"visualization/{mode}", exist_ok=True)
+            save_dir = os.path.join(self.hparams.output_path, f"visualization/{mode}/{idx}_{path}.png")
+            predict.visualize_example(img, saliency_maps, segs,
+                        patch_locations, patch_img, patch_attns,
+                        save_dir, self.hparams)
+
+        # save predicted regions of interest as polyline
+        predict.save_saliency_maps(img, saliency_maps, self.hparams.segmentation_path, f"{idx}.png", self.hparams)

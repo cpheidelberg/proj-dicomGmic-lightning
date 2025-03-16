@@ -75,7 +75,7 @@ if __name__ == "__main__":
     # data_dirs = ['../../sdsHD/sd24f004/FFDM/demd/extracted']
     # image_path = '../../sdsHD/sd24f004/FFDM/demd/extracted'
     # output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
-    data_dirs = ['/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'] #, '/home/ubuntu/gmic/omidb_data']
+    data_dirs = ['/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'] #, /home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted
     image_path = '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'
     output_path = '' # '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/predicted/'
     # segmentation_path = os.path.join(output_path, 'segmentation')
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         "device_type": device,
         "gpu_number": 0,
         "epochs": 256,
-        "batch_size": 64,
+        "batch_size": 2,
         "learning_rate": 1e-5,
         "regularization": 1e-4,
         "pretrained": True,
@@ -96,9 +96,9 @@ if __name__ == "__main__":
         "model_idx": 2,
 
         "undersampling_rate": 1.0,
-        "augmentation_rate": 0.2,
+        "augmentation_rate": 0.0,
         "binary": True,
-        "augment": True,
+        "augment": False,
         "smote_rate": 0.0,
         "epoch_smote": 256,
 
