@@ -1,5 +1,6 @@
 import os
 import cv2
+import ast
 import json
 import pickle
 import numpy as np
@@ -9,69 +10,91 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 
-from matplotlib import pyplot as plt
+import torchmetrics.functional.classification as metrics
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from src.modeling import gmic as gmic
 from src.data_loading import loading
 from src.constants import VIEWS, PERCENT_T_DICT
 
 
 class ActiveLearningGMICModule(pl.LightningModule):
-    def __init__(self, parameters):
+    def __init__(self, parameters, num_labels=2):
         """
         Lightning Modul, das das ursprüngliche ActiveLearningGMIC-Modell einbettet.
         """
         super().__init__()
         self.save_hyperparameters(parameters)
-        self.model = gmic.GMIC(parameters)
+        self.gmic = gmic.GMIC(parameters)
+        self.criterion = torch.nn.BCELoss(torch.FloatTensor([num_labels]) if num_labels else None, reduction='sum')
 
     def forward(self, x):
-        _ = self.model(x)
-        return self.model.saliency_map
+        y_fusion, y_global, y_local = self.gmic.forward(x)
+        return y_global, y_local, y_fusion
 
     def training_step(self, batch, batch_idx):
         x = batch["image"]
-        y = batch["mask"]
-        pred = self.forward(x)
+        y = batch["label"]
+        seg = batch["mask"]
+        y_global, y_local, y_fusion = self.forward(x)
 
-        loss = self.compute_loss(pred, y)
-        self.log("train_loss", loss, on_step=True, on_epoch=True)
+        loss_fusion = self.criterion(y_fusion, y)
+        loss_global = self.criterion(y_global, y)
+        loss_local = self.criterion(y_local, y)
+        loss_seg = torch.nn.MSELoss()(self.gmic.saliency_map[:, torch.argmax(y).item()], seg)
+        loss_reg = torch.sum(torch.abs(self.gmic.saliency_map))
+        loss = loss_global + loss_local + loss_seg + self.hparams.regularization * loss_reg
+
+        y = y.to(torch.int64)
+        self.log(f'train_acc', metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f'train_f1',  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f'train_auc', metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
+        self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
+        self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
+        self.log('train_loss_seg', loss_seg, on_step=True, on_epoch=True)
+        self.log('train_loss_reg', loss_reg, on_epoch=True, sync_dist=True)
+        self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
 
         if batch_idx == self.current_epoch:
-            original_img = x[0].detach().cpu().numpy().squeeze()
-            pred_saliency = pred[0].detach().cpu().numpy().squeeze()
-            gt_saliency = y[0].detach().cpu().numpy().squeeze()
-
-            logger.log_image(key="original_mammogram", image=original_img, caption="Original Mammogram")
-            logger.log_image(key="predicted_saliency", image=pred_saliency, caption="Predicted Saliency Map")
-            logger.log_image(key="ground_truth_saliency", image=gt_saliency, caption="Ground Truth Saliency Map")
+            self.log_saliency_map(x, self.gmic.saliency_map, seg)
 
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.5)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
         return optimizer
-    
-    def compute_loss(self, predicted_saliency_map, true_saliency_map):
-        loss = F.mse_loss(predicted_saliency_map, true_saliency_map)
-        return loss
 
     def save_model_weights(self, save_path):
         torch.save(self.state_dict(), save_path)
 
 
+    def log_saliency_map(self, x, pred, y):
+        original_img = x[0].detach().cpu().numpy().squeeze()
+        pred_saliency = pred[0].detach().cpu().numpy()
+        gt_saliency = y[0].detach().cpu().numpy()
+        logger.log_image(key="original_mammogram", images=[original_img], caption=["Original Mammogram"])
+        logger.log_image(key="healthy_saliency", images=[pred_saliency[0]], caption=["Healthy Saliency Map"])
+        logger.log_image(key="suspicious_saliency", images=[pred_saliency[1]], caption=["Suspicious Saliency Map"])
+        logger.log_image(key="ground_truth_saliency", images=[gt_saliency], caption=["Ground Truth Saliency Map"])
+
+
 class ActiveLearningDataset(Dataset):
-    def __init__(self, exam_list_path, image_path, csv_path):
+    def __init__(self, exam_list_path, image_path, csv_path, binary=False):
         """
-        Lädt die Exam-Liste und erstellt für jeden Eintrag pro View einen Datensatz.
+        Load csv annotations with region of interest as rectangular bounding boxes. 
+        Load exam list with converted image paths and link to annotations.
         """
         super().__init__()
+        self.binary = binary
         self.exam_list = self.load_exam_list(exam_list_path)
         self.image_path = image_path
         self.csv_path = csv_path
-        self.csv_annotations = pd.read_csv(csv_path)
+        self.csv_annotations = pd.read_csv(csv_path, converters={'finding_categories': ast.literal_eval})
         self.csv_annotations = self.csv_annotations[self.csv_annotations["xmin"].notna()]
 
         self.samples = []
@@ -91,8 +114,15 @@ class ActiveLearningDataset(Dataset):
         self.samples = [sample for sample in self.samples 
                         if (sample["study_id"], sample["image_id"]) in valid_keys]
 
+        if binary:
+            self.labels = ['No Finding', 'Suspicious']
+        else:
+            self.labels = ["No Finding", "Mass", "Suspicious Calcification", "Focal Asymmetry", "Architectural Distortion"]
+
+
     def __len__(self):
         return len(self.samples)
+
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
@@ -107,15 +137,16 @@ class ActiveLearningDataset(Dataset):
         true_saliency_map = self.load_annotation_layer(annotation_row.iloc[0], H, W)
         new_saliency_map = cv2.resize(true_saliency_map, (30, 46))
 
-        fig, ax = plt.subplots(1,2, constrained_layout=True)
-        ax[0].imshow(true_saliency_map)
-        ax[1].imshow(new_saliency_map)
-        plt.savefig("saliency_map.png")
-
-        mask = np.array([new_saliency_map, new_saliency_map])
+        mask = np.array(new_saliency_map)
         mask_tensor = torch.tensor(mask, dtype=torch.float32)
 
-        return {"image": image_tensor, "mask": mask_tensor}
+        label = annotation_row["finding_categories"].iloc[0][0]
+        y = np.zeros(len(self.labels), dtype=np.float32)
+        if self.binary:
+            label = "Suspicious" if label != "No Finding" else "No Finding"
+        y[self.labels.index(label)] = 1
+
+        return {"image": image_tensor, "label": y, "mask": mask_tensor}
     
 
     def load_annotation_layer(self, row, height, width):
@@ -129,7 +160,7 @@ class ActiveLearningDataset(Dataset):
         xmax = int(float(row['xmax']))
         ymax = int(float(row['ymax']))
 
-        cv2.rectangle(mask, (xmin, ymin), (xmax, ymax), 255, 2)
+        cv2.rectangle(mask, (ymax, xmax), (ymin, xmin), 255, 2)
 
         return mask
 
@@ -141,7 +172,7 @@ class ActiveLearningDataset(Dataset):
 
 
 def get_dataloader(exam_list_path, image_path, csv_path, batch_size=4, shuffle=True, num_workers=4):
-    dataset = ActiveLearningDataset(exam_list_path, image_path, csv_path)
+    dataset = ActiveLearningDataset(exam_list_path, image_path, csv_path, binary=True)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 
 
@@ -150,6 +181,11 @@ if __name__ == "__main__":
     parameters = {
         "device_type": "gpu",
         "gpu_number": 0,
+        "epochs": 128,
+        "batch_size": 4,
+        "learning_rate": 3e-5,
+        "regularization": 1e-4,
+
         "max_crop_noise": (100, 100),
         "max_crop_size_noise": 100,
         "image_path": "/home/pb438/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/images",
@@ -168,14 +204,17 @@ if __name__ == "__main__":
 
     exam_list_path = "/home/pb438/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl"
     csv_path = "/home/pb438/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/finding_annotations.csv"
-    dataloader = get_dataloader(exam_list_path, parameters["image_path"], csv_path, batch_size=4, num_workers=10)
+    dataloader = get_dataloader(exam_list_path, parameters["image_path"], csv_path, batch_size=parameters["batch_size"], num_workers=10)
     
     logger = pl.loggers.WandbLogger(project="gmic")
-    model = ActiveLearningGMICModule(parameters)
+    # logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
+
+    model = ActiveLearningGMICModule(parameters, num_labels=len(dataloader.dataset.labels))
 
     trainer = pl.Trainer(
-        max_epochs=128, 
+        max_epochs=parameters["epochs"], 
         devices="auto",
+        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         logger=logger,
     )
     trainer.fit(model, dataloader)
