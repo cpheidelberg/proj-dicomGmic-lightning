@@ -6,10 +6,8 @@ import lightning.pytorch as pl
 from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import StochasticWeightAveraging
 
-# import own files
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = "/".join(current_dir.split("/")[:-2])
-sys.path.append(parent_dir)
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from src.modeling.trainer import GMICTrainer
 from src.data_loading.dataset import ClassificationImages
@@ -20,6 +18,11 @@ def run_training(parameters):
     dataset = ClassificationImages(parameters["data_dirs"], parameters["undersampling_rate"], parameters["augmentation_rate"], parameters["binary"], parameters["augment"])
     parameters["class_names"] = dataset.labels
     data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
+    if parameters["binary"]:
+        assert parameters["num_classes"] == 2, "Binary classification is selected in model settings."
+    else:
+        assert parameters["num_classes"] == len(dataset.labels), "Number of classes does not match number of dataset labels."
+
     # Training
     model = GMICTrainer(
         parameters=parameters,
@@ -32,7 +35,7 @@ def run_training(parameters):
     )
 
     # logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
-    logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
+    # logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
 
     trainer = pl.Trainer(
         fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
@@ -43,7 +46,7 @@ def run_training(parameters):
         accelerator=parameters["device_type"], 
         # devices="auto",
         devices=[parameters["gpu_number"]],
-        logger=logger,
+        # logger=logger,
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
         reload_dataloaders_every_n_epochs=1,
@@ -83,9 +86,9 @@ if __name__ == "__main__":
         # training related hyper-parameters
         "device_type": device,
         "gpu_number": 0,
-        "epochs": 128,
-        "batch_size": 4,
-        "learning_rate": 3e-5,
+        "epochs": 256,
+        "batch_size": 64,
+        "learning_rate": 1e-5,
         "regularization": 1e-4,
         "pretrained": True,
         "fine-tuning": False,

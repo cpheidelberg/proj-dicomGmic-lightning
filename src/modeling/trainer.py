@@ -37,9 +37,6 @@ class GMICTrainer(pl.LightningModule):
         self.valid_dataset = dataset_valid
         self.test_dataset = dataset_test
         self.predict_dataset = dataset_predict
-        
-        self.train_acc = Accuracy(task="binary", num_classes=self.hparams.num_classes)
-        self.train_f1 = BinaryF1Score()
 
 
     def init_pretrained_weights(self, state: dict[str, object]):
@@ -111,8 +108,7 @@ class GMICTrainer(pl.LightningModule):
         loss_fusion = self.criterion(y_fusion, y)
         loss_global = self.criterion(y_global, y)
         loss_local = self.criterion(y_local, y)
-        loss_reg = torch.nn.MSELoss()(saliency_map[0,0], saliency_map[0,1])
-        # loss = loss_fusion + loss_global + loss_local
+        loss_reg = torch.sum(torch.abs(saliency_map))
         loss = loss_global + loss_local + self.hparams.regularization * loss_reg
 
         self._metrics('train', y_fusion, y)
