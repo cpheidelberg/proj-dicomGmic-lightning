@@ -247,7 +247,7 @@ class GMICTrainer(pl.LightningModule):
         return None
     
 
-    def _visualize_results(self, mode: str, img: torch.tensor, y: torch.tensor, path: str, idx: int):
+    def _visualize_results(self, mode: str, img: torch.tensor, y: torch.tensor, idx: int, path: str = ""):
         """Save visualization of results and store polylines"""
         img = img.data.cpu().numpy()
         segs = [None for _ in range(len(y[0]))]
