@@ -6,6 +6,7 @@ import lightning.pytorch as pl
 from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy, BinaryF1Score
 import torchmetrics.functional.classification as metrics
+import wandb
 
 from src.modeling import gmic
 from src.scripts import predict
@@ -133,7 +134,7 @@ class GMICTrainer(pl.LightningModule):
         self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
         
         if idx == self.current_epoch and self.current_epoch % 10 == 0:
-            self._visualize_results(mode="train", img=image, y=y, idx=idx)
+            self._visualize_results(mode="train", img=image, y=y, idx=idx, log=True)
 
         return loss
 
@@ -180,7 +181,7 @@ class GMICTrainer(pl.LightningModule):
         self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
         
         if batch_idx == self.current_epoch and self.current_epoch % 10 == 0:
-            self._visualize_results(mode="valid", img=img, y=y, idx=batch_idx)
+            self._visualize_results(mode="valid", img=img, y=y, idx=batch_idx, log=True)
 
         return loss
 
@@ -210,7 +211,7 @@ class GMICTrainer(pl.LightningModule):
         # forward propagation
         _, _, y_fusion = self(img)  # Add an extra dimension for batch
 
-        self._visualize_results(mode="predict", img=img, y=y, idx=batch_idx)
+        self._visualize_results(mode="predict", img=img, y=y, idx=batch_idx, path=self.hparams.output_path)
         return y_fusion
 
 
@@ -247,11 +248,10 @@ class GMICTrainer(pl.LightningModule):
         return None
     
 
-    def _visualize_results(self, mode: str, img: torch.tensor, y: torch.tensor, idx: int, path: str = ""):
+    def _visualize_results(self, mode: str, img: torch.tensor, y: torch.tensor, idx: int, path: str = None, log = False):
         """Save visualization of results and store polylines"""
         img = img.data.cpu().numpy()
         segs = [None for _ in range(len(y[0]))]
-        path = os.path.splitext(os.path.basename(path))[0]
 
         # save visualization
         saliency_maps = self.gmic.saliency_map.data.cpu().numpy()
@@ -259,11 +259,15 @@ class GMICTrainer(pl.LightningModule):
             patch_locations = self.gmic.patch_locations
             patch_img = self.gmic.patches
             patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
-            os.makedirs(f"visualization/{mode}", exist_ok=True)
+        if log:
+            figure = predict.visualize_example(img, saliency_maps, segs, patch_locations, patch_img, patch_attns, self.hparams)
+            self.logger.log_image(key=f"{mode}_visualize", images=[wandb.Image(figure)])
+        if path is not None:
+            # path = os.path.splitext(os.path.basename(path))[0]
             save_dir = os.path.join(self.hparams.output_path, f"visualization/{mode}/{idx}_{path}.png")
-            predict.visualize_example(img, saliency_maps, segs,
-                        patch_locations, patch_img, patch_attns,
-                        save_dir, self.hparams)
+            os.makedirs(f"visualization/{mode}", exist_ok=True)
+            figure = predict.visualize_example(img, saliency_maps, segs, patch_locations, patch_img, patch_attns, self.hparams, save_dir)
+            predict.save_saliency_maps(img, saliency_maps, self.hparams.segmentation_path, f"{idx}.png", self.hparams)
+
 
         # save predicted regions of interest as polyline
-        predict.save_saliency_maps(img, saliency_maps, self.hparams.segmentation_path, f"{idx}.png", self.hparams)
