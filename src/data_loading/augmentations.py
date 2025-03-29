@@ -273,10 +273,11 @@ def random_augmentation_best_center(image, input_size, random_number_generator, 
 
 
 def augment_image(x, augment: bool):
-    transform = alb.Compose([alb.RandomResizedCrop((2944, 1920), scale=(0.95, 1), p=0.3), 
-                        alb.RandomBrightnessContrast(brightness_limit=(0.1, 0.1), contrast_limit=(0.1, 0.1), p=0.3), 
-                    ])
+    transform = alb.Compose([
+        alb.RandomResizedCrop((2944, 1920), scale=(0.95, 1), p=0.3), 
+        alb.RandomBrightnessContrast(brightness_limit=(0.1, 0.1), contrast_limit=(0.1, 0.1), p=0.3), 
+    ])
     if augment:
         return transform(image=x)['image']
     else:
-        return np.expand_dims(x, 0)
+        return x
