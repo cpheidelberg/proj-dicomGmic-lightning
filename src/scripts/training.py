@@ -47,7 +47,7 @@ def run_training(parameters):
         reload_dataloaders_every_n_epochs=1,
     )
   
-    trainer.fit(model=model)    
+    trainer.fit(model=model)
     print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
     # trainer.predict(model=model, ckpt_path="GMIC/0veifs4j/checkpoints/epoch=255-step=98816.ckpt")
