@@ -42,7 +42,7 @@ def run_training(parameters):
         # gradient_clip_val=1e-3,
         accelerator=parameters["device_type"], 
         # devices="auto",
-        devices=[parameters["gpu_number"]],
+        devices=parameters["gpu_number"],
         logger=logger,
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],

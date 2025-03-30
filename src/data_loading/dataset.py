@@ -114,7 +114,6 @@ class ClassificationImages(Dataset):
         return x, y
 
 
-
 class SMOTE:
     """
     This class implements the SMOTE algorithm: https://arxiv.org/abs/1106.1813
