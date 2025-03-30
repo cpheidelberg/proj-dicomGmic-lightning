@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.classification import Accuracy, BinaryF1Score
 import torchmetrics.functional.classification as metrics
 import wandb
+from torch.utils.data.dataloader import default_collate
 
 from src.modeling import gmic
 from src.scripts import predict
@@ -150,14 +151,15 @@ class GMICTrainer(pl.LightningModule):
         self.log("train_loss_fusion", loss_fusion, on_epoch=True, sync_dist=True)
         self.log("train_loss_local", loss_local, on_epoch=True, sync_dist=True)
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log("hp_metric", loss) # Add loss to compare hyperparameters between trainings
+        self.log("hp_metric", loss, sync_dist=True) # Add loss to compare hyperparameters between trainings
         return loss
 
 
     def training_step(self, batch, batch_idx):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
+        if not batch:
+            return None
         x, y = batch
-
         if self._training_on_FV_now():
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
         else:
@@ -178,7 +180,7 @@ class GMICTrainer(pl.LightningModule):
         
         self._metrics('val', y_fusion, y)
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
-        self.log('hp_metric', loss) # Add loss to compare hyperparameters between trainings
+        self.log('hp_metric', loss, sync_dist=True) # Add loss to compare hyperparameters between trainings
         
         if batch_idx == self.current_epoch and self.current_epoch % 10 == 0:
             self._visualize_results(mode="valid", img=img, y=y, idx=batch_idx, log=True)
@@ -220,31 +222,40 @@ class GMICTrainer(pl.LightningModule):
         return optimizer
 
 
+    def custom_collate(batch):
+        """Custom collate function to handle None values in the batch"""
+        batch = [sample for sample in batch if sample is not None]
+        if len(batch) == 0:
+            return {}
+        return default_collate(batch)
+
+
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self._training_on_FV_now():
-            return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
+            return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=0, shuffle=True)
         else:
-            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=True)
+            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=0, shuffle=True)
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=0, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
+
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.predict_dataset:
-            return DataLoader(self.predict_dataset, batch_size=1, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.predict_dataset, batch_size=1, collate_fn=custom_collate, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
     
 
