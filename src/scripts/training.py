@@ -36,20 +36,17 @@ def run_training(parameters):
 
     trainer = pl.Trainer(
         fast_dev_run=False,
-        # limit_val_batches=0,
-        # num_sanity_val_steps=0,
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=parameters["device_type"], 
         # devices="auto",
-        devices=[parameters["gpu_number"]],
+        devices=parameters["gpu_number"],
         logger=logger,
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
         reload_dataloaders_every_n_epochs=1,
     )
-
-    # trainer.fit(model=model, ckpt_path="GMIC/y8zglucn/checkpoints/epoch=255-step=33024.ckpt")    
+  
     trainer.fit(model=model)    
     print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
