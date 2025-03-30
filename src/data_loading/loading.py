@@ -102,9 +102,9 @@ def optimize_contrast(image: np.ndarray) -> np.ndarray:
     image = cv2.normalize(image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
     image = image.astype(np.uint8)
 
-    image_inv = cv2.equalizeHist(image)
+    # image_inv = cv2.equalizeHist(image)
 
-    return image_inv
+    return image
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
