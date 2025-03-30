@@ -33,7 +33,6 @@ def flip_image(image, view, horizontal_flip) -> np.ndarray:
     return np.fliplr(image) if flip else image
 
 
-
 def read_image(path: str, dtype) -> np.ndarray:
     """
     Open an image and return it as an NumPy array

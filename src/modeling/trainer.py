@@ -222,7 +222,7 @@ class GMICTrainer(pl.LightningModule):
         return optimizer
 
 
-    def custom_collate(batch):
+    def custom_collate(self, batch):
         """Custom collate function to handle None values in the batch"""
         batch = [sample for sample in batch if sample is not None]
         if len(batch) == 0:
@@ -233,29 +233,29 @@ class GMICTrainer(pl.LightningModule):
     def train_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self._training_on_FV_now():
-            return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=0, shuffle=True)
+            return DataLoader(self.feature_vectors, batch_size=self.hparams.batch_size, collate_fn=self.custom_collate, num_workers=0, shuffle=True)
         else:
-            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=0, shuffle=True)
+            return DataLoader(self.train_dataset, batch_size=self.hparams.batch_size, collate_fn=self.custom_collate, num_workers=0, shuffle=True)
 
 
     def val_dataloader(self):
         """Create DataLoader for Training out of given DataSet"""
         if self.valid_dataset:
-            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=0, shuffle=False)
+            return DataLoader(self.valid_dataset, batch_size=self.hparams.batch_size, collate_fn=self.custom_collate, num_workers=0, shuffle=False)
         return None
     
 
     def test_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.test_dataset:
-            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, collate_fn=custom_collate, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.test_dataset, batch_size=self.hparams.batch_size, collate_fn=self.custom_collate, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
 
 
     def predict_dataloader(self):
         """Create DataLoader for Testing out of given DataSet"""
         if self.predict_dataset:
-            return DataLoader(self.predict_dataset, batch_size=1, collate_fn=custom_collate, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
+            return DataLoader(self.predict_dataset, batch_size=1, collate_fn=self.custom_collate, num_workers=multiprocessing.cpu_count() // 2, shuffle=False)
         return None
     
 
