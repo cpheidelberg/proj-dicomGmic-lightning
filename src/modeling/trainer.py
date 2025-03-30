@@ -112,7 +112,7 @@ class GMICTrainer(pl.LightningModule):
         self.log(f"{prefix}_auc", metrics.binary_auroc(y_hat, y), on_step=False, on_epoch=True, sync_dist=True)
 
 
-    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor, idx: int):
+    def _train_on_image(self, image: torch.Tensor, y: torch.Tensor, path: str, idx: int):
         y_global, h_crops, global_vec = self.gmic.forward_cnn(image)
         y_fusion, y_local = self.gmic.forward_classifier(global_vec, h_crops)
         saliency_map = self.gmic.saliency_map
@@ -135,7 +135,7 @@ class GMICTrainer(pl.LightningModule):
         self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
         
         if idx == self.current_epoch and self.current_epoch % 10 == 0:
-            self._visualize_results(mode="train", img=image, y=y, idx=idx, log=True)
+            self._visualize_results(mode="train", img=image, y=y, path=path, idx=idx, log=True)
 
         return loss
 
@@ -159,16 +159,16 @@ class GMICTrainer(pl.LightningModule):
         """Implementation of PyTorch training loop in Lightning called for each batch"""
         if not batch:
             return None
-        x, y = batch
+        x, y, path = batch
         if self._training_on_FV_now():
             return self._train_on_feature_vector(global_vec=x[0], h_crops=x[1], y=y)
         else:
-            return self._train_on_image(image=x, y=y, idx=batch_idx)
+            return self._train_on_image(image=x, y=y, path=path, idx=batch_idx)
 
 
     def validation_step(self, batch, batch_idx):
         """Implementation of PyTorch validation loop in Lightning called for each batch"""
-        img, y = batch
+        img, y, path = batch
 
         y_global, y_local, y_fusion = self(img)
 
@@ -183,14 +183,14 @@ class GMICTrainer(pl.LightningModule):
         self.log('hp_metric', loss, sync_dist=True) # Add loss to compare hyperparameters between trainings
         
         if batch_idx == self.current_epoch and self.current_epoch % 10 == 0:
-            self._visualize_results(mode="valid", img=img, y=y, idx=batch_idx, log=True)
+            self._visualize_results(mode="valid", img=img, y=y, path=path, idx=batch_idx, log=True)
 
         return loss
 
 
     def test_step(self, batch, batch_idx):
         """Implementation of PyTorch test loop in Lightning called for each batch"""
-        img, y = batch
+        img, y, path = batch
 
         y_global, y_local, y_fusion = self(img)
 
@@ -271,13 +271,13 @@ class GMICTrainer(pl.LightningModule):
             patch_img = self.gmic.patches
             patch_attns = self.gmic.patch_attns[0, :].data.cpu().numpy()
         if log:
-            figure = predict.visualize_example(img, saliency_maps, segs, patch_locations, patch_img, patch_attns, self.hparams)
+            figure = predict.visualize_example(img, path, saliency_maps, segs, patch_locations, patch_img, patch_attns, self.hparams)
             self.logger.log_image(key=f"{mode}_visualize", images=[wandb.Image(figure)])
         if path is not None:
             # path = os.path.splitext(os.path.basename(path))[0]
             save_dir = os.path.join(self.hparams.output_path, f"visualization/{mode}/{idx}_{path}.png")
             os.makedirs(f"visualization/{mode}", exist_ok=True)
-            figure = predict.visualize_example(img, saliency_maps, segs, patch_locations, patch_img, patch_attns, self.hparams, save_dir)
+            figure = predict.visualize_example(img, path, saliency_maps, segs, patch_locations, patch_img, patch_attns, self.hparams, save_dir)
             predict.save_saliency_maps(img, saliency_maps, self.hparams.segmentation_path, f"{idx}.png", self.hparams)
 
 

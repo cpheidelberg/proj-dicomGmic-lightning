@@ -110,8 +110,8 @@ class ClassificationImages(Dataset):
         y[label] = 1.0
 
         # Uncomment the following line to return the path as well
-        # return x, y, path
-        return x, y
+        return x, y, path
+        # return x, y
 
 
 class SMOTE:

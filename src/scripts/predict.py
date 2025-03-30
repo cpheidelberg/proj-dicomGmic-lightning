@@ -18,7 +18,7 @@ from src.modeling import trainer
 from src.data_loading import dataset
 
 
-def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, parameters, save_path=None):
+def visualize_example(img, path, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, parameters, save_path=None):
     """
     Function that visualizes the saliency maps for an example
     """
@@ -49,7 +49,7 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
             else:
                 subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_red, clim=[0.9, 1])
 
-    subfigure.set_title("input image")
+    subfigure.set_title(path)
     subfigure.axis('off')
 
     # patch map
