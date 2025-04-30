@@ -1,25 +1,17 @@
 import os
 import sys
 import cv2
-import ast
 import json
-import pickle
-import numpy as np
-from tqdm import tqdm
 import argparse
+import pickle
 import cProfile
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-import pytorch_lightning as pl
-
-import torchmetrics.functional.classification as metrics
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.strategies import DDPStrategy
-
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 # import own files
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,147 +23,143 @@ from src.data_loading import loading
 from src.constants import VIEWS, PERCENT_T_DICT
 
 
-class ActiveLearningGMICModule(pl.LightningModule):
-    def __init__(self, parameters, num_labels=2):
-        """
-        Lightning Modul, das das ursprüngliche ActiveLearningGMIC-Modell einbettet.
-        """
-        super().__init__()
-        self.save_hyperparameters(parameters)
-        self.gmic = gmic.GMIC(parameters)
-        self.criterion = torch.nn.BCELoss(torch.FloatTensor([num_labels]) if num_labels else None, reduction='sum')
+class ActiveLearningGMIC(gmic.GMIC):
+    def __init__(self, parameters):
+        super(ActiveLearningGMIC, self).__init__(parameters)
+        self.device = parameters["device_type"]
 
-    def forward(self, x):
-        y_fusion, y_global, y_local = self.gmic.forward(x)
-        return y_global, y_local, y_fusion
 
-    def training_step(self, batch, batch_idx):
-        x = batch["image"]
-        y = batch["label"]
-        seg = batch["mask"]
-        y_global, y_local, y_fusion = self.forward(x)
+    def compute_loss(self, predicted_saliency_map, true_saliency_map):
+        # Beispiel für den Mean Squared Error (MSE) als Verlustfunktion
+        loss = F.mse_loss(predicted_saliency_map, true_saliency_map)
+        return loss
+    
 
-        loss_fusion = self.criterion(y_fusion, y)
-        loss_global = self.criterion(y_global, y)
-        loss_local = self.criterion(y_local, y)
-        loss_seg = torch.nn.MSELoss()(self.gmic.saliency_map[:, torch.argmax(y).item()], seg)
-        loss_reg = torch.sum(torch.abs(self.gmic.saliency_map))
-        loss = loss_global + loss_local + loss_seg + self.hparams.regularization * loss_reg
+    def active_learning_step(self, x_original, true_saliency_map, optimizer):
+        # Umwandeln von x_original und true_saliency_map in PyTorch-Tensoren
+        x_original_tensor = torch.Tensor(x_original).to(self.device)
 
-        y = y.to(torch.int64)
-        self.log(f'train_acc', metrics.binary_accuracy(y_fusion, y), on_step=False, on_epoch=True, sync_dist=True)
-        self.log(f'train_f1',  metrics.binary_f1_score(y_fusion, y), on_step=False, on_epoch=True, sync_dist=True)
-        self.log(f'train_auc', metrics.binary_auroc(y_fusion, y), on_step=False, on_epoch=True, sync_dist=True)
-        self.log('train_loss_fusion', loss_fusion, on_epoch=True, sync_dist=True)
-        self.log('train_loss_global', loss_global, on_epoch=True, sync_dist=True)
-        self.log('train_loss_local', loss_local, on_epoch=True, sync_dist=True)
-        self.log('train_loss_seg', loss_seg, on_step=True, on_epoch=True)
-        self.log('train_loss_reg', loss_reg, on_epoch=True, sync_dist=True)
-        self.log('train_loss', loss, on_step=False, on_epoch=True, sync_dist=True)
+        # TODO: Umwandeln von self.saliency_map von einer heat map in eine Contour oder mask
+        true_saliency_map_tensor = torch.Tensor(true_saliency_map).to(self.device)
 
-        if batch_idx == self.current_epoch:
-            self.log_saliency_map(x, self.gmic.saliency_map, seg)
+        # Vorwärtsdurchlauf
+        self.forward(x_original_tensor)
+
+        # Verlust berechnen
+        loss = self.compute_loss(self.saliency_map, true_saliency_map_tensor)
+
+        # Rückwärtsdurchlauf
+        self.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        print(self.saliency_map.shape)
+        print(true_saliency_map.shape)
+
+        plt.figure(figsize=(10, 5))
+
+        plt.subplot(1, 2, 1)
+        plt.imshow(true_saliency_map[1], cmap='gray')
+        plt.title('True Saliency Map')
+        plt.axis('off')
+
+        plt.subplot(1, 2, 2)
+        plt.imshow(self.saliency_map.detach().numpy()[0,1], cmap='gray')
+        plt.title('Predicted Saliency Map')
+        plt.axis('off')
+
+        plt.show()
 
         return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.hparams.learning_rate)
-        return optimizer
+    
 
     def save_model_weights(self, save_path):
+        """Save learned weights in new file at 'save_path'"""
         torch.save(self.state_dict(), save_path)
 
 
-    def log_saliency_map(self, x, pred, y):
-        original_img = x[0].detach().cpu().numpy().squeeze()
-        pred_saliency = pred[0].detach().cpu().numpy()
-        gt_saliency = y[0].detach().cpu().numpy()
-        logger.log_image(key="original_mammogram", images=[original_img], caption=["Original Mammogram"])
-        logger.log_image(key="healthy_saliency", images=[pred_saliency[0]], caption=["Healthy Saliency Map"])
-        logger.log_image(key="suspicious_saliency", images=[pred_saliency[1]], caption=["Suspicious Saliency Map"])
-        logger.log_image(key="ground_truth_saliency", images=[gt_saliency], caption=["Ground Truth Saliency Map"])
+def load_annotation_layer(json_path, height, width):
+
+    with open(json_path, 'r') as json_file:
+        data = json.load(json_file)
+    print(len(data))
+
+    image = np.zeros((height, width), dtype=np.uint8)
+
+    # Iterieren Sie über die Datensätze in der JSON-Datei
+    for entry in data:
+        points = entry['points']
+        
+        # Extrahieren Sie die Parameter der Ellipse (Zentrum, Halbachsen und Winkel)
+        x1, y1 = points[0]['x'], points[0]['y']
+        x2, y2 = points[1]['x'], points[1]['y']
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        major_axis = np.sqrt((x2 - x1)**2 + (y2 - y1)**2) / 2
+        minor_axis = entry['radius'] / 2
+        angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+        
+        # Zeichnen Sie die Ellipse auf das Bild
+        cv2.ellipse(image, (int(center_x), int(center_y)), (int(major_axis), int(minor_axis)), angle, 0, 360, 255, 2)
+
+    return image
 
 
-class ActiveLearningDataset(Dataset):
-    def __init__(self, exam_list_path, image_path, csv_path, binary=False):
-        """
-        Load csv annotations with region of interest as rectangular bounding boxes. 
-        Load exam list with converted image paths and link to annotations.
-        """
-        super().__init__()
-        self.binary = binary
-        self.exam_list = self.load_exam_list(exam_list_path)
-        self.image_path = image_path
-        self.csv_path = csv_path
-        self.csv_annotations = pd.read_csv(csv_path, converters={'finding_categories': ast.literal_eval})
-        self.csv_annotations = self.csv_annotations[self.csv_annotations["xmin"].notna()]
+def load_exam_list(path):
+    with open(path, "rb") as f:
+        exam_list = pickle.load(f)
 
-        self.samples = []
-        for datum in self.exam_list:
-            for view in VIEWS.LIST:
-                sample = {
-                    "study_id": datum[f"{view}_path"].split("/")[-2],
-                    "image_id": datum[f"{view}_path"].split("/")[-1],
-                    "short_file_path": datum[view][0],
-                    "view": view,
-                    "horizontal_flip": datum["horizontal_flip"],
-                    "best_center": datum["best_center"][view][0]
-                }
-                self.samples.append(sample)
-        valid_keys = set(zip(self.csv_annotations["study_id"].astype(str), 
-                             self.csv_annotations["image_id"].astype(str)))
-        self.samples = [sample for sample in self.samples 
-                        if (sample["study_id"], sample["image_id"]) in valid_keys]
-
-        if binary:
-            self.labels = ['No Finding', 'Suspicious']
-        else:
-            self.labels = ["No Finding", "Mass", "Suspicious Calcification", "Focal Asymmetry", "Architectural Distortion"]
+    return exam_list
 
 
-    def __len__(self):
-        return len(self.samples)
+def run_active_learning(exam_list_path, model_path, json_path, model_index, parameters):
+
+    parameters["percent_t"] = PERCENT_T_DICT[model_index]
+    pretrained_model_path = os.path.join(model_path, "sample_model_{0}.p".format(model_index))
+    model = ActiveLearningGMIC(parameters)
+    print(f"Model loaded on device: {model.device}")
+
+    # load parameters
+    if parameters["device_type"] == "gpu":
+        model.load_state_dict(torch.load(pretrained_model_path), strict=False)
+    else:
+        model.load_state_dict(torch.load(pretrained_model_path, map_location="cpu"), strict=False)
+    print(f"Weights loaded from {pretrained_model_path}")
+
+    exam_list = load_exam_list(exam_list_path)
+    print("Exam list loaded from {}".format(exam_list_path))
 
 
-    def __getitem__(self, idx):
-        sample = self.samples[idx]
-        image_file = os.path.join(self.image_path, sample["short_file_path"] + ".png")
+    # iterate through each exam
+    for i, datum in enumerate(tqdm(exam_list)):
+        if i > 0:
+            break
+        for view in VIEWS.LIST:
+            short_file_path = datum[view][0]
+            # load image
+            # the image is already flipped so no need to do it again
+            loaded_image = loading.load_image(
+                image_path=os.path.join(parameters["image_path"], short_file_path + ".png"),
+                view=view,
+                horizontal_flip=datum["horizontal_flip"],
+            )
+            loaded_image = loading.process_image(loaded_image, view, datum["best_center"][view][0])
 
-        loaded_image = loading.read_image(image_file, 'float32')
-        loaded_image = loading.process_image(loaded_image, sample["view"], sample["horizontal_flip"], sample["best_center"])
-        image_tensor = torch.tensor(loaded_image, dtype=torch.float32).unsqueeze(0)
+            # convert python 2D array into 4D torch tensor in N,C,H,W format
+            x_original = np.expand_dims(np.expand_dims(loaded_image, 0), 0).copy()
+            x_height, x_width = x_original.shape[2], x_original.shape[3]
 
-        H, W = loaded_image.shape
-        annotation_row = self.csv_annotations[self.csv_annotations["study_id"] == sample["study_id"]].loc[self.csv_annotations["image_id"] == sample["image_id"]]
-        true_saliency_map = self.load_annotation_layer(annotation_row.iloc[0], H, W)
-        new_saliency_map = cv2.resize(true_saliency_map, (30, 46))
+            true_saliency_map = load_annotation_layer(json_path, x_height, x_width)
+            new_saliency_map = cv2.resize(true_saliency_map, (30, 46))
+            new_saliency_array = np.array([new_saliency_map, new_saliency_map])
 
-        mask = np.array(new_saliency_map)
-        mask_tensor = torch.tensor(mask, dtype=torch.float32)
-
-        label = annotation_row["finding_categories"].iloc[0][0]
-        y = np.zeros(len(self.labels), dtype=np.float32)
-        if self.binary:
-            label = "Suspicious" if label != "No Finding" else "No Finding"
-        y[self.labels.index(label)] = 1
-
-        return {"image": image_tensor, "label": y, "mask": mask_tensor}
-    
-
-    def load_annotation_layer(self, row, height, width):
-        """
-        Erzeugt eine Binärmaske in der Bildgröße (height, width) und zeichnet ein Rechteck,
-        dessen Koordinaten in den Spalten 'xmin', 'ymin', 'xmax', 'ymax' der CSV-Zeile stehen.
-        """
-        mask = np.zeros((height, width), dtype=np.uint8)
-        xmin = int(float(row['xmin']))
-        ymin = int(float(row['ymin']))
-        xmax = int(float(row['xmax']))
-        ymax = int(float(row['ymax']))
-
-        cv2.rectangle(mask, (ymax, xmax), (ymin, xmin), 255, 2)
-
-        return mask
+            model = ActiveLearningGMIC(parameters)
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.5)
+            loss = model.active_learning_step(x_original, new_saliency_array, optimizer)
+            print(loss)
+    learned_path = os.path.join(model_path, "active_learning_model_{0}.p".format(model_index))
+    model.save_model_weights(learned_path)
+    print("Learned weights stored at {}".format(learned_path))
 
 
 def main():
@@ -209,7 +197,7 @@ def main():
     }
 
     model_path = "models"
-    json_path = '/media/ayk/4644D1AB10BDC110/Medken/proj-dicomGmic-lightning-master/proj-dicomGmic-lightning/medken_feedback.json'
+    json_path = 'medken_feedback.json'
     exam_list_path = args.exam_path
     model_index=args.model_index
 
@@ -229,44 +217,4 @@ def main():
 
 
 if __name__ == "__main__":
-
-    parameters = {
-        "device_type": "gpu",
-        "gpu_number": 0,
-        "epochs": 128,
-        "batch_size": 4,
-        "learning_rate": 3e-5,
-        "regularization": 1e-4,
-
-        "max_crop_noise": (100, 100),
-        "max_crop_size_noise": 100,
-        "image_path": "/home/pb438/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/images",
-        "segmentation_path": "results/segmentation",
-        "output_path": "results",
-
-        "cam_size": (46, 30),
-        "K": 6,
-        "percent_t": 0.03,
-        "crop_shape": (256, 256),
-        "post_processing_dim": 256,
-        "num_classes": 2,
-        "use_v1_global": False,
-    }
-
-
-    exam_list_path = "/home/pb438/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/output/data.pkl"
-    csv_path = "/home/pb438/sdsHD/sd18a006/DataBaseMammography/vindr-mammo/1.0.0/finding_annotations.csv"
-    dataloader = get_dataloader(exam_list_path, parameters["image_path"], csv_path, batch_size=parameters["batch_size"], num_workers=10)
-    
-    logger = pl.loggers.WandbLogger(project="gmic")
-    # logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
-
-    model = ActiveLearningGMICModule(parameters, num_labels=len(dataloader.dataset.labels))
-
-    trainer = pl.Trainer(
-        max_epochs=parameters["epochs"], 
-        devices="auto",
-        strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
-        logger=logger,
-    )
-    trainer.fit(model, dataloader)
+    main()
