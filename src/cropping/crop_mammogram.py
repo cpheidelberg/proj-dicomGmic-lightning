@@ -24,6 +24,7 @@ from functools import partial
 import scipy.ndimage
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 import src.utilities.pickling as pickling
 import src.utilities.reading_images as reading_images
@@ -176,14 +177,14 @@ def crop_img_from_largest_connected(img, mode, erode_dialate=True, iterations=10
 
     # Erosion in order to remove thin lines in the background
     if erode_dialate:
-        img_mask = scipy.ndimage.morphology.binary_erosion(img_mask, iterations=iterations)
+        img_mask = scipy.ndimage.binary_erosion(img_mask, iterations=iterations)
 
     # Select mask for largest connected component
     largest_mask = get_mask_of_largest_connected_component(img_mask)
 
     # Dilation to recover the original mask, excluding the thin lines
     if erode_dialate:
-        largest_mask = scipy.ndimage.morphology.binary_dilation(largest_mask, iterations=iterations)
+        largest_mask = scipy.ndimage.binary_dilation(largest_mask, iterations=iterations)
 
     # figure out where to crop
     y_edge_top, y_edge_bottom = get_edge_values(img, largest_mask, "y")
@@ -265,7 +266,7 @@ def crop_mammogram(input_data_folder, exam_list_path, cropped_exam_list_path, ou
         buffer_size=buffer_size,
     )
     with Pool(num_processes) as pool:
-        cropped_image_info = pool.map(crop_mammogram_one_image_func, image_list)
+        cropped_image_info = list(tqdm(pool.imap(crop_mammogram_one_image_func, image_list), total=len(image_list)))
 
     window_location_dict = dict([x[0] for x in cropped_image_info])
     rightmost_points_dict = dict([x[1] for x in cropped_image_info])

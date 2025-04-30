@@ -18,73 +18,108 @@
 # ==============================================================================
 
 import numpy as np
+import cv2
+import PIL.Image as pillow
 from src.constants import VIEWS
-import imageio
-import src.data_loading.augmentations as augmentations
+from src.data_loading import augmentations
 
 
-def flip_image(image, view, horizontal_flip):
+def flip_image(image, view, horizontal_flip) -> np.ndarray:
     """
-    If training mode, makes all images face right direction.
-    In medical, keeps the original directions unless horizontal_flip is set.
+    Flip images to ensure correct horizontal orientation
     """
-    if horizontal_flip == 'NO':
-        if VIEWS.is_right(view):
-            image = np.fliplr(image)
-    elif horizontal_flip == 'YES':
-        if VIEWS.is_left(view):
-            image = np.fliplr(image)
-
-    return image
+    flip  = horizontal_flip == 'NO' and VIEWS.is_right(view)
+    flip |= horizontal_flip == 'YES' and VIEWS.is_left(view)
+    return np.fliplr(image) if flip else image
 
 
-def standard_normalize_single_image(image):
+def read_image(path: str, dtype) -> np.ndarray:
     """
-    Standardizes an image in-place 
+    Open an image and return it as an NumPy array
+    - path: the file path from which to read
+    - dtype: the type of the resulting array
     """
-    image -= np.mean(image)
-    image /= np.maximum(np.std(image), 10**(-5))
+    return np.array(pillow.open(path), dtype=dtype)
 
 
-def read_image_png(file_name):
-    image = np.array(imageio.imread(file_name))
-    return image
-
-
-def load_image(image_path, view, horizontal_flip):
+def write_image(path: str, image: np.ndarray):
     """
-    Loads a png or hdf5 image as floats and flips according to its view.
+    Save an image from an NumPy array to a PNG file
+    - path: the file path where the image will be saved
+    - image: the image to be saved
     """
-    if image_path.endswith("png"):
-        image = read_image_png(image_path)
-    else:
-        raise RuntimeError()
-    image = image.astype(np.float32)
-    image = flip_image(image, view, horizontal_flip)
-    return image
+    pillow.fromarray(np.asarray(image)).save(path, format='PNG')
 
 
-def process_image(image, view, best_center):
+def crop_image(image, view, best_center) -> np.ndarray:
     """
     Applies augmentation window with random noise in location and size
     and return normalized cropped image.
     """
-    cropped_image, _ = augmentations.random_augmentation_best_center(
-        image=image,
-        input_size=(2944, 1920),
-        random_number_generator=np.random.RandomState(0),
-        best_center=best_center,
-        view=view
-    )
-
-    # For test time only, normalize a copy of the cropped image
-    # in order to avoid changing the value of original image which gets augmented multiple times
-    cropped_image = cropped_image.copy()
-    standard_normalize_single_image(cropped_image)
-
-    return cropped_image
+    img, _ = augmentations.random_augmentation_best_center(image, (2944, 1920), np.random.RandomState(0), best_center=best_center, view=view)
+    return img.copy()
 
 
+def _standardize(image):
+    """
+    Standardizes the image in-place; insuring that its pixel values are
+    distributed with mean = 0 and sd = 1
+    """
+    # Standardizes an image in-place 
+    image -= np.mean(image)
+    image /= np.maximum(np.std(image), 10**(-5))
+    return image
 
 
+def adjust_brightness(image: np.ndarray) -> np.ndarray:
+    """
+    If the background at the edges as the most common colour is too light,
+    we assume that it means that the background is light and tissue is dark
+    in this image, so we invert the colours to ensure that all images have light
+    tissue on dark background.
+    """
+    
+    border_width = int(0.05 * min(image.shape))
+    top = image[0:border_width, :]
+    bottom = image[-border_width:, :]
+    left = image[:, 0:border_width]
+    right = image[:, -border_width:]
+    
+    border_pixels = np.concatenate((top.flatten(), bottom.flatten(), left.flatten(), right.flatten()))
+    mean_intensity = np.mean(border_pixels)
+    threshold = (np.max(image) - np.min(image)) // 2
+    
+    if mean_intensity > threshold:
+        inverted_image = cv2.bitwise_not(image)
+        inverted_image = inverted_image.astype(image.dtype)
+        return inverted_image
+    else:
+        return image
 
+
+def optimize_contrast(image: np.ndarray) -> np.ndarray:
+    image = cv2.normalize(image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+    image = image.astype(np.uint8)
+
+    # image_inv = cv2.equalizeHist(image)
+
+    return image
+
+
+def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:
+    """
+    Flip, crop and standardize
+    """
+    img = crop_image(flip_image(image, view, horizontal_flip), view, best_center)
+    _standardize(img)
+    return img
+
+
+def read_image_standardized(image) -> np.ndarray:
+    """
+    Reads an image as float32 and standardizes it
+    - path: the file path from which to read
+    """
+    img = read_image(image, 'float32')
+    _standardize(img)
+    return img

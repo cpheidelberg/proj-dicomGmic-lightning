@@ -24,19 +24,26 @@ Script that executes the model pipeline.
 import argparse
 import numpy as np
 import os
+import sys
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import torch
 import tqdm
 import cv2
 import pydicom as dcm
 import matplotlib.cm as cm
+
+# import own files 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = "/".join(current_dir.split("/")[:-2])
+print(parent_dir)
+sys.path.append(parent_dir)
+
 from src.utilities import pickling, tools
 from src.modeling import gmic as gmic
 from src.data_loading import loading
 from src.constants import VIEWS, PERCENT_T_DICT
+from src.modeling import trainer
 
 #assert torch.__version__ == '1.1.0', "GMIC not tested for pytorch > 1.1.0 (nor python3.8)"
 
@@ -126,7 +133,7 @@ def save_saliency_maps(input_img, saliency_maps, datum, save_dir, file_path, dic
 
     input_img = input_img[0, 0, :, :]
     H, W = input_img.shape
-    ds = dcm.dcmread(dicom_path, force=True)
+    # ds = dcm.dcmread(dicom_path, force=True)
     view = file_path.split('_')[1].split('.')[0]
     window_location = datum["window_location"][view][0]
 
@@ -183,9 +190,17 @@ def process_saliency_map(input_img, saliency_map, window_location, save_dir, fil
 
     for i, (contour, intensity, centroid) in enumerate(top_contours):
         polyline = [point[0].tolist() for point in contour]
+        # print("polyline")
+        # print(len(polyline))
+        # print(len(polyline[0]))
+        # print(polyline[0][0])
+        # print(polyline[0][1])
         for p in polyline:
             p[0] -= window_location[2]
             p[1] -= window_location[0]
+        # print(polyline[0][0])
+        # print(polyline[0][1])
+        # TODO: add shift from window_location to polyline coordinates
         with open(os.path.join(save_dir, "{0}_polyline_{1}_{2}.txt".format(file_path, label, i)), 'w') as f:
             f.write(f"Saliency Map:\n")
             for point in polyline:
@@ -217,11 +232,7 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
     Run the model over images in sample_data.
     Save the predictions as csv and visualizations as png.
     """
-    if (parameters["device_type"] == "gpu") and torch.has_cudnn:
-        device = torch.device("cuda:{}".format(parameters["gpu_number"]))
-    else:
-        device = torch.device("cpu")
-    model = model.to(device)
+    
     model.eval()
 
     # initialize data holders
@@ -230,13 +241,10 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
     with torch.no_grad():
         # iterate through each exam
         for datum in tqdm.tqdm(exam_list):
-            print("Datum")
-            print(datum)
             for view in VIEWS.LIST:
+                print(datum)
                 short_file_path = datum[view][0]
                 dicom_path = os.path.join(datum[str(view) + "_path"], dicom_file)
-                print("View")
-                print(os.path.join(parameters["image_path"], short_file_path + ".png"))
                 # load image
                 # the image is already flipped so no need to do it again
                 loaded_image = loading.read_image(os.path.join(parameters["image_path"], short_file_path + ".png"), 'float32')
@@ -248,9 +256,10 @@ def run_model(model, dicom_file, exam_list, parameters, turn_on_visualization):
                 malignant_seg = None
                 # convert python 2D array into 4D torch tensor in N,C,H,W format
                 loaded_image = np.expand_dims(np.expand_dims(loaded_image, 0), 0).copy()
-                tensor_batch = torch.Tensor(loaded_image).to(device)
+                tensor_batch = torch.Tensor(loaded_image)
                 # forward propagation
                 output = model(tensor_batch)[0]
+                print(output)
                 pred_numpy = output.data.cpu().numpy()
                 benign_pred, malignant_pred = pred_numpy[0, 0], pred_numpy[0, 1]
                 # save visualization
@@ -283,13 +292,9 @@ def run_single_model(model_path, data_path, dicom_file, parameters, turn_on_visu
     """
     Load a single model and run on sample data
     """
-    # construct model
-    model = gmic.GMIC(parameters)
-    # load parameters
-    if parameters["device_type"] == "gpu":
-        model.load_state_dict(torch.load(model_path), strict=False)
-    else:
-        model.load_state_dict(torch.load(model_path, map_location="cpu"), strict=False)
+    # gmicTrainer = trainer.GMICTrainer.load_from_checkpoint(model_path, map_location=parameters["device_type"])
+    model = trainer.GMICTrainer(parameters)
+    model.load_state_dict(torch.load(model_path, map_location=parameters["device_type"]), strict=False)
     # load metadata
     exam_list = pickling.unpickle_from_file(data_path)
     # run the model on the dataset
@@ -297,38 +302,16 @@ def run_single_model(model_path, data_path, dicom_file, parameters, turn_on_visu
     return output_df
 
 
-def start_experiment(model_path, data_path, dicom_file, output_path, model_index, parameters, turn_on_visualization):
+def start_experiment(model_path, data_path, dicom_file, output_path, parameters, turn_on_visualization):
     """
     Run the model on sample data and save the predictions as a csv file
     """
-    # make sure model_index is valid
-    valid_model_index = ["1", "2", "3", "4", "5", "ensemble"]
-    assert model_index in valid_model_index, "Invalid model_index {0}. Valid options: {1}".format(model_index, valid_model_index)
     # create directories
     os.makedirs(output_path, exist_ok=True)
     os.makedirs(os.path.join(output_path, "visualization"), exist_ok=True)
-    # do the average ensemble over predictions
-    if model_index == "ensemble":
-        output_df_list = []
-        for i in range(1,6):
-            single_model_path = os.path.join(model_path, "sample_model_{0}.p".format(i))
-            # set percent_t for the model
-            parameters["percent_t"] = PERCENT_T_DICT[str(i)]
-            # only do visualization for the first model
-            need_visualization = i==1 and turn_on_visualization
-            current_model_output = run_single_model(single_model_path, data_path, dicom_file, parameters, need_visualization)
-            output_df_list.append(current_model_output)
-        all_prediction_df = pd.concat(output_df_list)
-        output_df = all_prediction_df.groupby("image_index").apply(lambda rows: pd.Series({"benign_pred":np.nanmean(rows["benign_pred"]),
-                      "malignant_pred": np.nanmean(rows["malignant_pred"]),
-                      "benign_label": rows.iloc[0]["benign_label"],
-                      "malignant_label": rows.iloc[0]["malignant_label"],
-                      })).reset_index()
-    else:
-        # set percent_t for the model
-        parameters["percent_t"] = PERCENT_T_DICT[model_index]
-        single_model_path = os.path.join(model_path, "sample_model_{0}.p".format(model_index))
-        output_df = run_single_model(single_model_path, data_path, dicom_file, parameters, turn_on_visualization)
+
+    parameters["percent_t"] = 0.03 #PERCENT_T_DICT[model_index]
+    output_df = run_single_model(model_path, data_path, dicom_file, parameters, turn_on_visualization)
 
     # save the predictions
     output_df.to_csv(os.path.join(output_path, "predictions.csv"), index=False, float_format='%.4f')
@@ -337,43 +320,96 @@ def start_experiment(model_path, data_path, dicom_file, output_path, model_index
 def main():
     # retrieve command line arguments
     parser = argparse.ArgumentParser(description='Run GMIC on the sample data')
-    parser.add_argument('--model-path', required=True)
-    parser.add_argument('--data-path', required=True)
-    parser.add_argument('--dicom-file', required=True)
-    parser.add_argument('--image-path', required=True)
-    parser.add_argument('--segmentation-path', required=True)
-    parser.add_argument('--output-path', required=True)
+    parser.add_argument('--model-path')
+    parser.add_argument('--data-path')
+    parser.add_argument('--dicom-file')
+    parser.add_argument('--image-path')
+    parser.add_argument('--segmentation-path')
+    parser.add_argument('--output-path')
     parser.add_argument('--device-type', default="cpu", choices=['gpu', 'cpu'])
     parser.add_argument("--gpu-number", type=int, default=0)
-    parser.add_argument("--model-index", type=str, default="1")
     parser.add_argument("--visualization-flag", action="store_true", default=False)
     args = parser.parse_args()
 
-    parameters = {
-        "device_type": args.device_type,
-        "gpu_number": args.gpu_number,
-        "max_crop_noise": (100, 100),
-        "max_crop_size_noise": 100,
-        "image_path": args.image_path,
-        "segmentation_path": args.segmentation_path,
-        "output_path": args.output_path,
-        # model related hyper-parameters
-        "cam_size": (46, 30),
-        "K": 6,
-        "crop_shape": (256, 256),
-        "post_processing_dim":256,
-        "num_classes":2,
-        "use_v1_global":False,
-    }
-    start_experiment(
-        model_path=args.model_path,
-        data_path=args.data_path,
-        dicom_file=args.dicom_file,
-        output_path=args.output_path,
-        model_index=args.model_index,
-        parameters=parameters,
-        turn_on_visualization=args.visualization_flag,
-    )
+    if len(sys.argv) > 1:
+        parameters = {
+            "device_type": args.device_type,
+            "gpu_number": args.gpu_number,
+            "max_crop_noise": (100, 100),
+            "max_crop_size_noise": 100,
+            "image_path": args.image_path,
+            "segmentation_path": args.segmentation_path,
+            "output_path": args.output_path,
+            # model related hyper-parameters
+            "cam_size": (46, 30),
+            "K": 6,
+            "crop_shape": (256, 256),
+            "post_processing_dim":256,
+            "num_classes":11,
+            "use_v1_global":False,
+        }
+        start_experiment(
+            model_path=args.model_path,
+            data_path=args.data_path,
+            dicom_file=args.dicom_file,
+            output_path=args.output_path,
+            parameters=parameters,
+            turn_on_visualization=args.visualization_flag,
+        )
+    else:
+        print("No argument has been given")
+
+        if torch.cuda.is_available():
+            device = "gpu"
+        elif torch.backends.mps.is_available():
+            print("Apple MPS is available")
+            device = "mps"
+        else: 
+            device = "cpu"
+        device = "cpu"
+        
+        model_path = "../tb_logs_helix/balanced/version_1/checkpoints/epoch=127-step=1388928.ckpt"
+        dicom_file = '1-1.dcm'
+        data_path = 'sample_output/data.pkl'
+        image_path = 'sample_output/cropped_images/'
+        seg_path = 'sample_output/segmentation'
+        output_path = 'sample_output/'
+
+        parameters = {
+            # training related hyper-parameters
+            "device_type": device,
+            "gpu_number": 0,
+            "epochs": 32,
+            "batch_size": 4,
+            "learning_rate": 1e-3,
+            "pretrained": False,
+            "fine-tuning": False,
+            "model_idx": 2,
+
+            "max_crop_noise": (100, 100),
+            "max_crop_size_noise": 100,
+            "image_path": image_path,
+            "segmentation_path": seg_path,
+            "output_path": output_path,
+
+            # model related hyper-parameters
+            "cam_size": (46, 30),
+            "K": 6, # num patches
+            "crop_shape": (256, 256), # patch size
+            "percent_t": 0.03,
+            "post_processing_dim": 256,
+            "num_classes": 6, # output classes
+            "use_v1_global": False,
+        }
+        start_experiment(
+            model_path=model_path,
+            data_path=data_path,
+            dicom_file=dicom_file,
+            output_path=output_path,
+            parameters=parameters,
+            turn_on_visualization=True,
+        )
+        
 
 if __name__ == "__main__":
     main()

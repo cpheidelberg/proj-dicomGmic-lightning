@@ -217,13 +217,14 @@ def generate_mask_uplft(input_image, window_shape, upper_left_points, gpu_number
     mask_x_max = upper_left_points[:,:,0] + window_h
     mask_y_min = upper_left_points[:,:,1]
     mask_y_max = upper_left_points[:,:,1] + window_w
+    # print(mask_x_min.get_device())
     # generate masks
-    mask_x = Variable(torch.arange(0, H).view(-1, 1).repeat(N, C, 1, W))
-    mask_y = Variable(torch.arange(0, W).view(1, -1).repeat(N, C, H, 1))
-    if gpu_number is not None:
-        device = torch.device("cuda:{}".format(gpu_number))
-        mask_x = mask_x.cuda().to(device)
-        mask_y = mask_y.cuda().to(device)
+    mask_x = Variable(torch.arange(0, H).view(-1, 1).repeat(N, C, 1, W)).type_as(mask_x_min)
+    mask_y = Variable(torch.arange(0, W).view(1, -1).repeat(N, C, H, 1)).type_as(mask_x_min)
+    # if gpu_number is not None:
+    #     device = torch.device("cuda:{}".format(gpu_number))
+    #     mask_x = mask_x.to(device)
+    #     mask_y = mask_y.to(device)
     x_gt_min = mask_x.float() >= mask_x_min.unsqueeze(-1).unsqueeze(-1).float()
     x_ls_max = mask_x.float() < mask_x_max.unsqueeze(-1).unsqueeze(-1).float()
     y_gt_min = mask_y.float() >= mask_y_min.unsqueeze(-1).unsqueeze(-1).float()
@@ -236,3 +237,49 @@ def generate_mask_uplft(input_image, window_shape, upper_left_points, gpu_number
     selected = selected_x * selected_y
     mask = 1 - selected.float()
     return mask
+
+
+def scale_crops(crops, current_size, target_size):
+    """
+    Function that converts the crop locations from current_size to target_size
+    :param crops_x_small: N, k*c, 2 numpy matrix
+    :param current_size: (h, w)
+    :param target_size: (height, width)
+    :return: N, k*c, 2 numpy matrix
+    """
+    # Deconstruct sizes into height and width
+    h, w = current_size
+    height, width = target_size
+
+    # Make sizes relative to current_size
+    rel_x = crops[:, :, 0] / h
+    rel_y = crops[:, :, 1] / w
+
+    # Sanity check
+    assert np.max(rel_x) <= 1.0 and np.min(rel_x) >= 0.0, "rel_x must be between 0.0 and 1.0"
+    assert np.max(rel_y) <= 1.0 and np.min(rel_y) >= 0.0, "rel_y must be between 0.0 and 1.0"
+
+    # interpolate the crop position from cam_size to x_original
+    final_x = np.expand_dims(np.around(rel_x * height), -1)
+    final_y = np.expand_dims(np.around(rel_y * width), -1)
+    return np.concatenate([final_x, final_y], axis=-1)
+
+
+def retrieve_crops(img, crops, shape, method):
+    """
+    Function that takes in the original image and cropping position and returns the crops
+    :param x: PyTorch Tensor array (N,C,H,W)
+    :param crops: the crops to be applied
+    :param shape: height and width of the crops
+    :param method: supported in ["center", "upper_left"]
+    """
+    batch_size, num_crops, _ = crops.shape
+    crop_h, crop_w = shape
+
+    output = torch.ones((batch_size, num_crops, crop_h, crop_w)).type_as(img)
+
+    for i in range(batch_size):
+        for j in range(num_crops):
+            crop_pytorch(img[i, 0, :, :], shape, crops[i,j,:], output[i,j,:,:], method=method)
+
+    return output
