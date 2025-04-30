@@ -1,4 +1,4 @@
-import os, sys, time
+import os, sys, time, tomllib
 
 import torch
 from torch.utils.data import random_split
@@ -35,28 +35,25 @@ def run_training(parameters):
     )
 
     # logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=True)
-    # logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
+    logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
 
     trainer = pl.Trainer(
-        fast_dev_run=False, # default is False. True for running 1 training & 1 validation epoch, int for number of looped batches
-        # limit_val_batches=0,
-        # num_sanity_val_steps=0,
+        fast_dev_run=False,
         max_epochs=parameters["epochs"], 
         # gradient_clip_val=1e-3,
         accelerator=parameters["device_type"], 
         # devices="auto",
-        devices=[parameters["gpu_number"]],
-        # logger=logger,
+        devices=parameters["gpu_number"],
+        logger=logger,
         strategy=DDPStrategy(find_unused_parameters=True), # ignore unused parameters in network
         # callbacks=[ModelSummary(max_depth=2)],
         reload_dataloaders_every_n_epochs=1,
     )
-
-    # trainer.fit(model=model, ckpt_path="GMIC/y8zglucn/checkpoints/epoch=255-step=33024.ckpt")    
-    trainer.fit(model=model)    
+  
+    trainer.fit(model=model)
     print("Training finished at: ", time.ctime())
     # trainer.test(model=model)
-    # trainer.predict(model=model, ckpt_path="optuna_logs/balanced/version_7/checkpoints/epoch=15-step=112.ckpt")
+    # trainer.predict(model=model, ckpt_path="GMIC/0veifs4j/checkpoints/epoch=255-step=98816.ckpt")
 
     return trainer
 
@@ -73,51 +70,47 @@ if __name__ == "__main__":
     else: 
         device = "cpu"
 
-    # set path variables
-    model_path = 'models/'
-    data_dirs = ['../../sdsHD/sd24f004/FFDM/demd/extracted']
-    image_path = '../../sdsHD/sd24f004/FFDM/demd/extracted'
-    # output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
-    output_path = '../../sdsHD/sd24f004/FFDM/demd/predicted'
-    segmentation_path = os.path.join(output_path, 'segmentation')
+    # load config file
+    with open("src/config.toml", "rb") as f:
+        config = tomllib.load(f)
 
     # set hyperparameters
     parameters = {
         # training related hyper-parameters
         "device_type": device,
-        "gpu_number": 0,
-        "epochs": 256,
-        "batch_size": 64,
-        "learning_rate": 1e-5,
-        "regularization": 1e-4,
-        "pretrained": True,
-        "fine-tuning": False,
-        "model_idx": 2,
+        "gpu_number": config["training"]["gpu_number"],
+        "epochs": config["training"]["epochs"],
+        "batch_size": config["training"]["batch_size"],
+        "learning_rate": config["training"]["learning_rate"],
+        "regularization": config["training"]["regularization"],
+        "pretrained": config["training"]["pretrained"],
+        "fine-tuning": config["training"]["fine-tuning"],
+        "model_idx": config["training"]["model_idx"],
 
-        "undersampling_rate": 1.0,
-        "augmentation_rate": 0.0,
-        "binary": True,
-        "augment": True,
-        "smote_rate": 0.0,
-        "epoch_smote": 256,
+        "undersampling_rate": config["dataloader"]["undersampling_rate"],
+        "augmentation_rate": config["dataloader"]["augmentation_rate"],
+        "binary": config["dataloader"]["binary"],
+        "augment": config["dataloader"]["augment"],
+        "smote_rate": config["dataloader"]["smote_rate"],
+        "epoch_smote": config["dataloader"]["epoch_smote"],
 
-        "max_crop_noise": (100, 100),
-        "max_crop_size_noise": 100,
-        "data_dirs": data_dirs,
-        "image_path": image_path,
-        "segmentation_path": segmentation_path,
-        "output_path": output_path,
-        "model_path": model_path,
-        "turn_on_visualization": True,
+        "max_crop_noise": config["model"]["max_crop_noise"],
+        "max_crop_size_noise": config["model"]["max_crop_size_noise"],
+        "data_dirs": config["path"]["data_dirs"],
+        "image_path": config["path"]["image_path"],
+        "segmentation_path": os.path.join(config["path"]["output_path"], 'segmentation'),
+        "output_path": config["path"]["output_path"],
+        "model_path": config["path"]["model_path"],
+        "turn_on_visualization": config["model"]["turn_on_visualization"],
 
         # model related hyper-parameters
-        "cam_size": (46, 30),
-        "K": 6, # num patches
-        "crop_shape": (256, 256), # patch size
-        "percent_t": 0.03,
-        "post_processing_dim": 256,
-        "num_classes": 2, # output classes (=len(dataset.labels))
-        "use_v1_global": False,
+        "cam_size": config["model"]["cam_size"],
+        "K": config["model"]["K"],
+        "crop_shape": config["model"]["crop_shape"],
+        "percent_t": config["model"]["percent_t"],
+        "post_processing_dim": config["model"]["post_processing_dim"],
+        "num_classes": config["model"]["num_classes"],
+        "use_v1_global": config["model"]["use_v1_global"],
     }
 
     trainer = run_training(parameters)

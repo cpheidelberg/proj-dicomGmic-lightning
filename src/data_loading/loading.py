@@ -18,6 +18,7 @@
 # ==============================================================================
 
 import numpy as np
+import cv2
 import PIL.Image as pillow
 from src.constants import VIEWS
 from src.data_loading import augmentations
@@ -30,7 +31,6 @@ def flip_image(image, view, horizontal_flip) -> np.ndarray:
     flip  = horizontal_flip == 'NO' and VIEWS.is_right(view)
     flip |= horizontal_flip == 'YES' and VIEWS.is_left(view)
     return np.fliplr(image) if flip else image
-
 
 
 def read_image(path: str, dtype) -> np.ndarray:
@@ -73,15 +73,37 @@ def _standardize(image):
 
 def adjust_brightness(image: np.ndarray) -> np.ndarray:
     """
-    Scale brightness to 0 - 65535 range
-    If the most common colour (i.e. probably the background colour) is too light,
+    If the background at the edges as the most common colour is too light,
     we assume that it means that the background is light and tissue is dark
     in this image, so we invert the colours to ensure that all images have light
     tissue on dark background.
     """
-    img = image * (2 ** 16 - 1) // image.max()
-    most_frequent = np.argmax(np.bincount(img.flatten()))
-    return (2 ** 16 - 1) - img if most_frequent > 10000 else img
+    
+    border_width = int(0.05 * min(image.shape))
+    top = image[0:border_width, :]
+    bottom = image[-border_width:, :]
+    left = image[:, 0:border_width]
+    right = image[:, -border_width:]
+    
+    border_pixels = np.concatenate((top.flatten(), bottom.flatten(), left.flatten(), right.flatten()))
+    mean_intensity = np.mean(border_pixels)
+    threshold = (np.max(image) - np.min(image)) // 2
+    
+    if mean_intensity > threshold:
+        inverted_image = cv2.bitwise_not(image)
+        inverted_image = inverted_image.astype(image.dtype)
+        return inverted_image
+    else:
+        return image
+
+
+def optimize_contrast(image: np.ndarray) -> np.ndarray:
+    image = cv2.normalize(image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+    image = image.astype(np.uint8)
+
+    # image_inv = cv2.equalizeHist(image)
+
+    return image
 
 
 def process_image(image, view, horizontal_flip, best_center) -> np.ndarray:

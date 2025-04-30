@@ -1,5 +1,7 @@
 import os, cv2, sys
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
@@ -16,7 +18,7 @@ from src.modeling import trainer
 from src.data_loading import dataset
 
 
-def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, save_path, parameters):
+def visualize_example(img, path, saliency_maps, seg_masks, patch_locations, patch_img, patch_attentions, parameters, save_path=None):
     """
     Function that visualizes the saliency maps for an example
     """
@@ -47,11 +49,10 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
             else:
                 subfigure.imshow(seg_mask, alpha=0.85, cmap=alpha_red, clim=[0.9, 1])
 
-    subfigure.set_title("input image")
+    subfigure.set_title(path)
     subfigure.axis('off')
 
     # patch map
-    print(patch_locations)
     subfigure = figure.add_subplot(1, total_num_subplots, 2)
     subfigure.imshow(img[0, 0, :, :], aspect='equal', cmap='gray')
     subfigure.imshow(
@@ -85,10 +86,12 @@ def visualize_example(img, saliency_maps, seg_masks, patch_locations, patch_img,
         # crops_attn can be None when we only need the left branch + visualization
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
 
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-    plt.savefig(save_path, bbox_inches='tight', format="png", dpi=500)
+    if save_path is not None:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, bbox_inches='tight', format="png", dpi=500)
     plt.close()
+
+    return figure
 
 
 def save_saliency_maps(img, saliency_maps, folder, filename, parameters):

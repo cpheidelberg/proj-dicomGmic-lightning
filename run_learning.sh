@@ -19,27 +19,31 @@ PROFILE_PATH='learning.prof'
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
-#echo 'Stage 1: Convert DICOM exams'
-#python3 src/dicom/convert_dicom.py \
-#   --dicom-data-folder $DICOM_FOLDER \
-#   --dicom-file $DICOM_FILE \
-#   --image-data-folder $DATA_FOLDER \
-#   --exam-list-path $INITIAL_EXAM_LIST_PATH
-#
-#echo 'Stage 2: Crop Mammograms'
-#python3 src/cropping/crop_mammogram.py \
-#   --input-data-folder $DATA_FOLDER \
-#   --output-data-folder $CROPPED_IMAGE_PATH \
-#   --exam-list-path $INITIAL_EXAM_LIST_PATH  \
-#   --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
-#   --num-processes $NUM_PROCESSES
-#
-#echo 'Stage 3: Extract Centers'
-#python3 src/optimal_centers/get_optimal_centers.py \
-#   --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
-#   --data-prefix $CROPPED_IMAGE_PATH \
-#   --output-exam-list-path $EXAM_LIST_PATH \
-#   --num-processes $NUM_PROCESSES
+
+echo 'Stage 1: Convert DICOM exams'
+python3 src/dicom/convert_dicom.py \
+  --dicom-data-folder $DICOM_FOLDER \
+  --dicom-file $DICOM_FILE \
+  --image-data-folder $DATA_FOLDER \
+  --exam-list-path $INITIAL_EXAM_LIST_PATH
+
+
+echo 'Stage 2: Crop Mammograms'
+python3 src/cropping/crop_mammogram.py \
+  --input-data-folder $DATA_FOLDER \
+  --output-data-folder $CROPPED_IMAGE_PATH \
+  --exam-list-path $INITIAL_EXAM_LIST_PATH  \
+  --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
+  --num-processes $NUM_PROCESSES
+
+
+echo 'Stage 3: Extract Centers'
+python3 src/optimal_centers/get_optimal_centers.py \
+  --cropped-exam-list-path $CROPPED_EXAM_LIST_PATH \
+  --data-prefix $CROPPED_IMAGE_PATH \
+  --output-exam-list-path $EXAM_LIST_PATH \
+  --num-processes $NUM_PROCESSES
+
 
 echo 'Stage 4: Run Active Learning'
 python3 src/scripts/learn_rois.py \

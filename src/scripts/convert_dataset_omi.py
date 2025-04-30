@@ -80,6 +80,8 @@ def process_dicom(path: str, data: dict, dstDir: str) -> Dicom:
     try:
         with pydicom.dcmread(path) as file:
             image = file.pixel_array
+            image = loading.adjust_brightness(image)
+            image = loading.optimize_contrast(image)
             view = determine_view(file.ImageLaterality, file.ViewPosition)
             horizontal_flip = 'YES' if file.FieldOfViewHorizontalFlip == 'YES' else 'NO'
         category = get_category(data)
@@ -226,4 +228,5 @@ def main(src_dir: str, dst_dir: str):
 
 
 if __name__ == '__main__':
-    main(src_dir='/mnt/sds-hd/sd24f004/FFDM/demd/', dst_dir='/mnt/sds-hd/sd24f004/FFDM/demd/extracted')
+    # main(src_dir='/home/ubuntu/sdsHD/sd24f004/FFDM/demd/', dst_dir='/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted')
+    main(src_dir='/home/ubuntu/sdsHD/sd24f004/FFDM/demd/', dst_dir='/home/ubuntu/gmic/extracted_test')
