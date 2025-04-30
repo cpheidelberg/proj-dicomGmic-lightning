@@ -6,6 +6,8 @@ import json
 import pickle
 import numpy as np
 from tqdm import tqdm
+import argparse
+import cProfile
 
 import torch
 import torch.nn.functional as F
@@ -172,15 +174,58 @@ class ActiveLearningDataset(Dataset):
         return mask
 
 
-    def load_exam_list(self, path):
-        with open(path, "rb") as f:
-            exam_list = pickle.load(f)
-        return exam_list
+def main():
 
+    # retrieve command line arguments
+    parser = argparse.ArgumentParser(description='Run GMIC on the sample data')
+    parser.add_argument('--model-path', default='models/')
+    parser.add_argument('--exam-path', default='sample_output/data.pkl')
+    parser.add_argument('--image-path', default='sample_output/cropped_images')
+    parser.add_argument('--segmentation-path', default='sample_output/segmentation')
+    parser.add_argument('--output-path', default='sample_output')
+    parser.add_argument('--device-type', default="cpu", choices=['gpu', 'cpu'])
+    parser.add_argument("--gpu-number", type=int, default=0)
+    parser.add_argument("--model-index", type=str, default="1")
+    parser.add_argument('--profile-path', default=None, help="Enable cProfile profiling and specify the output path")
 
-def get_dataloader(exam_list_path, image_path, csv_path, batch_size=4, shuffle=True, num_workers=4):
-    dataset = ActiveLearningDataset(exam_list_path, image_path, csv_path, binary=True)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+    args = parser.parse_args()
+
+    # parameters copied from run_model.py
+    parameters = {
+        "device_type": args.device_type,
+        "gpu_number": args.gpu_number,
+        "max_crop_noise": (100, 100),
+        "max_crop_size_noise": 100,
+        "image_path": args.image_path,
+        "segmentation_path": args.segmentation_path,
+        "output_path": args.output_path,
+        # model related hyper-parameters
+        "cam_size": (46, 30),
+        "K": 6,
+        "crop_shape": (256, 256),
+        "post_processing_dim":256,
+        "num_classes":2,
+        "use_v1_global":False,
+    }
+
+    model_path = "models"
+    json_path = '/media/ayk/4644D1AB10BDC110/Medken/proj-dicomGmic-lightning-master/proj-dicomGmic-lightning/medken_feedback.json'
+    exam_list_path = args.exam_path
+    model_index=args.model_index
+
+    if args.profile_path:
+        print(exam_list_path)
+        print(args.profile_path)
+        profile_args = {
+            "exam_list_path": exam_list_path,
+            "model_path": model_path,
+            "json_path": json_path,
+            "model_index": model_index,
+            "parameters": parameters
+        }
+        cProfile.runctx("run_active_learning(**profile_args)", globals(), locals(), args.profile_path)
+    else:
+        run_active_learning(exam_list_path, model_path, json_path, model_index, parameters)
 
 
 if __name__ == "__main__":
