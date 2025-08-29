@@ -59,3 +59,5 @@ PERCENT_T_DICT = {
     "3":0.03,
     "4":0.05,
     "5":0.1}
+
+USED_PATH_STORAGE_FILE = "used_paths_trial_3_20250816.txt"

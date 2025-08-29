@@ -329,6 +329,9 @@ def main():
     parser.add_argument('--device-type', default="cpu", choices=['gpu', 'cpu'])
     parser.add_argument("--gpu-number", type=int, default=0)
     parser.add_argument("--visualization-flag", action="store_true", default=False)
+    parser.add_argument("--smote-rate", type=float, default=0.0)
+    parser.add_argument("--epoch-smote", type=int, default=256)
+
     args = parser.parse_args()
 
     if len(sys.argv) > 1:

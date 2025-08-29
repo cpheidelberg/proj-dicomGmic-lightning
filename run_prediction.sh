@@ -17,6 +17,8 @@ CROPPED_EXAM_LIST_PATH='sample_data_vindr/cropped_images/cropped_exam_list.pkl'
 SEG_PATH='sample_data_vindr/segmentation'
 EXAM_LIST_PATH='sample_data_vindr/data.pkl'
 OUTPUT_PATH='sample_data_vindr'
+SMOTE_RATE=0.0
+EPOCH_SMOTE=256
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
@@ -56,6 +58,8 @@ python3 src/scripts/test_model.py \
      --output-path $OUTPUT_PATH \
      --device-type $DEVICE_TYPE \
      --gpu-number $GPU_NUMBER \
+     --smote-rate $SMOTE_RATE \
+     --epoch-smote $EPOCH_SMOTE \
      --visualization-flag
 
 # echo 'Stage 5: Create DICOM SR exams'

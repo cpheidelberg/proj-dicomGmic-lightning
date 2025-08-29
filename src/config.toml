@@ -2,8 +2,8 @@
 
 [path]
 model_path = 'models/'
-data_dirs = ['/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted']
-image_path = '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'
+data_dirs = ['/home/ubuntu/gmic/omidb_data/']
+image_path = '/home/ubuntu/gmic/omidb_data/'
 output_path = '' # '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/predicted/'
 
 [training]
@@ -19,7 +19,7 @@ model_idx = 2
 [dataloader]
 undersampling_rate = 1.0
 augmentation_rate = 0.0
-binary = false
+binary = true
 augment = false
 smote_rate = 0.0
 epoch_smote = 256
