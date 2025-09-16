@@ -8,7 +8,7 @@ output_path = '' # '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/predicted/'
 
 [training]
 gpu_number = [0]
-epochs = 20
+epochs = 100
 batch_size = 16
 learning_rate = 2.2346472512691852e-05
 regularization = 2.428480620004177e-05

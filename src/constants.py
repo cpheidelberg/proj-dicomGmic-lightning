@@ -60,4 +60,4 @@ PERCENT_T_DICT = {
     "4":0.05,
     "5":0.1}
 
-USED_PATH_STORAGE_FILE = "db_score_run_trial_05_paths.txt"
+USED_PATH_STORAGE_FILE = "db_score_run_trial_100_epochs_paths.txt"
