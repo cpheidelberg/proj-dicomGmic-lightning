@@ -31,7 +31,7 @@ def run_training(parameters):
         model_path=parameters["model_path"]
     )
 
-    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="balanced", log_graph=False)
+    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="db_score_with_data", log_graph=False)
     # logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
 
     trainer = pl.Trainer(

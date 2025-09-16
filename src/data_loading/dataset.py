@@ -52,7 +52,7 @@ class ClassificationImages(Dataset):
             the program slower. If augment=True, images are randomly augmented
             each time they are loaded.
         """
-
+        random.seed(42)
         tables = []
         for data_dir in data_dirs:
             data_dir = data_dir.removesuffix('/')
