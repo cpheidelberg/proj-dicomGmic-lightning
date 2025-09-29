@@ -33,7 +33,7 @@ from src.constants import USED_PATH_STORAGE_FILE
 
 # --------- CONFIGURATION ---------
 used_paths_file = USED_PATH_STORAGE_FILE
-checkpoint_path = "/home/ubuntu/gmic/trained_models/epoch=19-step=7720.ckpt"
+checkpoint_path = "/home/ubuntu/gmic/trained_models/epoch=39-step=15440.ckpt"
 config_path = "src/config.toml"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

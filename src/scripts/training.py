@@ -16,10 +16,11 @@ from src.data_loading.dataset import ClassificationImages
 
 
 def run_training(parameters):
-
+    print("Training started at: ", time.ctime())
     dataset = ClassificationImages(parameters["data_dirs"], parameters["undersampling_rate"], parameters["augmentation_rate"], parameters["binary"], parameters["augment"])
     parameters["class_names"] = dataset.labels
     data_train, data_valid, data_test = random_split(dataset, [0.8, 0.1, 0.1])
+
     # Training
     model = GMICTrainer(
         parameters=parameters,
@@ -31,7 +32,7 @@ def run_training(parameters):
         model_path=parameters["model_path"]
     )
 
-    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="db_score_100_epochs", log_graph=False)
+    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="db_score_from_20_epochs_checkpoint", log_graph=False)
     # logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
 
     trainer = pl.Trainer(

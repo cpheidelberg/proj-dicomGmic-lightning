@@ -24,7 +24,7 @@ from src.modeling.trainer import GMICTrainer
 from src.data_loading.dataset import ClassificationImages
 
 # ----- Configuration -----
-CHECKPOINT_PATH = "/home/ubuntu/gmic/trained_models/epoch=19-step=7720.ckpt"
+CHECKPOINT_PATH = "/home/ubuntu/gmic/trained_models/epoch=99-step=38600.ckpt"
 CONFIG_PATH = "src/config.toml"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DEBUG = False  # Set True to run only 64 validation samples
@@ -70,6 +70,7 @@ def evaluate():
     parameters = load_parameters()
 
     print("Loading model...")
+    print(CHECKPOINT_PATH)
     model = GMICTrainer(parameters)
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
     model.load_state_dict(checkpoint["state_dict"], strict=False)
@@ -137,8 +138,8 @@ def evaluate():
     plt.title("ROC Curve")
     plt.legend()
     plt.grid(True)
-    plt.savefig("roc_curve_full_run.png", dpi=300)
-    print("ROC curve saved to roc_curve_full_run.png")
-
+    plt.savefig("roc_curve_full_run_100_epochs.png", dpi=300)
+    print("ROC curve saved to roc_curve_full_run_100_epochs.png")
+    #Training finished at:  Thu Sep 18 03:57:55 2025
 if __name__ == "__main__":
     evaluate()

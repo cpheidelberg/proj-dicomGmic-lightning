@@ -4,16 +4,16 @@
 model_path = 'models/'
 data_dirs = ['/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted']
 image_path = '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/extracted'
-output_path = '' # '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/predicted/'
+output_path = '' # '/home/ubuntu/sdsHD/sd24f004/FFDM/demd/predicted/exp_from_20_epoch_checkpoint'
 
 [training]
 gpu_number = [0]
-epochs = 100
+epochs = 1
 batch_size = 16
 learning_rate = 2.2346472512691852e-05
 regularization = 2.428480620004177e-05
 pretrained = true
-fine-tuning = false
+fine-tuning = true
 model_idx = 2
 
 [dataloader]
