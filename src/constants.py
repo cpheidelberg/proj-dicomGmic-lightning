@@ -60,4 +60,4 @@ PERCENT_T_DICT = {
     "4":0.05,
     "5":0.1}
 
-USED_PATH_STORAGE_FILE = "test.txt"
+USED_PATH_STORAGE_FILE = "exp_20_for_multi_class.txt"

@@ -162,8 +162,8 @@ class GMICTrainer(pl.LightningModule):
         self._metrics('val', y_fusion, y)
         self.log("val_loss", loss, on_epoch=True, sync_dist=True)
         self.log('hp_metric', loss, sync_dist=True)
-        # if batch_idx == self.current_epoch and self.current_epoch % 10 == 0:
-        #     self._visualize_results(mode="valid", img=img, y=y, path=path, idx=batch_idx, log=True)
+        if batch_idx == self.current_epoch and self.current_epoch % 10 == 0:
+            self._visualize_results(mode="valid", img=img, y=y, path=path, idx=batch_idx, log=True)
         return loss
 
     def test_step(self, batch, batch_idx):

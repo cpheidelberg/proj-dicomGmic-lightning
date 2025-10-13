@@ -32,7 +32,7 @@ def run_training(parameters):
         model_path=parameters["model_path"]
     )
 
-    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="db_score_from_20_epochs_checkpoint", log_graph=False)
+    logger = pl.loggers.TensorBoardLogger("optuna_logs", name="db_exp_20_for_multi_class", log_graph=False)
     # logger = pl.loggers.WandbLogger(project="GMIC", log_model=True) # , name=config["wandb_name"]
 
     trainer = pl.Trainer(
