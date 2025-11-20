@@ -87,6 +87,7 @@ def visualize_example(img, path, saliency_maps, seg_masks, patch_locations, patc
         subfigure.set_title("$\\alpha_{0} = ${1:.2f}".format(crop_idx, patch_attentions[crop_idx]))
 
     if save_path is not None:
+        print(save_path)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, bbox_inches='tight', format="png", dpi=500)
     plt.close()
@@ -106,7 +107,7 @@ def save_saliency_maps(img, saliency_maps, folder, filename, parameters):
         process_saliency_map(img, maps, window_location, folder, filename, parameters["class_names"][i], parameters["turn_on_visualization"])
 
 
-def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization):
+def process_saliency_map(input_img, saliency_map, window_location, folder, filename, label, turn_on_visualization, save=True):
     contours, _ = cv2.findContours(saliency_map, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
     os.makedirs(folder, exist_ok=True)
@@ -148,21 +149,24 @@ def process_saliency_map(input_img, saliency_map, window_location, folder, filen
             p[0] -= window_location[2]
             p[1] -= window_location[0]
 
-        with open(os.path.join(folder, "{0}_polyline_{1}_{2}.txt".format(filename, label, i)), 'w') as f:
-            f.write(f"Saliency Map:\n")
-            for point in polyline:
-                f.write(f"{point[0]}, {point[1]}\n")
-            f.write("---\n")
-        
-        if turn_on_visualization:
-            image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
-            # plt.imshow(input_img, cmap='gray', aspect='equal')
-            plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
-            print("Polyline saved to: {}".format(os.path.join(folder, "{}_seg_{}_{}.png".format(filename, label, i))))
-            plt.savefig(os.path.join(folder, "{0}_seg_{1}_{2}.png".format(filename, label, i)))
+        if save:
+            with open(os.path.join(folder, "{0}_polyline_{1}_{2}.txt".format(filename, label, i)), 'w') as f:
+                f.write(f"Saliency Map:\n")
+                for point in polyline:
+                    f.write(f"{point[0]}, {point[1]}\n")
+                f.write("---\n")
+            
+            if turn_on_visualization:
+                image_with_contours = cv2.drawContours(saliency_map.copy(), [contour], -1, 255, 3)
+                # plt.imshow(input_img, cmap='gray', aspect='equal')
+                plt.imshow(image_with_contours, alpha=0.5, cmap="gray")
+                print("Polyline saved to: {}".format(os.path.join(folder, "{}_seg_{}_{}.png".format(filename, label, i))))
+                plt.savefig(os.path.join(folder, "{0}_seg_{1}_{2}.png".format(filename, label, i)))
 
     if not contours:
         print(filename, "\n\tNo contours found in the saliency map.")
+
+    
 
 
 if __name__ == "__main__":
