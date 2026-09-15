@@ -19,7 +19,12 @@
 
 import cv2
 import numpy as np
+import albumentations as alb
 
+import sys, os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = "/".join(current_dir.split("/")[:-2])
+sys.path.append(parent_dir)
 from src.constants import VIEWS
 
 
@@ -264,3 +269,15 @@ def random_augmentation_best_center(image, input_size, random_number_generator, 
         return sampled_joint_image[:, :, 0], None
     else:
         return sampled_joint_image[:, :, 0], sampled_joint_image[:, :, 1:]
+
+
+
+def augment_image(x, augment: bool):
+    transform = alb.Compose([
+        alb.RandomResizedCrop((2944, 1920), scale=(0.95, 1), p=0.3), 
+        alb.RandomBrightnessContrast(brightness_limit=(0.1, 0.1), contrast_limit=(0.1, 0.1), p=0.3), 
+    ])
+    if augment:
+        return transform(image=x)['image']
+    else:
+        return x

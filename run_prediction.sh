@@ -5,24 +5,26 @@ DEVICE_TYPE='cpu'
 GPU_NUMBER=0
 MODEL_INDEX='2'
 
-MODEL_PATH='models/'
-DICOM_FOLDER='sample_data/dicom_exams'
+MODEL_PATH="models/"
+MODEL_PATH="tb_logs/GMIC_transfer/version_16/checkpoints/epoch=127-step=243200.ckpt"
+DICOM_FOLDER='sample_data_vindr/dicom_exams'
 DICOM_FILE='1-1.dcm'
 # DICOM_FILE='Example-Image.dcm'
-DATA_FOLDER='sample_data/images'
-INITIAL_EXAM_LIST_PATH='sample_data/exam_list.pkl'
-CROPPED_IMAGE_PATH='sample_output/cropped_images'
-CROPPED_EXAM_LIST_PATH='sample_output/cropped_images/cropped_exam_list.pkl'
-SEG_PATH='sample_output/segmentation'
-EXAM_LIST_PATH='sample_output/data.pkl'
-OUTPUT_PATH='sample_output'
+DATA_FOLDER='sample_data_vindr/images'
+INITIAL_EXAM_LIST_PATH='sample_data_vindr/exam_list.pkl'
+CROPPED_IMAGE_PATH='sample_data_vindr/cropped_images'
+CROPPED_EXAM_LIST_PATH='sample_data_vindr/cropped_images/cropped_exam_list.pkl'
+SEG_PATH='sample_data_vindr/segmentation'
+EXAM_LIST_PATH='sample_data_vindr/data.pkl'
+OUTPUT_PATH='sample_data_vindr'
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
 start_time=$(date +%s)
 
 # echo 'Stage 1: Convert DICOM exams'
-# python3 src/dicom/convert_dicom.py \
+# # use convert_dicom.py for DBT dataset, convert_dicom2.py script for vindr dataset
+# python3 src/dicom/convert_dicom2.py \
 #     --dicom-data-folder $DICOM_FOLDER \
 #     --dicom-file $DICOM_FILE \
 #     --image-data-folder $DATA_FOLDER \
@@ -43,25 +45,25 @@ start_time=$(date +%s)
 #     --output-exam-list-path $EXAM_LIST_PATH \
 #     --num-processes $NUM_PROCESSES
 
-# echo 'Stage 4: Run Classifier'
+echo 'Stage 4: Run Classifier'
 # python3 src/scripts/run_model.py \
-#     --model-path $MODEL_PATH \
-#     --dicom-file $DICOM_FILE \
-#     --data-path $EXAM_LIST_PATH \
-#     --image-path $CROPPED_IMAGE_PATH \
-#     --segmentation-path $SEG_PATH \
-#     --output-path $OUTPUT_PATH \
-#     --device-type $DEVICE_TYPE \
-#     --gpu-number $GPU_NUMBER \
-#     --model-index $MODEL_INDEX \
-#     --visualization-flag
+python3 src/scripts/test_model.py \
+     --model-path $MODEL_PATH \
+     --dicom-file $DICOM_FILE \
+     --data-path $EXAM_LIST_PATH \
+     --image-path $CROPPED_IMAGE_PATH \
+     --segmentation-path $SEG_PATH \
+     --output-path $OUTPUT_PATH \
+     --device-type $DEVICE_TYPE \
+     --gpu-number $GPU_NUMBER \
+     --visualization-flag
 
-echo 'Stage 5: Create DICOM SR exams'
-python3 src/dicom/create_dicomsr.py \
-    --segmentation-path $SEG_PATH \
-    --result-path $OUTPUT_PATH \
-    --dicom-file $DICOM_FILE \
-    --exam-list-path $INITIAL_EXAM_LIST_PATH \
+# echo 'Stage 5: Create DICOM SR exams'
+# python3 src/dicom/create_dicomsr.py \
+#     --segmentation-path $SEG_PATH \
+#     --result-path $OUTPUT_PATH \
+#     --dicom-file $DICOM_FILE \
+#     --exam-list-path $INITIAL_EXAM_LIST_PATH \
 
 end_time=$(date +%s)
 elapsed_time=$((end_time - start_time))
